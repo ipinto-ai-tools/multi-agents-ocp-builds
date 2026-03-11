@@ -9,11 +9,12 @@
 5. [Usage](#usage)
 6. [Architecture](#architecture)
 7. [Agent Details](#agent-details)
-8. [Tools Reference](#tools-reference)
-9. [Examples](#examples)
-10. [Troubleshooting](#troubleshooting)
-11. [Development](#development)
-12. [FAQ](#faq)
+8. [Jobs-to-be-Done (JTBD) Documentation](#jobs-to-be-done-jtbd-documentation)
+9. [Tools Reference](#tools-reference)
+10. [Examples](#examples)
+11. [Troubleshooting](#troubleshooting)
+12. [Development](#development)
+13. [FAQ](#faq)
 
 ---
 
@@ -529,6 +530,89 @@ print(f"\nRelease Notes:\n{result['release_notes']}")
 3. **Documentation Changes** - Specific updates to docs/user-guide.md, etc.
 4. **Upgrade Notes** - Version-specific migration guidance
 5. **Known Limitations** - Edge cases and current restrictions
+
+---
+
+## Jobs-to-be-Done (JTBD) Documentation
+
+Starting with release 1.8, the Docs Agent generates user-focused Jobs-to-be-Done documentation for every new feature or change.
+
+### What is JTBD Documentation?
+
+JTBD documentation is organized around the specific outcomes users are trying to achieve, rather than technical features. This structure allows users to quickly identify the necessary steps, examples, and troubleshooting information required to complete their tasks effectively.
+
+### JTBD Structure
+
+Each job includes:
+
+1. **Job Title** - Clear statement of what the user wants to accomplish
+   - Format: "When [situation], I want to [motivation], so I can [expected outcome]"
+
+2. **Context** - When and why users need this
+   - User persona
+   - Common scenarios
+   - Prerequisites
+
+3. **Steps to Complete** - Concrete, actionable steps
+   - Numbered steps with examples
+   - Code snippets
+   - Expected outputs
+
+4. **Troubleshooting** - Common issues and solutions
+   - Error messages and fixes
+   - Edge cases
+   - Validation steps
+
+5. **Related Jobs** - See also
+   - Related tasks
+   - Next steps
+
+### Using JTBD Output
+
+When you run the Docs Agent (or full orchestration), the output includes JTBD documentation:
+
+```python
+from agents.graph import orchestrate
+
+result = orchestrate(
+    title="Add timeout support to BuildRun",
+    description="Users need to specify build timeout to prevent hanging builds"
+)
+
+# Access JTBD documentation
+print(result["jtbd_documentation"])
+```
+
+### Example JTBD Output
+
+The JTBD documentation will look like:
+
+```markdown
+## Job: Prevent Build Runs from Hanging Indefinitely
+
+**Context:** When running long-running builds, I want to set a maximum timeout, so I can prevent builds from consuming resources indefinitely and ensure my CI/CD pipeline completes in a predictable timeframe.
+
+**Steps to Complete:**
+1. Update your BuildRun spec to include timeout field...
+2. Apply the configuration...
+3. Verify the timeout is enforced...
+
+**Troubleshooting:**
+- If timeout is ignored, check...
+- If builds terminate prematurely, increase...
+
+**Related Jobs:**
+- Configure build retries
+- Set up build notifications
+```
+
+### For Contributors
+
+When adding new features or changes:
+1. The Docs Agent will automatically generate JTBD documentation
+2. Review the generated JTBD content for accuracy
+3. Ensure all required sections are present
+4. Validate examples are runnable
 
 ---
 
