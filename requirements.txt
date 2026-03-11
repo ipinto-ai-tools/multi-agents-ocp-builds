@@ -1,2 +1,17 @@
-langgraph
-python-dotenv
+# Core AI/LLM dependencies
+anthropic>=0.40.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# Git operations
+GitPython>=3.1.0
+
+# YAML parsing for Kubernetes manifests
+pyyaml>=6.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

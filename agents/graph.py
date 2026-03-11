@@ -1,15 +1,208 @@
+"""LangGraph orchestrator for multi-agent workflow.
+
+This module implements the main orchestration workflow using LangGraph to coordinate
+the Design and Documentation agents in a stateful workflow.
+"""
+
+from typing import Any, Dict, Literal
+
+from langgraph.graph import StateGraph, END
+from graph.state import AgentState
 from agents.design_agent import run_design
-from agents.dev_agent import run_dev
-from agents.test_agent import run_tests
 from agents.docs_agent import run_docs
 
-def orchestrate(title, description):
 
-    result = {}
+def design_node(state: AgentState) -> Dict[str, Any]:
+    """Execute the Design Agent phase.
 
-    result.update(run_design(title, description))
-    result.update(run_dev(result))
-    result.update(run_tests(result))
-    result.update(run_docs(result))
+    Args:
+        state: Current agent state
 
-    return result
+    Returns:
+        Updated state with design analysis outputs
+    """
+    try:
+        # Run design agent
+        design_output = run_design(
+            title=state["issue_title"],
+            description=state["issue_description"],
+            repo_path=state.get("repo_path"),
+        )
+
+        # Update state with design outputs
+        return {
+            "design_analysis": design_output["design_analysis"],
+            "impacted_components": design_output["impacted_components"],
+            "risks": design_output["risks"],
+            "acceptance_criteria": design_output["acceptance_criteria"],
+            "implementation_plan": design_output.get("implementation_plan", []),
+            "current_phase": "design_complete",
+        }
+    except Exception as e:
+        return {
+            "design_analysis": f"Error in design phase: {str(e)}",
+            "current_phase": "error",
+        }
+
+
+def docs_node(state: AgentState) -> Dict[str, Any]:
+    """Execute the Documentation Agent phase.
+
+    Args:
+        state: Current agent state with design, dev, and test outputs
+
+    Returns:
+        Updated state with documentation outputs
+    """
+    try:
+        # Prepare context for docs agent
+        context = {
+            "design_analysis": state.get("design_analysis", ""),
+            "implementation_plan": state.get("implementation_plan", ""),
+            "impacted_components": state.get("impacted_components", []),
+            "risks": state.get("risks", []),
+            "acceptance_criteria": state.get("acceptance_criteria", []),
+            "code_changes": state.get("code_changes", {}),
+            "files_modified": state.get("files_modified", []),
+            "test_results": state.get("test_results", {}),
+            "test_summary": state.get("test_summary", ""),
+            "coverage_gaps": state.get("coverage_gaps", []),
+            "test_failures": state.get("test_failures", []),
+            "issue_title": state.get("issue_title", ""),
+            "issue_description": state.get("issue_description", ""),
+            "issue_type": state.get("issue_type", "feature"),
+        }
+
+        # Run docs agent
+        docs_output = run_docs(context)
+
+        # Update state with documentation outputs
+        return {
+            "pr_summary": docs_output["pr_summary"],
+            "release_notes": docs_output["release_notes"],
+            "docs_changes": docs_output["docs_changes"],
+            "current_phase": "done",
+        }
+    except Exception as e:
+        return {
+            "pr_summary": f"Error in docs phase: {str(e)}",
+            "current_phase": "error",
+        }
+
+
+def should_continue(state: AgentState) -> Literal["docs", "end"]:
+    """Determine if workflow should continue to docs phase.
+
+    Args:
+        state: Current agent state
+
+    Returns:
+        Next node name or END
+    """
+    phase = state.get("current_phase", "")
+
+    # If design completed successfully, proceed to docs
+    if phase == "design_complete":
+        return "docs"
+
+    # Otherwise, end the workflow
+    return "end"
+
+
+def build_workflow() -> StateGraph:
+    """Build the LangGraph workflow.
+
+    Returns:
+        Compiled LangGraph workflow
+    """
+    # Create the graph
+    workflow = StateGraph(AgentState)
+
+    # Add nodes
+    workflow.add_node("design", design_node)
+    workflow.add_node("docs", docs_node)
+
+    # Set entry point
+    workflow.set_entry_point("design")
+
+    # Add conditional edges
+    workflow.add_conditional_edges(
+        "design",
+        should_continue,
+        {
+            "docs": "docs",
+            "end": END,
+        }
+    )
+
+    # Add edge from docs to END
+    workflow.add_edge("docs", END)
+
+    # Compile the graph
+    return workflow.compile()
+
+
+# Create the compiled graph
+graph = build_workflow()
+
+
+def orchestrate(
+    title: str,
+    description: str,
+    repo_path: str = None,
+    issue_type: str = "feature",
+) -> Dict[str, Any]:
+    """Orchestrate the multi-agent workflow.
+
+    This function runs the complete workflow from design analysis through
+    documentation generation using LangGraph state management.
+
+    Args:
+        title: GitHub issue title
+        description: GitHub issue description
+        repo_path: Optional path to the repository for code analysis
+        issue_type: Type of issue (bug, feature, refactor, docs)
+
+    Returns:
+        Final state containing all agent outputs
+
+    Example:
+        >>> result = orchestrate(
+        ...     title="Add timeout support",
+        ...     description="Users need build timeout configuration",
+        ...     repo_path="/path/to/repo"
+        ... )
+        >>> print(result["design_analysis"])
+        >>> print(result["pr_summary"])
+    """
+    # Initialize state
+    initial_state = {
+        "issue_title": title,
+        "issue_description": description,
+        "issue_type": issue_type,
+        "repo_path": repo_path or "",
+        "target_branch": "main",
+        "current_phase": "init",
+        "approval_status": "pending",
+        "messages": [],
+        # Initialize optional fields
+        "design_analysis": "",
+        "impacted_components": [],
+        "risks": [],
+        "acceptance_criteria": [],
+        "implementation_plan": "",
+        "code_changes": {},
+        "files_modified": [],
+        "test_results": {},
+        "test_summary": "",
+        "coverage_gaps": [],
+        "test_failures": [],
+        "pr_summary": "",
+        "release_notes": "",
+        "docs_changes": {},
+    }
+
+    # Run the workflow
+    final_state = graph.invoke(initial_state)
+
+    return final_state
