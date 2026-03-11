@@ -1,23 +1,39 @@
 """Documentation Agent for the OpenShift Build API multi-agent system.
 
 This agent generates documentation artifacts including PR summaries, release notes,
-documentation changes, and upgrade notes based on design, development, and test outputs.
+documentation changes, upgrade notes, and high-level design documents.
+
+Enhanced with:
+- Agentic RAG for fetching relevant documentation and code examples
+- SHIP format output (Solution, Highlight, Impact, Plan)
+- Input file support for context-aware documentation
+- High-level design generation for implementation guidance
 """
 
 import json
 import os
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from anthropic import Anthropic, APIError
 from config.agent_prompts import DOCS_AGENT_PROMPT
+from tools.rag_search import RAGSearch, RAGSearchError
 
 
-def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
+def run_docs(
+    context: Dict[str, Any],
+    input_files: Optional[List[str]] = None,
+    output_format: str = "standard",
+    enable_rag: bool = True
+) -> Dict[str, Any]:
     """Generate documentation based on design, development, and test outputs.
 
     This function uses Claude API to analyze the complete context from previous
     agent phases (design analysis, code changes, test results) and generates
     comprehensive documentation artifacts.
+
+    Enhanced with RAG capabilities to fetch relevant documentation, code examples,
+    and API usage patterns from the repository.
 
     Args:
         context: Dictionary containing outputs from previous agents with keys:
@@ -30,6 +46,10 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
             - issue_title: str - Original issue title
             - issue_description: str - Original issue description
             - issue_type: str - Type of issue (bug, feature, etc.)
+            - repo_path: str - Path to repository (required for RAG)
+        input_files: Optional list of file paths to include as context
+        output_format: Output format - "standard", "ship", "jtbd", or "all"
+        enable_rag: Enable RAG for fetching relevant documentation
 
     Returns:
         Dictionary with documentation outputs:
@@ -39,6 +59,9 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
             - upgrade_notes: str - Version upgrade considerations
             - known_limitations: str - Limitations and edge cases
             - jtbd_documentation: str - Jobs-to-be-Done format documentation
+            - ship_document: str - SHIP format document (if requested)
+            - high_level_design: str - Comprehensive design for implementation
+            - input_files_analyzed: list - List of files processed
 
     Raises:
         ValueError: If required context is missing
@@ -58,8 +81,29 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
             "Please set it to use the Documentation Agent."
         )
 
+    # Initialize RAG search if enabled
+    rag_context = {}
+    if enable_rag and "repo_path" in context:
+        try:
+            rag_context = _fetch_rag_context(context, input_files)
+        except RAGSearchError as e:
+            print(f"Warning: RAG search failed: {e}. Continuing without RAG context.")
+
+    # Process input files if provided
+    input_file_context = {}
+    if input_files:
+        input_file_context = _process_input_files(
+            input_files,
+            context.get("repo_path", ".")
+        )
+
     # Build context message for Claude
-    context_message = _build_context_message(context)
+    context_message = _build_context_message(
+        context,
+        rag_context,
+        input_file_context,
+        output_format
+    )
 
     # Initialize Anthropic client
     client = Anthropic(api_key=api_key)
@@ -68,7 +112,7 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
         # Call Claude API
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4096,
+            max_tokens=8192,  # Increased for comprehensive documentation
             system=DOCS_AGENT_PROMPT,
             messages=[
                 {
@@ -83,7 +127,12 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
         response_text = response.content[0].text
 
         # Parse structured output
-        docs_output = _parse_docs_response(response_text)
+        docs_output = _parse_docs_response(response_text, output_format)
+
+        # Add metadata about processing
+        docs_output["input_files_analyzed"] = input_files or []
+        docs_output["rag_enabled"] = enable_rag
+        docs_output["output_format"] = output_format
 
         return docs_output
 
@@ -93,11 +142,168 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
         raise RuntimeError(f"Unexpected error in docs agent: {e}") from e
 
 
-def _build_context_message(context: Dict[str, Any]) -> str:
+def _fetch_rag_context(
+    context: Dict[str, Any],
+    input_files: Optional[List[str]] = None
+) -> Dict[str, Any]:
+    """Fetch relevant context using RAG search.
+
+    Args:
+        context: Agent context with repo_path and files_modified
+        input_files: Optional input files to analyze
+
+    Returns:
+        Dictionary with RAG context:
+            - related_docs: List of related documentation
+            - code_examples: List of code examples
+            - api_patterns: List of API usage patterns
+            - similar_implementations: List of similar code
+    """
+    repo_path = context.get("repo_path")
+    if not repo_path:
+        return {}
+
+    rag_search = RAGSearch(repo_path)
+    rag_context: Dict[str, Any] = {}
+
+    # Search Shipwright documentation
+    if "issue_title" in context:
+        doc_matches = rag_search.search_shipwright_docs(
+            query=context["issue_title"],
+            max_results=3
+        )
+        rag_context["related_docs"] = [
+            {
+                "file": match.file_path,
+                "section": match.section_title,
+                "content": match.content[:500]  # First 500 chars
+            }
+            for match in doc_matches
+        ]
+
+    # Extract code examples from modified files or input files
+    files_to_analyze = input_files or context.get("files_modified", [])
+    if files_to_analyze:
+        code_examples = rag_search.extract_code_examples(files_to_analyze)
+        rag_context["code_examples"] = [
+            {
+                "file": ex.file_path,
+                "language": ex.language,
+                "context": ex.context,
+                "code": ex.code[:300]  # First 300 chars
+            }
+            for ex in code_examples[:5]  # Top 5 examples
+        ]
+
+    # Search for similar implementations
+    if files_to_analyze:
+        similar = rag_search.search_similar_code(
+            reference_files=files_to_analyze[:3],  # Top 3 files
+            max_results=5
+        )
+        rag_context["similar_implementations"] = [
+            {"file": res.file_path, "line": res.line_number}
+            for res in similar
+        ]
+
+    # Find API usage patterns (extract from design analysis)
+    api_names = _extract_api_names(context.get("design_analysis", ""))
+    if api_names:
+        api_patterns = rag_search.search_api_patterns(
+            api_names=api_names[:3],  # Top 3 APIs
+            file_pattern="**/*.go"
+        )
+        rag_context["api_patterns"] = [
+            {
+                "api": pattern.api_name,
+                "file": pattern.file_path,
+                "type": pattern.pattern_type,
+                "code": pattern.usage_code[:200]
+            }
+            for pattern in api_patterns[:5]  # Top 5 patterns
+        ]
+
+    return rag_context
+
+
+def _extract_api_names(design_text: str) -> List[str]:
+    """Extract API/type names from design text.
+
+    Args:
+        design_text: Design analysis text
+
+    Returns:
+        List of API/type names
+    """
+    import re
+
+    # Look for capitalized identifiers (likely type names)
+    # Pattern: words that start with capital letter and have at least 2 more letters
+    api_names = re.findall(r'\b([A-Z][a-z]+[A-Z]\w+)\b', design_text)
+
+    # Also look for explicitly mentioned APIs
+    # Pattern: "the XYZ API" or "XYZ spec"
+    explicit_apis = re.findall(r'\b([A-Z][a-zA-Z0-9]+)\s+(?:API|spec|controller|CRD)\b', design_text)
+
+    # Combine and deduplicate
+    all_apis = list(set(api_names + explicit_apis))
+
+    return all_apis[:10]  # Return top 10
+
+
+def _process_input_files(
+    input_files: List[str],
+    repo_path: str
+) -> Dict[str, Any]:
+    """Process input files to extract context.
+
+    Args:
+        input_files: List of file paths
+        repo_path: Repository root path
+
+    Returns:
+        Dictionary with input file context
+    """
+    repo_root = Path(repo_path)
+    input_context: Dict[str, Any] = {}
+    file_contents = {}
+
+    for file_path in input_files:
+        full_path = repo_root / file_path
+
+        if not full_path.exists():
+            continue
+
+        try:
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Truncate large files
+            if len(content) > 5000:
+                content = content[:5000] + "\n... (truncated)"
+
+            file_contents[file_path] = content
+
+        except (IOError, UnicodeDecodeError) as e:
+            file_contents[file_path] = f"Error reading file: {e}"
+
+    input_context["file_contents"] = file_contents
+    return input_context
+
+
+def _build_context_message(
+    context: Dict[str, Any],
+    rag_context: Dict[str, Any],
+    input_file_context: Dict[str, Any],
+    output_format: str
+) -> str:
     """Build a comprehensive context message for the documentation agent.
 
     Args:
         context: Dictionary with outputs from previous agents
+        rag_context: RAG search results
+        input_file_context: Processed input file context
+        output_format: Requested output format
 
     Returns:
         Formatted context message for Claude
@@ -157,32 +363,108 @@ def _build_context_message(context: Dict[str, Any]) -> str:
         failures = "\n".join(f"- {failure}" for failure in context["test_failures"])
         message_parts.append(f"## Test Failures\n{failures}\n")
 
-    # Request documentation generation
-    message_parts.append(
-        "\n---\n\n"
+    # RAG context
+    if rag_context:
+        message_parts.append("\n## RAG Context (Retrieved Documentation & Examples)\n")
+
+        if "related_docs" in rag_context and rag_context["related_docs"]:
+            message_parts.append("### Related Documentation\n")
+            for doc in rag_context["related_docs"]:
+                message_parts.append(
+                    f"**{doc['file']}** - {doc['section']}\n"
+                    f"{doc['content']}\n"
+                )
+
+        if "code_examples" in rag_context and rag_context["code_examples"]:
+            message_parts.append("### Code Examples\n")
+            for example in rag_context["code_examples"]:
+                message_parts.append(
+                    f"**{example['file']}** ({example['language']}) - {example['context']}\n"
+                    f"```{example['language']}\n{example['code']}\n```\n"
+                )
+
+        if "api_patterns" in rag_context and rag_context["api_patterns"]:
+            message_parts.append("### API Usage Patterns\n")
+            for pattern in rag_context["api_patterns"]:
+                message_parts.append(
+                    f"**{pattern['api']}** - {pattern['type']} in {pattern['file']}\n"
+                    f"```go\n{pattern['code']}\n```\n"
+                )
+
+    # Input file context
+    if input_file_context and "file_contents" in input_file_context:
+        message_parts.append("\n## Input Files Provided\n")
+        for file_path, content in input_file_context["file_contents"].items():
+            message_parts.append(f"### {file_path}\n```\n{content}\n```\n")
+
+    # Request documentation generation based on format
+    message_parts.append("\n---\n\n")
+    message_parts.append(_get_generation_request(output_format))
+
+    return "\n".join(message_parts)
+
+
+def _get_generation_request(output_format: str) -> str:
+    """Get documentation generation request based on format.
+
+    Args:
+        output_format: Requested output format
+
+    Returns:
+        Generation request text
+    """
+    base_request = (
         "Based on the above context, generate comprehensive documentation including:\n"
         "1. PR Summary - concise pull request description\n"
         "2. Release Notes - user-facing changelog entry\n"
         "3. Documentation Changes - specific doc updates needed\n"
         "4. Upgrade Notes - version-specific upgrade guidance\n"
         "5. Known Limitations - edge cases or limitations\n"
-        "6. JTBD Documentation - Jobs-to-be-Done format with:\n"
+        "6. High-Level Design - comprehensive design document for implementation\n"
+    )
+
+    jtbd_request = (
+        "7. JTBD Documentation - Jobs-to-be-Done format with:\n"
         "   - Job title (what the user wants to accomplish)\n"
         "   - Context (when/why they need this)\n"
         "   - Steps to complete the job (with examples)\n"
         "   - Troubleshooting (common issues and solutions)\n"
-        "   - Related jobs (see also)\n\n"
-        "Format your response with clear section headers."
+        "   - Related jobs (see also)\n"
     )
 
-    return "\n".join(message_parts)
+    ship_request = (
+        "8. SHIP Document - Structured as:\n"
+        "   - **Solution**: What is being built and why\n"
+        "   - **Highlight**: Key features, benefits, and differentiators\n"
+        "   - **Impact**: Who is affected and how (users, operators, developers)\n"
+        "   - **Plan**: Implementation roadmap with phases and milestones\n"
+    )
+
+    if output_format == "standard":
+        return base_request + "\nFormat your response with clear section headers."
+
+    elif output_format == "jtbd":
+        return base_request + jtbd_request + "\nFormat your response with clear section headers."
+
+    elif output_format == "ship":
+        return base_request + ship_request + "\nFormat your response with clear section headers."
+
+    elif output_format == "all":
+        return (
+            base_request + jtbd_request + ship_request +
+            "\nFormat your response with clear section headers."
+        )
+
+    else:
+        return base_request + "\nFormat your response with clear section headers."
 
 
-def _parse_docs_response(response_text: str) -> Dict[str, Any]:
+def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, Any]:
     """Parse Claude's response into structured documentation output.
 
     Args:
         response_text: Raw text response from Claude API
+        output_format: Requested output format
 
     Returns:
         Dictionary with structured documentation sections
@@ -195,6 +477,8 @@ def _parse_docs_response(response_text: str) -> Dict[str, Any]:
         "upgrade_notes": "",
         "known_limitations": "",
         "jtbd_documentation": "",
+        "ship_document": "",
+        "high_level_design": "",
     }
 
     # Split response into sections
@@ -205,7 +489,14 @@ def _parse_docs_response(response_text: str) -> Dict[str, Any]:
     output["release_notes"] = sections.get("release note", "").strip()
     output["upgrade_notes"] = sections.get("upgrade note", "").strip()
     output["known_limitations"] = sections.get("known limitation", "").strip()
-    output["jtbd_documentation"] = sections.get("jtbd documentation", "").strip()
+    output["high_level_design"] = sections.get("high-level design", sections.get("high level design", "")).strip()
+
+    # Format-specific sections
+    if output_format in ("jtbd", "all"):
+        output["jtbd_documentation"] = sections.get("jtbd documentation", "").strip()
+
+    if output_format in ("ship", "all"):
+        output["ship_document"] = sections.get("ship document", "").strip()
 
     # Parse documentation changes
     docs_section = sections.get("documentation change", "")

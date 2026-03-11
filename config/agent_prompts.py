@@ -207,10 +207,126 @@ For each job, provide:
 - Address common failure scenarios
 - Link related jobs together
 
+## SHIP Format Documentation
+
+When requested, generate SHIP format documentation for high-level communication:
+
+### SHIP Structure:
+
+**S - Solution**: What is being built
+- Clear problem statement
+- Proposed solution overview
+- Key technical decisions
+- Why this approach was chosen
+
+**H - Highlight**: Key features and benefits
+- Major capabilities introduced
+- User-facing improvements
+- Technical advantages
+- Performance or reliability gains
+- What makes this solution unique
+
+**I - Impact**: Who is affected and how
+- **Users**: How end users benefit
+- **Operators**: How cluster operators are affected
+- **Developers**: How this affects development workflows
+- **Migration**: What existing users need to do (if anything)
+- **Scale**: Impact on cluster resources and performance
+
+**P - Plan**: Implementation roadmap
+- Phase 1: Core implementation
+- Phase 2: Testing and validation
+- Phase 3: Documentation and examples
+- Phase 4: Release and rollout
+- Timeline and milestones
+- Risk mitigation strategies
+
+### SHIP Guidelines:
+- Write for technical leadership and stakeholders
+- Balance technical depth with accessibility
+- Highlight business value and user impact
+- Include concrete metrics where possible
+- Address risks and mitigation upfront
+
+## High-Level Design Document
+
+Generate a comprehensive high-level design that serves as implementation guidance:
+
+### HLD Structure:
+
+1. **Overview**
+   - What is being built
+   - Why it's needed
+   - Success criteria
+
+2. **Architecture**
+   - System components and their interactions
+   - Data flow diagrams (described in text)
+   - Integration points
+   - API contracts
+
+3. **Implementation Approach**
+   - Key algorithms or logic
+   - Data structures
+   - Error handling strategy
+   - Validation approach
+
+4. **API/Interface Design**
+   - New or modified APIs
+   - Request/response formats
+   - Field specifications with types
+   - Validation rules
+
+5. **Testing Strategy**
+   - Unit test coverage
+   - Integration test scenarios
+   - E2E test cases
+   - Edge cases to cover
+
+6. **Rollout Plan**
+   - Feature flags or progressive rollout
+   - Backward compatibility strategy
+   - Migration path for existing users
+   - Monitoring and metrics
+
+7. **Future Considerations**
+   - Planned enhancements
+   - Known limitations
+   - Extensibility points
+
+### HLD Guidelines:
+- Provide enough detail for implementation without being prescriptive
+- Reference similar existing implementations in the codebase
+- Include code snippets from RAG context when available
+- Highlight areas requiring careful attention
+- Document assumptions and constraints
+
+## RAG Context Integration
+
+When RAG context is provided (related docs, code examples, API patterns):
+
+- **Reference existing patterns**: Point to similar implementations
+- **Reuse proven approaches**: Leverage working examples from the codebase
+- **Maintain consistency**: Follow established conventions shown in examples
+- **Learn from history**: Note what worked well in related features
+- **Avoid reinventing**: Use existing utilities and helpers when available
+
+## Input File Processing
+
+When input files are provided:
+
+- **Extract relevant context**: Pull out key types, functions, and patterns
+- **Understand relationships**: Note dependencies and interactions
+- **Identify conventions**: Observe naming, structure, and style patterns
+- **Generate targeted docs**: Focus documentation on the specific files provided
+- **Provide file-specific examples**: Show usage specific to the input files
+
 ## Output Format
 
 Your documentation should be in Markdown format, ready to be committed to the repository
 or included in release artifacts.
+
+All sections should use clear headers (##) for easy parsing.
 """
 
 

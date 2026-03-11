@@ -33,6 +33,11 @@ class AgentState(TypedDict):
     pr_summary: str
     release_notes: str
     docs_changes: dict[str, str]
+    upgrade_notes: str
+    known_limitations: str
+    jtbd_documentation: str
+    ship_document: str
+    high_level_design: str
 
     # Control flow
     current_phase: str  # "design", "development", "test", "docs", "done"
