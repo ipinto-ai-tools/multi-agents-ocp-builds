@@ -17,6 +17,7 @@ An intelligent, autonomous system that:
 - Analyzes feature requests and bug reports using Claude AI
 - Identifies impacted components across the Shipwright codebase
 - Generates comprehensive design documents with risk assessment
+- Creates Ginkgo v2 test suites with Data-Driven Testing patterns
 - Produces PR summaries, release notes, and documentation changes
 - Orchestrates multi-agent workflows with state management
 - Provides domain expertise in Shipwright Build architecture
@@ -828,26 +829,20 @@ uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
 
 **Design Analysis:**
 ```bash
-uv run python -m agents.design_agent \
+uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
-  --description "Users need to specify timeouts for build execution" \
-  --components buildrun_api,buildrun_controller
+  --description "Users need to specify timeouts for build execution"
 ```
 
-**Documentation Generation:**
+**Full Orchestration with Dashboard:**
 ```bash
-uv run python -m agents.docs_agent \
-  --design-doc /path/to/design.md \
-  --code-changes /path/to/diff.txt \
-  --test-results /path/to/test-output.txt
-```
+# Terminal 1: Start dashboard
+uv run python scripts/run_dashboard.py
 
-**Full Orchestration:**
-```bash
-uv run python -m scripts.orchestrate \
+# Terminal 2: Run workflow
+uv run scripts/orchestrate.py \
   --title "Feature Request" \
-  --description "Add new capability" \
-  --components build_api
+  --description "Add new capability"
 ```
 
 ### 4. Integrate with Workflows
@@ -870,7 +865,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           uv pip install -r requirements.txt
-          uv run python -m agents.design_agent \
+          uv run scripts/orchestrate.py \
             --title "${{ github.event.issue.title }}" \
             --description "${{ github.event.issue.body }}"
 ```

@@ -5,11 +5,14 @@ the Design and Documentation agents in a stateful workflow.
 """
 
 from typing import Any, Dict, Literal
+import uuid
 
 from langgraph.graph import StateGraph, END
 from graph.state import AgentState
 from agents.design_agent import run_design
+from agents.testing_agent import run_testing
 from agents.docs_agent import run_docs
+from dashboard.heartbeat import emit_heartbeat
 
 
 def design_node(state: AgentState) -> Dict[str, Any]:
@@ -30,7 +33,7 @@ def design_node(state: AgentState) -> Dict[str, Any]:
         )
 
         # Update state with design outputs
-        return {
+        updated_state = {
             "design_analysis": design_output["design_analysis"],
             "impacted_components": design_output["impacted_components"],
             "risks": design_output["risks"],
@@ -38,11 +41,78 @@ def design_node(state: AgentState) -> Dict[str, Any]:
             "implementation_plan": design_output.get("implementation_plan", []),
             "current_phase": "design_complete",
         }
+
+        # Emit heartbeat to dashboard
+        complete_state = {**state, **updated_state}
+        emit_heartbeat("design", complete_state)
+
+        return updated_state
     except Exception as e:
-        return {
+        error_state = {
             "design_analysis": f"Error in design phase: {str(e)}",
             "current_phase": "error",
         }
+
+        # Emit error heartbeat
+        complete_state = {**state, **error_state}
+        emit_heartbeat("design", complete_state)
+
+        return error_state
+
+
+def testing_node(state: AgentState) -> Dict[str, Any]:
+    """Execute the Testing Agent phase.
+
+    Args:
+        state: Current agent state with design outputs
+
+    Returns:
+        Updated state with testing outputs
+    """
+    try:
+        # Prepare context for testing agent
+        context = {
+            "design_analysis": state.get("design_analysis", ""),
+            "impacted_components": state.get("impacted_components", []),
+            "acceptance_criteria": state.get("acceptance_criteria", []),
+            "risks": state.get("risks", []),
+            "implementation_plan": state.get("implementation_plan", ""),
+            "issue_title": state.get("issue_title", ""),
+            "issue_description": state.get("issue_description", ""),
+            "issue_type": state.get("issue_type", "feature"),
+        }
+
+        # Run testing agent
+        testing_output = run_testing(context)
+
+        # Update state with testing outputs
+        updated_state = {
+            "test_plan": testing_output["test_plan"],
+            "test_specifications": testing_output["test_specifications"],
+            "unit_tests": testing_output["unit_tests"],
+            "integration_tests": testing_output["integration_tests"],
+            "e2e_tests": testing_output["e2e_tests"],
+            "test_summary": testing_output["test_summary"],
+            "coverage_analysis": testing_output["coverage_analysis"],
+            "current_phase": "testing_complete",
+        }
+
+        # Emit heartbeat to dashboard
+        complete_state = {**state, **updated_state}
+        emit_heartbeat("testing", complete_state)
+
+        return updated_state
+    except Exception as e:
+        error_state = {
+            "test_plan": f"Error in testing phase: {str(e)}",
+            "current_phase": "error",
+        }
+
+        # Emit error heartbeat
+        complete_state = {**state, **error_state}
+        emit_heartbeat("testing", complete_state)
+
+        return error_state
 
 
 def docs_node(state: AgentState) -> Dict[str, Any]:
@@ -68,6 +138,12 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
             "test_summary": state.get("test_summary", ""),
             "coverage_gaps": state.get("coverage_gaps", []),
             "test_failures": state.get("test_failures", []),
+            "test_plan": state.get("test_plan", ""),
+            "test_specifications": state.get("test_specifications", {}),
+            "unit_tests": state.get("unit_tests", {}),
+            "integration_tests": state.get("integration_tests", {}),
+            "e2e_tests": state.get("e2e_tests", {}),
+            "coverage_analysis": state.get("coverage_analysis", ""),
             "issue_title": state.get("issue_title", ""),
             "issue_description": state.get("issue_description", ""),
             "issue_type": state.get("issue_type", "feature"),
@@ -77,21 +153,33 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
         docs_output = run_docs(context)
 
         # Update state with documentation outputs
-        return {
+        updated_state = {
             "pr_summary": docs_output["pr_summary"],
             "release_notes": docs_output["release_notes"],
             "docs_changes": docs_output["docs_changes"],
             "current_phase": "done",
         }
+
+        # Emit heartbeat to dashboard
+        complete_state = {**state, **updated_state}
+        emit_heartbeat("docs", complete_state)
+
+        return updated_state
     except Exception as e:
-        return {
+        error_state = {
             "pr_summary": f"Error in docs phase: {str(e)}",
             "current_phase": "error",
         }
 
+        # Emit error heartbeat
+        complete_state = {**state, **error_state}
+        emit_heartbeat("docs", complete_state)
 
-def should_continue(state: AgentState) -> Literal["docs", "end"]:
-    """Determine if workflow should continue to docs phase.
+        return error_state
+
+
+def should_continue(state: AgentState) -> Literal["testing", "docs", "end"]:
+    """Determine if workflow should continue to next phase.
 
     Args:
         state: Current agent state
@@ -101,8 +189,12 @@ def should_continue(state: AgentState) -> Literal["docs", "end"]:
     """
     phase = state.get("current_phase", "")
 
-    # If design completed successfully, proceed to docs
+    # If design completed successfully, proceed to testing
     if phase == "design_complete":
+        return "testing"
+
+    # If testing completed successfully, proceed to docs
+    if phase == "testing_complete":
         return "docs"
 
     # Otherwise, end the workflow
@@ -120,14 +212,25 @@ def build_workflow() -> StateGraph:
 
     # Add nodes
     workflow.add_node("design", design_node)
+    workflow.add_node("testing", testing_node)
     workflow.add_node("docs", docs_node)
 
     # Set entry point
     workflow.set_entry_point("design")
 
-    # Add conditional edges
+    # Add conditional edges from design
     workflow.add_conditional_edges(
         "design",
+        should_continue,
+        {
+            "testing": "testing",
+            "end": END,
+        }
+    )
+
+    # Add conditional edges from testing
+    workflow.add_conditional_edges(
+        "testing",
         should_continue,
         {
             "docs": "docs",
@@ -175,8 +278,12 @@ def orchestrate(
         >>> print(result["design_analysis"])
         >>> print(result["pr_summary"])
     """
+    # Generate session ID for dashboard tracking
+    session_id = str(uuid.uuid4())
+
     # Initialize state
     initial_state = {
+        "session_id": session_id,
         "issue_title": title,
         "issue_description": description,
         "issue_type": issue_type,
@@ -191,6 +298,12 @@ def orchestrate(
         "risks": [],
         "acceptance_criteria": [],
         "implementation_plan": "",
+        "test_plan": "",
+        "test_specifications": {},
+        "unit_tests": {},
+        "integration_tests": {},
+        "e2e_tests": {},
+        "coverage_analysis": "",
         "code_changes": {},
         "files_modified": [],
         "test_results": {},
@@ -201,6 +314,9 @@ def orchestrate(
         "release_notes": "",
         "docs_changes": {},
     }
+
+    # Emit initial heartbeat
+    emit_heartbeat("orchestrator", initial_state)
 
     # Run the workflow
     final_state = graph.invoke(initial_state)

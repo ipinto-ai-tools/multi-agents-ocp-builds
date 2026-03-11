@@ -7,14 +7,15 @@
 3. [Installation](#installation)
 4. [Configuration](#configuration)
 5. [Usage](#usage)
-6. [Architecture](#architecture)
-7. [Agent Details](#agent-details)
-8. [Jobs-to-be-Done (JTBD) Documentation](#jobs-to-be-done-jtbd-documentation)
-9. [Tools Reference](#tools-reference)
-10. [Examples](#examples)
-11. [Troubleshooting](#troubleshooting)
-12. [Development](#development)
-13. [FAQ](#faq)
+6. [Dashboard](#dashboard)
+7. [Architecture](#architecture)
+8. [Agent Details](#agent-details)
+9. [Jobs-to-be-Done (JTBD) Documentation](#jobs-to-be-done-jtbd-documentation)
+10. [Tools Reference](#tools-reference)
+11. [Examples](#examples)
+12. [Troubleshooting](#troubleshooting)
+13. [Development](#development)
+14. [FAQ](#faq)
 
 ---
 
@@ -111,11 +112,9 @@ cp .env.example .env
 ### Step 4: Verify Installation
 
 ```bash
-# Test the design agent
-uv run --with anthropic --with langgraph python -c "from agents.design_agent import run_design; print('✓ Design agent loaded')"
-
-# Test the docs agent
-uv run --with anthropic --with langgraph python -c "from agents.docs_agent import run_docs; print('✓ Docs agent loaded')"
+# Verify installation
+uv run python -c "from agents.design_agent import run_design; print('✓ Design agent loaded')"
+uv run python -c "from agents.docs_agent import run_docs; print('✓ Docs agent loaded')"
 ```
 
 Expected output:
@@ -211,9 +210,9 @@ CACHE_TTL=3600
 
 ## Usage
 
-### Running the Full Orchestration
+### Quick Start: Run the Full Workflow
 
-The main entry point orchestrates both Design and Documentation agents:
+This runs both Design and Documentation agents:
 
 ```bash
 uv run scripts/orchestrate.py \
@@ -221,27 +220,22 @@ uv run scripts/orchestrate.py \
   --description "Users need ability to specify build timeout to prevent hanging builds"
 ```
 
-**Output:**
-```
---- RESULT ---
+**What you get:**
 
-DESIGN_ANALYSIS
-# Design Document: Add timeout support to BuildRun
-...
+1. A complete design document with component analysis
+2. A PR summary ready to paste into GitHub
+3. Release notes for the changelog
 
-PR_SUMMARY
-This PR adds timeout support to the BuildRun API...
+All three are printed to the console when the workflow finishes.
 
-RELEASE_NOTES
-**New Feature:** BuildRun now supports timeout configuration...
-```
+### Standalone Agent Execution
 
-### Running Design Agent Standalone
+**Note:** Agents are typically called automatically by `orchestrate.py`. For advanced use cases, you can call agents programmatically.
 
-For design analysis only (no documentation generation):
+**Design agent standalone:**
 
-```bash
-uv run --with anthropic --with langgraph python -c "
+```python
+# design_only.py
 from agents.design_agent import run_design
 import os
 
@@ -252,59 +246,194 @@ result = run_design(
 )
 
 print(result['design_analysis'])
-"
 ```
 
-### Running Docs Agent Standalone
+Then run: `uv run python design_only.py`
 
-For documentation generation from existing context:
+**Docs agent standalone:**
 
-```bash
-uv run --with anthropic --with langgraph python -c "
+```python
+# docs_only.py
 from agents.docs_agent import run_docs
 
-context = {
-    'design_analysis': 'Design document content...',
-    'code_changes': {'pkg/apis/build/v1/buildrun_types.go': 'Added Timeout field'},
-    'test_results': {'unit': 'passed', 'e2e': 'passed'}
-}
+result = run_docs(
+    design_doc='/path/to/design.md',
+    code_changes='/path/to/changes.txt'
+)
 
-result = run_docs(context)
 print(result['pr_summary'])
-"
 ```
 
-### CLI Examples with Real Commands
+Then run: `uv run python docs_only.py`
 
-#### Example 1: Feature Request Analysis
+**For most users:** Use `uv run scripts/orchestrate.py` which handles agent coordination automatically.
+
+### Real-World Examples
+
+**Example 1: Analyze a feature request**
 
 ```bash
-# Analyze a feature request for build caching
 uv run scripts/orchestrate.py \
   --title "Implement build output caching" \
   --description "Allow BuildRuns to cache intermediate build layers to speed up subsequent builds. Should support OCI registry-based caching."
 ```
 
-#### Example 2: Bug Report Analysis
+**Example 2: Analyze a bug report**
 
 ```bash
-# Analyze a bug report
 uv run scripts/orchestrate.py \
-  --title "BuildRun stuck in Running state after pod completion" \
-  --description "Observed BuildRuns remaining in Running state even after the build pod has completed successfully. Status reconciliation appears to fail."
+  --title "BuildRun stuck in Running state" \
+  --description "BuildRuns remain Running even after pod completes. Status reconciliation fails."
 ```
 
-#### Example 3: With Repository Context
+**Example 3: With code repository context**
 
 ```bash
-# Set repository path in environment
+# Tell agents where to find Shipwright code for deeper analysis
 export SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
 
-# Run analysis with code context
 uv run scripts/orchestrate.py \
-  --title "Add support for private Git repositories with SSH keys" \
+  --title "Add SSH key support for private Git repos" \
   --description "Users need to build from private Git repos using SSH authentication"
 ```
+
+When you provide SHIPWRIGHT_REPO_PATH, agents can analyze actual code structure and identify specific files to modify.
+
+---
+
+## Dashboard
+
+### Overview
+
+The dashboard is a web page that shows you what your agents are doing in real-time. See which phase they're in, how much context they're using, and which components they're analyzing - all updating automatically every 5 seconds.
+
+**Most important feature**: Context usage percentage. When it hits 80%+, you know the agent is running out of space and might need help.
+
+Inspired by [Marc Nuri's AI Coding Agent Dashboard](https://blog.marcnuri.com/ai-coding-agent-dashboard).
+
+### Starting the Dashboard
+
+Run the dashboard server:
+
+```bash
+# Start dashboard backend
+uv run python scripts/run_dashboard.py
+```
+
+The dashboard will be available at:
+- **Web UI**: http://localhost:8080
+- **API Docs**: http://localhost:8080/docs
+- **Health Check**: http://localhost:8080/api/health
+
+### What You Can See
+
+**On each session card:**
+
+- **Phase progress**: Where is the workflow? (design → docs → complete)
+- **Context usage**: How full is the context window? (0-100%)
+- **Components**: Which parts of Shipwright are being analyzed
+- **Risks**: How many risks identified and their severity
+- **Model**: Which Claude model is running
+- **Last update**: How recently the agent reported status
+
+**Page features:**
+
+- Auto-refresh every 5 seconds (can toggle off)
+- Manual refresh button
+- All active sessions shown simultaneously
+
+### Session Card Example
+
+```
+┌─────────────────────────────────────────────┐
+│ 🔵 Session abc123                          │
+│                                             │
+│ Issue: Add timeout support to BuildRun     │
+│ Type: feature                               │
+│                                             │
+│ Design Agent  ✓ Complete                   │
+│ Docs Agent    ⏳ In Progress               │
+│                                             │
+│ Context: ████████░░ 82%                    │
+│ Model: claude-sonnet-4                     │
+│                                             │
+│ Components: build_controller, buildrun_api │
+│ Risks: 3 identified - MEDIUM               │
+│                                             │
+│ Last update: 2s ago                        │
+└─────────────────────────────────────────────┘
+```
+
+### Configuration
+
+Control dashboard behavior with environment variables (all optional):
+
+```bash
+# Where agents send updates (default: http://localhost:8080)
+DASHBOARD_URL=http://localhost:8080
+
+# Turn heartbeats on/off (default: true)
+DASHBOARD_ENABLED=true
+
+# Where to store session data (default: /tmp/claude/dashboard.db)
+DASHBOARD_DB_PATH=/tmp/claude/dashboard.db
+```
+
+**Default values work fine for local development.** Only change these if you need custom behavior.
+
+### How It Works
+
+Agents automatically send status updates ("heartbeats") to the dashboard as they work. You don't need to configure anything - it just works.
+
+**Heartbeats are sent:**
+
+1. When the workflow starts (creates a new session)
+2. When design phase completes (shows design results)
+3. When docs phase completes (shows documentation)
+4. If errors occur (shows what went wrong)
+
+The dashboard collects these updates and displays them in real-time.
+
+### API Endpoints
+
+The dashboard backend provides a REST API:
+
+- `POST /api/heartbeat` - Receive agent heartbeat
+- `GET /api/sessions` - List all sessions
+- `GET /api/sessions/{id}` - Get specific session details
+- `GET /api/health` - Health check
+
+### Dashboard Architecture
+
+See [DASHBOARD_ARCHITECTURE.md](DASHBOARD_ARCHITECTURE.md) for detailed technical design including:
+- Heartbeat protocol specification
+- Enricher framework architecture
+- Database schema
+- Frontend implementation details
+
+### Troubleshooting Dashboard
+
+**No heartbeats showing up?**
+
+1. Is the dashboard server running? Check <http://localhost:8080/api/health>
+2. Is `DASHBOARD_ENABLED=true` in your environment?
+3. Is port 8080 available? Try `curl http://localhost:8080/api/health`
+
+**Sessions not appearing?**
+
+1. Try refreshing the page manually
+2. Check if the database exists: `ls -l /tmp/claude/dashboard.db`
+3. Look at agent logs to confirm they're sending heartbeats
+
+**Context usage is high (>80%)?**
+
+This is important! High context means the agent is running out of room:
+
+- **Break down the task**: Split complex issues into smaller, focused tasks
+- **Reduce scope**: Limit which components are analyzed
+- **Shorter descriptions**: Keep issue descriptions concise
+
+The dashboard alerts you before context runs out completely.
 
 ---
 
@@ -330,13 +459,13 @@ The system uses **LangGraph** for stateful workflow orchestration with specializ
          ┌───────────┴───────────┐
          │                       │
          ▼                       ▼
-┌────────────────┐      ┌────────────────┐
-│ Design Agent   │──────▶ Docs Agent     │
-│ (design_agent) │      │ (docs_agent)   │
-└────────┬───────┘      └────────┬───────┘
-         │                       │
-         │ Uses                  │ Uses
-         ▼                       ▼
+┌────────────────┐    ┌────────────────┐    ┌────────────────┐
+│ Design Agent   │───▶│ Testing Agent  │───▶│ Docs Agent     │
+│ (design_agent) │    │(testing_agent) │    │ (docs_agent)   │
+└────────┬───────┘    └────────┬───────┘    └────────┬───────┘
+         │                     │                      │
+         │ Uses                │ Uses                 │ Uses
+         ▼                     ▼                      ▼
 ┌─────────────────────────────────────────┐
 │             Tools                       │
 │  • repo_search (code analysis)          │
@@ -347,10 +476,11 @@ The system uses **LangGraph** for stateful workflow orchestration with specializ
 
 ### Agent Roles
 
-| Agent | Purpose | Input | Output |
-|-------|---------|-------|--------|
-| **Design Agent** | Analyzes requirements and generates design docs | Issue title/description + repo context | Design analysis, impacted components, risks, acceptance criteria |
-| **Docs Agent** | Generates documentation artifacts | Design outputs + code changes + test results | PR summary, release notes, doc updates |
+| Agent            | Purpose                                        | Input                                        | Output                                                              |
+|------------------|------------------------------------------------|----------------------------------------------|---------------------------------------------------------------------|
+| **Design Agent** | Analyzes requirements and generates design docs | Issue title/description + repo context       | Design analysis, impacted components, risks, acceptance criteria    |
+| **Testing Agent** | Generates Ginkgo v2 tests with DDT patterns    | Design analysis + acceptance criteria        | Test plans, test specs, Ginkgo test code (unit/integration/E2E)    |
+| **Docs Agent**   | Generates documentation artifacts              | Design outputs + code changes + test results | PR summary, release notes, doc updates                              |
 
 ### Tools
 
@@ -449,6 +579,217 @@ The agent produces documents with these sections:
 6. **Implementation Plan** - Step-by-step approach
 7. **Required Tests** - Unit, integration, E2E test scenarios
 8. **Documentation Changes** - User guides, API docs, examples
+
+---
+
+### Testing Agent
+
+**File:** `agents/testing_agent.py`
+
+**Purpose:**
+Generates comprehensive Ginkgo v2 test suites for Shipwright Build features, including unit tests, integration tests, and end-to-end tests with Data-Driven Testing (DDT) patterns.
+
+**Inputs:**
+```python
+context = {
+    "design_analysis": str,           # Design document from design_agent
+    "impacted_components": list[str], # Components affected
+    "acceptance_criteria": list[str], # Testable acceptance criteria
+    "issue_title": str,               # Feature/bug title (optional)
+    "issue_description": str,         # Detailed description (optional)
+    "implementation_plan": list[str], # Implementation steps (optional)
+    "risks": list[str],               # Risks to test (optional)
+}
+```
+
+**Outputs:**
+```python
+{
+    "test_plan": str,                 # Human-readable test strategy
+    "test_specifications": dict,      # YAML test specs with scenario IDs
+    "unit_tests": dict[str, str],     # File name → Ginkgo test code
+    "integration_tests": dict[str, str], # File name → Ginkgo test code
+    "e2e_tests": dict[str, str],      # File name → Ginkgo test code
+    "test_summary": str,              # Test generation summary
+    "coverage_analysis": str,         # Coverage mapping
+    "patterns_detected": dict,        # Detected Shipwright patterns
+}
+```
+
+**Test Generation Process:**
+
+1. **Pattern Detection**
+   - Analyzes issue description and design for Shipwright-specific patterns
+   - Detects build strategies (kaniko, buildkit, buildpacks, buildah, s2i)
+   - Identifies source types (git, bundle, registry)
+   - Recognizes output types (image, imagestream)
+   - Finds security contexts (privileged, nonroot, restricted)
+
+2. **Test Planning**
+   - Creates human-readable test strategy document
+   - Maps acceptance criteria to test scenarios
+   - Organizes tests by type (unit/integration/E2E)
+   - Identifies risk areas requiring extra testing
+
+3. **Test Code Generation**
+   - Model: `claude-sonnet-4-20250514`
+   - Framework: Ginkgo v2 with Gomega assertions
+   - Max tokens: 16000 (larger for code generation)
+   - Generates working Go code that compiles
+
+4. **Output Parsing**
+   - Extracts test plans, specifications, and code
+   - Organizes tests by type and file
+   - Generates coverage analysis
+
+**Test Types:**
+
+- **Unit Tests**
+  - Scope: Isolated functions with mocks
+  - Duration: Fast (<5s)
+  - Focus: Function logic, error handling, edge cases
+  - Pattern: Table-driven tests with DescribeTable
+
+- **Integration Tests**
+  - Scope: Real Kubernetes cluster
+  - Duration: Medium (~30s)
+  - Focus: Controller reconciliation, webhook validation
+  - Pattern: Resource creation and lifecycle tests
+
+- **E2E Tests**
+  - Scope: Full workflow
+  - Duration: Slow (~5m)
+  - Focus: Complete build workflows, strategy-specific scenarios
+  - Pattern: Full build lifecycle with actual execution
+
+**Pattern Detection:**
+
+The agent automatically detects Shipwright-specific patterns:
+
+```python
+patterns_detected = {
+    "strategies": ["kaniko", "buildkit"],       # Build strategies found
+    "source_types": ["git", "bundle"],          # Source types found
+    "output_types": ["image"],                  # Output types found
+    "security_contexts": ["nonroot"],           # Security contexts found
+}
+```
+
+**Generated Test Features:**
+
+- **Ginkgo v2 Syntax**: Modern Ginkgo with proper imports
+- **Data-Driven Testing**: DescribeTable entries for parameterized tests
+- **Shipwright Helpers**: Uses libfactory and libk8s test utilities
+- **Test IDs**: Structured IDs in format `BUILD-XXX-NNN`
+- **Proper Setup/Cleanup**: BeforeEach/AfterEach blocks
+- **Async Checks**: Eventually/Consistently with timeouts
+- **Real Code**: Compiles and runs in Shipwright test suite
+
+**Usage Example:**
+
+```python
+from agents.testing_agent import run_testing
+
+context = {
+    "design_analysis": "# Design: Add timeout support...",
+    "impacted_components": ["buildrun_api", "buildrun_controller"],
+    "acceptance_criteria": [
+        "BuildRun API accepts timeout field",
+        "Controller respects timeout value",
+        "Build fails after timeout exceeded"
+    ],
+    "issue_title": "Add timeout support to BuildRun",
+    "issue_description": "Users need to specify max build execution time..."
+}
+
+result = run_testing(context)
+
+print(f"Test Plan:\n{result['test_plan']}")
+print(f"\nUnit Tests Generated: {len(result['unit_tests'])} files")
+print(f"Integration Tests Generated: {len(result['integration_tests'])} files")
+print(f"E2E Tests Generated: {len(result['e2e_tests'])} files")
+print(f"\nPatterns Detected: {result['patterns_detected']}")
+```
+
+**Test Specifications Example:**
+
+```yaml
+scenarios:
+  - id: BUILD-TIMEOUT-001
+    type: unit
+    description: Validate timeout field in BuildRun API
+    pattern: validation
+    helpers:
+      - ValidateBuildRunTimeout
+    expected: Accept valid timeout values, reject invalid
+
+  - id: BUILD-TIMEOUT-002
+    type: integration
+    description: Controller respects timeout configuration
+    pattern: controller
+    helpers:
+      - libfactory.NewBuildRun
+      - libk8s.WaitForBuildRunCompletion
+    expected: Build terminates after timeout exceeded
+```
+
+**Test Code Example:**
+
+```go
+var _ = Describe("BuildRun Timeout", func() {
+    DescribeTable("timeout validation",
+        func(scenario TimeoutScenario) {
+            buildRun := libfactory.NewBuildRun(namespace, "test-buildrun").
+                WithTimeout(scenario.Timeout).
+                Create()
+
+            if scenario.ExpectError {
+                Expect(buildRun).To(BeNil())
+            } else {
+                Expect(buildRun).ToNot(BeNil())
+                Expect(buildRun.Spec.Timeout.Duration).To(Equal(scenario.ExpectedTimeout))
+            }
+        },
+        Entry("[BUILD-TIMEOUT-001] valid timeout", TimeoutScenario{
+            Timeout: "10m",
+            ExpectedTimeout: 10 * time.Minute,
+            ExpectError: false,
+        }),
+        Entry("[BUILD-TIMEOUT-002] invalid timeout", TimeoutScenario{
+            Timeout: "invalid",
+            ExpectError: true,
+        }),
+    )
+})
+```
+
+**Configuration:**
+
+The Testing Agent uses configuration from `config/testing_config.py`:
+
+- **SHIPWRIGHT_TEST_PATTERNS**: Strategy, source, output patterns
+- **TEST_TYPES**: Unit, integration, E2E specifications
+- **GINKGO_IMPORTS**: Go import templates
+- **GINKGO_TEMPLATES**: Test structure templates
+- **TEST_HELPERS**: Shipwright test helper snippets
+- **DDT_PATTERNS**: Data-driven test data structures
+
+**Quality Features:**
+
+- **Pattern-Aware**: Detects and uses Shipwright-specific patterns
+- **Coverage Mapping**: Maps tests to acceptance criteria
+- **Test Organization**: Clear separation by type and scope
+- **Helper Usage**: Leverages existing Shipwright test utilities
+- **Realistic Tests**: Generates tests that match actual Shipwright test patterns
+- **Comprehensive**: Covers happy paths, error paths, and edge cases
+
+**Qualityflow Integration:**
+
+The Testing Agent is inspired by Red Hat's qualityflow test generation framework, adapted for:
+- Shipwright Build domain-specific patterns
+- Ginkgo v2 test framework
+- Kubernetes and OpenShift testing patterns
+- Data-Driven Testing best practices
 
 ---
 

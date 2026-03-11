@@ -19,12 +19,20 @@ class AgentState(TypedDict):
     acceptance_criteria: list[str]
     implementation_plan: str
 
+    # Testing phase outputs
+    test_plan: str
+    test_specifications: dict
+    unit_tests: dict[str, str]  # file_path: test_code
+    integration_tests: dict[str, str]  # file_path: test_code
+    e2e_tests: dict[str, str]  # file_path: test_code
+    coverage_analysis: str
+
     # Development phase outputs
     code_changes: dict[str, str]  # file_path: changes
     files_modified: list[str]
     test_results: dict
 
-    # Test phase outputs
+    # Test execution outputs
     test_summary: str
     coverage_gaps: list[str]
     test_failures: list[str]
@@ -40,6 +48,7 @@ class AgentState(TypedDict):
     high_level_design: str
 
     # Control flow
+    session_id: str
     current_phase: str  # "design", "development", "test", "docs", "done"
     approval_status: str  # "pending", "approved", "rejected"
 

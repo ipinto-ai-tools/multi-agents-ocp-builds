@@ -14,9 +14,17 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 ### Intelligent Analysis
 
 - **Design Agent**: Analyzes GitHub issues and generates comprehensive design documents using Claude API
+- **Testing Agent**: Generates Ginkgo v2 tests with Data-Driven Testing patterns for unit, integration, and E2E scenarios
 - **Documentation Agent**: Produces PR summaries, release notes, and documentation changes
 - **Repository Analysis**: Examines Shipwright codebase to identify impacted components
 - **Risk Assessment**: Evaluates compatibility concerns and architectural impacts
+
+### Real-Time Monitoring
+
+- **Dashboard**: Web-based dashboard for monitoring agent workflows in real-time
+- **Heartbeat Protocol**: Agents emit state updates for live progress tracking
+- **Context Tracking**: Monitor token usage and context consumption
+- **Session Management**: View active and completed agent sessions
 
 ### Orchestrated Workflow
 
@@ -75,41 +83,71 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 
 ### Configuration
 
-Create a `.env` file with your settings:
+Create a `.env` file in the project root:
 
 ```bash
-# Required: Your Anthropic Claude API key
-ANTHROPIC_API_KEY=your_api_key_here
+# Required: Get your API key from https://console.anthropic.com/settings/keys
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
 
-# Optional: Path to Shipwright repository for code analysis
+# Optional: Enable deeper code analysis (leave blank to skip)
 SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
-
-# Optional: Path to OpenShift builds repository
 OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
 
-# Optional: Logging configuration
+# Optional: Adjust logging (defaults shown)
 LOG_LEVEL=INFO
 LOG_FORMAT=text
 
-# Optional: Claude model configuration
+# Optional: Change AI model (default is claude-sonnet-4)
 CLAUDE_MODEL=claude-sonnet-4-20250514
 CLAUDE_MAX_TOKENS=8000
 ```
 
-See [`.env.example`](.env.example) for all available configuration options.
+**Quick setup**: Copy `.env.example` to `.env` and add your API key. Everything else has sensible defaults.
+
+See [`.env.example`](.env.example) for all available options.
 
 ### Running Your First Analysis
 
+**Option 1: Quick design analysis** (no GitHub required)
+
 ```bash
-# Run design analysis on a GitHub issue
-uv run python -m agents.design_agent \
+uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
+```
 
-# Run full orchestration workflow
-uv run python -m graph.orchestrator \
-  --issue-number 123 \
-  --repo shipwright-io/build
+This generates a design document with component analysis and recommendations.
+
+**Option 2: Full workflow with dashboard** (recommended for monitoring)
+
+```bash
+# Terminal 1: Start the dashboard
+uv run python scripts/run_dashboard.py
+# Open http://localhost:8080 in your browser
+
+# Terminal 2: Run the workflow
+uv run scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun API" \
+  --description "Users need to specify timeouts for build execution"
+```
+
+The dashboard shows real-time progress, context usage, and component impacts.
+
+### Common Commands
+
+**Three essential commands you'll use:**
+
+```bash
+# 1. Run a workflow (most common)
+uv run scripts/orchestrate.py \
+  --title "Your feature title" \
+  --description "Detailed description"
+
+# 2. Start the dashboard (for monitoring)
+uv run python scripts/run_dashboard.py
+
+# 3. Run tests
+uv run pytest tests/ -v
 ```
 
 ---
@@ -134,17 +172,16 @@ The system uses a multi-agent architecture orchestrated by LangGraph:
         ┌────────────┼────────────┐
         │            │            │
         ▼            ▼            ▼
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│  Design  │  │   Docs   │  │   Test   │
-│  Agent   │  │  Agent   │  │  Agent   │
-├──────────┤  ├──────────┤  ├──────────┤
-│ Claude   │  │ Claude   │  │ Local    │
-│ API      │  │ API      │  │ Exec     │
-└────┬─────┘  └────┬─────┘  └────┬─────┘
-     │             │             │
-     └─────────────┴─────────────┘
-                   │
-                   ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│    Design    │  │   Testing    │  │     Docs     │
+│    Agent     │─>│    Agent     │─>│    Agent     │
+├──────────────┤  ├──────────────┤  ├──────────────┤
+│  Claude API  │  │  Claude API  │  │  Claude API  │
+└──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+       │                 │                 │
+       └─────────────────┼─────────────────┘
+                         │
+                         ▼
 ┌─────────────────────────────────────────────────────┐
 │         Shipwright Repository Analysis              │
 │  • API Types  • Controllers  • CRDs  • Webhooks     │
@@ -153,12 +190,12 @@ The system uses a multi-agent architecture orchestrated by LangGraph:
 
 ### Agent Responsibilities
 
-| Agent            | Purpose                                                                      | Technology      |
-|------------------|------------------------------------------------------------------------------|-----------------|
-| **Design Agent** | Analyzes requirements, identifies impacted components, generates design docs | Claude API      |
-| **Docs Agent**   | Creates PR summaries, release notes, documentation changes                   | Claude API      |
-| **Test Agent**   | Validates implementation, runs test suites                                   | Local execution |
-| **Orchestrator** | Coordinates workflow, manages state, handles errors                          | LangGraph       |
+| Agent             | Purpose                                                                      | Technology      |
+|-------------------|------------------------------------------------------------------------------|-----------------|
+| **Design Agent**  | Analyzes requirements, identifies impacted components, generates design docs | Claude API      |
+| **Testing Agent** | Generates Ginkgo v2 tests with DDT patterns, covers unit/integration/E2E    | Claude API      |
+| **Docs Agent**    | Creates PR summaries, release notes, documentation changes                   | Claude API      |
+| **Orchestrator**  | Coordinates workflow, manages state, handles errors                          | LangGraph       |
 
 For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -170,24 +207,36 @@ For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITE
 muilti-agents-ocp-builds/
 ├── agents/               # AI agent implementations
 │   ├── design_agent.py   # Design analysis agent (Claude API)
+│   ├── testing_agent.py  # Test generation agent (Claude API)
 │   ├── docs_agent.py     # Documentation generation agent (Claude API)
-│   └── test_agent.py     # Test execution agent
-├── graph/                # LangGraph orchestration
-│   ├── orchestrator.py   # Main workflow orchestrator
-│   └── state.py          # State management
+│   └── graph.py          # LangGraph workflow orchestrator
+├── dashboard/            # Real-time monitoring dashboard
+│   ├── backend.py        # FastAPI dashboard server
+│   ├── heartbeat.py      # Heartbeat protocol implementation
+│   ├── enrichers.py      # State enrichment pipeline
+│   └── frontend/         # Web UI
+│       └── index.html    # Dashboard interface
+├── graph/                # LangGraph state management
+│   └── state.py          # Agent state schema
 ├── tools/                # Repository analysis tools
-│   ├── repo_analyzer.py  # Code structure analysis
-│   └── component_map.py  # Shipwright component mapping
+│   ├── repo_search.py    # Code search and analysis
+│   ├── rag_search.py     # Documentation search with RAG
+│   └── git_ops.py        # Git operations
 ├── config/               # Configuration files
-│   └── components.yaml   # Shipwright component definitions
-├── tests/                # Comprehensive test suite
+│   ├── agent_prompts.py  # Agent system prompts
+│   ├── testing_config.py # Testing patterns and Ginkgo templates
+│   └── shipwright_components.py  # Component definitions
+├── tests/                # Test suite
 │   ├── test_design_agent.py
 │   ├── test_docs_agent.py
+│   ├── test_dashboard.py
 │   └── test_orchestration.py
 ├── docs/                 # Documentation
-│   ├── HOWTO.md          # Detailed usage guide
-│   └── ARCHITECTURE.md   # Architecture documentation
+│   ├── HOWTO.md          # User guide
+│   ├── ARCHITECTURE.md   # System architecture
+│   └── DASHBOARD_ARCHITECTURE.md  # Dashboard design
 ├── scripts/              # Utility scripts
+│   └── run_dashboard.py  # Dashboard server launcher
 ├── .env.example          # Environment configuration template
 ├── requirements.txt      # Python dependencies
 └── README.md             # This file
@@ -199,66 +248,60 @@ muilti-agents-ocp-builds/
 
 - **[HOWTO.md](docs/HOWTO.md)** - Comprehensive usage guide with examples
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and design
+- **[DASHBOARD_ARCHITECTURE.md](docs/DASHBOARD_ARCHITECTURE.md)** - Dashboard design and implementation
 - **[Test Suite Guide](tests/README.md)** - Testing documentation and best practices
 
 ---
 
 ## Example Usage
 
-### Design Analysis
+### 1. Design Analysis
 
-Analyze a feature request and generate a design document:
+Generate a design document for a feature request:
 
 ```bash
-uv run python -m agents.design_agent \
+uv run scripts/orchestrate.py \
   --title "Add BuildRun timeout support" \
-  --description "Users need to configure max execution time for builds" \
-  --components buildrun_api,buildrun_controller
+  --description "Users need to configure max execution time for builds"
 ```
 
-**Output**: Comprehensive design document with:
+**What you get**: A comprehensive design document including component impacts, risks, implementation plan, acceptance criteria, and testing strategy.
 
-- Component impact analysis
-- Risk assessment
-- Implementation recommendations
-- Acceptance criteria
-- Testing strategy
+### 2. Full Workflow with Dashboard
 
-### Documentation Generation
-
-Generate documentation from a completed design:
+Monitor the workflow in real-time:
 
 ```bash
-uv run python -m agents.docs_agent \
-  --design-doc /path/to/design.md \
-  --code-changes /path/to/diff.txt \
-  --test-results /path/to/test-output.txt
+# Terminal 1: Start dashboard
+uv run python scripts/run_dashboard.py
+
+# Terminal 2: Run workflow
+uv run scripts/orchestrate.py \
+  --title "Add BuildRun timeout support" \
+  --description "Users need to configure max execution time for builds"
 ```
 
-**Output**:
+**What happens**: Analyzes requirements → identifies impacted components → generates design → creates Ginkgo tests → generates documentation → dashboard shows real-time progress.
 
-- PR summary with technical overview
-- Release notes for end users
-- Documentation change recommendations
+### 3. Testing Agent Output
 
-### Full Orchestration
+The Testing Agent generates comprehensive Ginkgo v2 tests:
 
-Run the complete workflow for a GitHub issue:
+**What you get**:
 
-```bash
-uv run python -m graph.orchestrator \
-  --issue-number 456 \
-  --repo shipwright-io/build \
-  --components buildrun_api,webhook_validation
-```
+- **Test Plan**: Human-readable test strategy and coverage mapping
+- **Test Specifications**: YAML test specs with scenario IDs
+- **Unit Tests**: Mock-based, isolated function tests
+- **Integration Tests**: Real K8s cluster controller/webhook tests
+- **E2E Tests**: Full workflow tests with actual build execution
+- **Coverage Analysis**: Mapping of tests to acceptance criteria
 
-**Workflow**:
+**Example test output**:
 
-1. Fetch issue from GitHub
-2. Analyze design requirements
-3. Identify impacted components
-4. Generate implementation plan
-5. Create documentation artifacts
+- Ginkgo v2 syntax with proper imports
+- Data-Driven Testing (DescribeTable) for parameterized tests
+- Shipwright-specific helpers (libfactory, libk8s)
+- Pattern detection (kaniko, buildkit, git sources, etc.)
 
 ---
 

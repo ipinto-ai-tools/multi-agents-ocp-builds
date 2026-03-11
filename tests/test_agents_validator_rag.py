@@ -7,10 +7,7 @@ This module tests RAG search capabilities including:
 - Similar code finding
 """
 
-import os
-import tempfile
 from pathlib import Path
-from typing import List
 
 import pytest
 

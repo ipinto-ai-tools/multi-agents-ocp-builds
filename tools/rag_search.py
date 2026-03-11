@@ -13,7 +13,7 @@ and context from the codebase and existing documentation.
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 
 from tools.repo_search import RepoSearch, SearchResult, RepositorySearchError
 
