@@ -103,6 +103,48 @@ continue to run without time limits. No action required for upgrade.
 ## Known Limitations
 - Timeout enforcement has ~10 second granularity due to controller reconciliation interval
 - Very short timeouts (<30s) may not be enforced reliably
+
+## JTBD Documentation
+
+### Job: Prevent Build Runs from Hanging Indefinitely
+
+**Context**: When running builds in a Kubernetes cluster, users need to prevent builds from
+consuming resources indefinitely when they hang or stall. This is critical for production
+environments where resource management is important.
+
+**Steps to Complete**:
+
+1. Add timeout to BuildRun specification:
+   ```yaml
+   apiVersion: shipwright.io/v1beta1
+   kind: BuildRun
+   metadata:
+     name: my-buildrun
+   spec:
+     timeout: 30m
+     build:
+       name: my-build
+   ```
+
+2. The controller will monitor the build execution time and terminate builds that exceed
+   the specified timeout.
+
+3. Check build status to see if timeout was triggered:
+   ```bash
+   kubectl get buildrun my-buildrun -o yaml
+   ```
+
+**Troubleshooting**:
+
+- **Build terminated prematurely**: Timeout may be too short. Increase timeout value.
+- **Timeout not enforced**: Very short timeouts (<30s) have ~10s granularity limitation.
+- **Existing builds affected**: This is backward-compatible. Builds without timeout continue
+  to run without time limits.
+
+**Related Jobs**:
+- Configure build resource limits
+- Monitor build execution metrics
+- Set up build failure notifications
 """
 
 
@@ -139,6 +181,7 @@ class TestDocsAgent:
         assert "docs_changes" in result
         assert "upgrade_notes" in result
         assert "known_limitations" in result
+        assert "jtbd_documentation" in result
 
         # Validate content types
         assert isinstance(result["pr_summary"], str)
@@ -146,6 +189,7 @@ class TestDocsAgent:
         assert isinstance(result["docs_changes"], dict)
         assert isinstance(result["upgrade_notes"], str)
         assert isinstance(result["known_limitations"], str)
+        assert isinstance(result["jtbd_documentation"], str)
 
         # Should have substantial content
         assert len(result["pr_summary"]) > 50
@@ -166,6 +210,8 @@ class TestDocsAgent:
         print(result["upgrade_notes"])
         print("\nKNOWN LIMITATIONS:")
         print(result["known_limitations"])
+        print("\nJTBD DOCUMENTATION:")
+        print(result["jtbd_documentation"])
 
     @pytest.mark.skipif(
         bool(os.getenv("ANTHROPIC_API_KEY")),
@@ -200,9 +246,11 @@ class TestDocsAgent:
                 assert "docs_changes" in result
                 assert "upgrade_notes" in result
                 assert "known_limitations" in result
+                assert "jtbd_documentation" in result
 
                 # Validate content
                 assert "BuildRun timeout support" in result["pr_summary"]
+                assert result["jtbd_documentation"]  # JTBD should not be empty
                 # docs_changes parsing depends on section extraction
 
     def test_docs_agent_with_test_failures(self):
@@ -257,6 +305,66 @@ class TestDocsAgent:
                 call_args = mock_client.messages.create.call_args
                 context_msg = call_args.kwargs["messages"][0]["content"]
                 assert "Coverage Gaps" in context_msg
+
+    def test_docs_agent_jtbd_output(self):
+        """Test that JTBD documentation is generated."""
+        mock_response = Mock()
+        mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
+
+        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+            mock_client = Mock()
+            mock_client.messages.create.return_value = mock_response
+            mock_anthropic.return_value = mock_client
+
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+                result = run_docs(SAMPLE_CONTEXT)
+
+                # Validate JTBD key exists
+                assert "jtbd_documentation" in result
+
+                # Validate it's not empty
+                assert result["jtbd_documentation"]
+                assert len(result["jtbd_documentation"]) > 0
+
+                # Check for JTBD structure keywords
+                jtbd = result["jtbd_documentation"]
+                assert "Job:" in jtbd or "Context:" in jtbd or "Steps" in jtbd
+
+    def test_jtbd_structure(self):
+        """Test that JTBD has all required sections."""
+        mock_response = Mock()
+        mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
+
+        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+            mock_client = Mock()
+            mock_client.messages.create.return_value = mock_response
+            mock_anthropic.return_value = mock_client
+
+            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+                result = run_docs(SAMPLE_CONTEXT)
+
+                jtbd = result["jtbd_documentation"]
+
+                # Check for job title format
+                assert "Job:" in jtbd or "###" in jtbd
+
+                # Check for context section
+                assert "Context" in jtbd
+
+                # Check for steps
+                assert "Steps" in jtbd
+
+                # Check for troubleshooting
+                assert "Troubleshooting" in jtbd
+
+                # Check for related jobs
+                assert "Related" in jtbd
+
+                # Print for manual inspection
+                print("\n" + "="*80)
+                print("JTBD DOCUMENTATION STRUCTURE")
+                print("="*80)
+                print(jtbd)
 
 
 class TestHelperFunctions:
@@ -522,7 +630,7 @@ class TestIntegration:
                 # Validate comprehensive output
                 assert all(key in result for key in [
                     "pr_summary", "release_notes", "docs_changes",
-                    "upgrade_notes", "known_limitations"
+                    "upgrade_notes", "known_limitations", "jtbd_documentation"
                 ])
 
                 # Context should include all sections

@@ -169,6 +169,44 @@ When creating documentation, produce the following sections:
 - **Link to related docs** - Cross-reference related features and documentation
 - **Keep formatting consistent** - Follow existing documentation style
 
+## Jobs-to-be-Done (JTBD) Documentation
+
+For every new feature or change, you MUST generate JTBD documentation organized around user outcomes.
+
+### JTBD Structure:
+
+For each job, provide:
+
+1. **Job Title** - Clear statement of what the user wants to accomplish
+   Format: "When [situation], I want to [motivation], so I can [expected outcome]"
+
+2. **Context** - When and why users need this
+   - User persona
+   - Common scenarios
+   - Prerequisites
+
+3. **Steps to Complete** - Concrete, actionable steps
+   - Numbered steps with examples
+   - Code snippets where applicable
+   - Expected outputs
+
+4. **Troubleshooting** - Common issues and solutions
+   - Error messages and fixes
+   - Edge cases
+   - Validation steps
+
+5. **Related Jobs** - See also
+   - Related tasks
+   - Next steps
+   - Prerequisites
+
+### JTBD Guidelines:
+- Focus on user outcomes, not technical features
+- Use concrete examples from the actual implementation
+- Include command-line examples users can copy/paste
+- Address common failure scenarios
+- Link related jobs together
+
 ## Output Format
 
 Your documentation should be in Markdown format, ready to be committed to the repository

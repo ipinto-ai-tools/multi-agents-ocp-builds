@@ -166,6 +166,7 @@ def sample_workflow_state() -> Dict[str, Any]:
         "pr_summary": "",
         "release_notes": "",
         "docs_changes": {},
+        "jtbd_documentation": "",
     }
 
 

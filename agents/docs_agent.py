@@ -38,6 +38,7 @@ def run_docs(context: Dict[str, Any]) -> Dict[str, Any]:
             - docs_changes: dict - Documentation file changes (path: content)
             - upgrade_notes: str - Version upgrade considerations
             - known_limitations: str - Limitations and edge cases
+            - jtbd_documentation: str - Jobs-to-be-Done format documentation
 
     Raises:
         ValueError: If required context is missing
@@ -164,7 +165,13 @@ def _build_context_message(context: Dict[str, Any]) -> str:
         "2. Release Notes - user-facing changelog entry\n"
         "3. Documentation Changes - specific doc updates needed\n"
         "4. Upgrade Notes - version-specific upgrade guidance\n"
-        "5. Known Limitations - edge cases or limitations\n\n"
+        "5. Known Limitations - edge cases or limitations\n"
+        "6. JTBD Documentation - Jobs-to-be-Done format with:\n"
+        "   - Job title (what the user wants to accomplish)\n"
+        "   - Context (when/why they need this)\n"
+        "   - Steps to complete the job (with examples)\n"
+        "   - Troubleshooting (common issues and solutions)\n"
+        "   - Related jobs (see also)\n\n"
         "Format your response with clear section headers."
     )
 
@@ -187,6 +194,7 @@ def _parse_docs_response(response_text: str) -> Dict[str, Any]:
         "docs_changes": {},
         "upgrade_notes": "",
         "known_limitations": "",
+        "jtbd_documentation": "",
     }
 
     # Split response into sections
@@ -197,6 +205,7 @@ def _parse_docs_response(response_text: str) -> Dict[str, Any]:
     output["release_notes"] = sections.get("release note", "").strip()
     output["upgrade_notes"] = sections.get("upgrade note", "").strip()
     output["known_limitations"] = sections.get("known limitation", "").strip()
+    output["jtbd_documentation"] = sections.get("jtbd documentation", "").strip()
 
     # Parse documentation changes
     docs_section = sections.get("documentation change", "")
@@ -224,8 +233,8 @@ def _split_into_sections(text: str) -> Dict[str, str]:
     current_content = []
 
     for line in text.split("\n"):
-        # Check if line is a section header (## Header or ### Header)
-        if line.startswith("##"):
+        # Check if line is a section header (## Header only, not ###)
+        if line.startswith("##") and not line.startswith("###"):
             # Save previous section
             if current_section:
                 sections[current_section] = "\n".join(current_content)
@@ -233,7 +242,7 @@ def _split_into_sections(text: str) -> Dict[str, str]:
             current_section = line.lstrip("#").strip().lower()
             current_content = []
         else:
-            # Add to current section
+            # Add to current section (including ### subsections)
             if current_section:
                 current_content.append(line)
 
