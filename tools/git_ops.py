@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Self
 import shutil
 from git import Repo, GitCommandError, InvalidGitRepositoryError
-from git.refs import Head
 
 
 @dataclass(frozen=True, slots=True)

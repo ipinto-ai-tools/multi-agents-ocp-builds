@@ -6,7 +6,7 @@ documentation changes, and upgrade notes based on design, development, and test 
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from anthropic import Anthropic, APIError
 from config.agent_prompts import DOCS_AGENT_PROMPT

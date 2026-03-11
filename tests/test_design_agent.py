@@ -7,8 +7,7 @@ risk assessment, and implementation planning.
 
 import os
 import pytest
-from typing import Dict, Any
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from agents.design_agent import (
     run_design,

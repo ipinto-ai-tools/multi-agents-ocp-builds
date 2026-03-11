@@ -7,7 +7,6 @@ PR summaries, release notes, and upgrade notes.
 
 import os
 import pytest
-from typing import Dict, Any
 from unittest.mock import Mock, patch
 
 from agents.docs_agent import (
@@ -299,7 +298,7 @@ class TestDocsAgent:
             mock_anthropic.return_value = mock_client
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
-                result = run_docs(context_with_gaps)
+                run_docs(context_with_gaps)
 
                 # Check that context message includes gaps
                 call_args = mock_client.messages.create.call_args

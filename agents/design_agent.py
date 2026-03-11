@@ -8,9 +8,8 @@ structured design documentation including impact analysis, risk assessment, and
 implementation planning.
 """
 
-import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 try:
     from anthropic import Anthropic
@@ -22,19 +21,16 @@ except ImportError:
 from config.agent_prompts import DESIGN_AGENT_PROMPT
 from config.shipwright_components import (
     get_component_info,
-    validate_component,
     COMPONENTS,
     CRD_TYPES,
     BUILD_STRATEGIES,
     OPENSHIFT_INTEGRATIONS,
-    COMPONENT_DEPENDENCIES,
 )
 from tools.repo_search import RepoSearch
 
 
 class DesignAgentError(Exception):
     """Base exception for Design Agent errors."""
-    pass
 
 
 def run_design(title: str, description: str, repo_path: Optional[str] = None) -> Dict[str, Any]:

@@ -50,7 +50,6 @@ class PackageInfo:
 
 class RepositorySearchError(Exception):
     """Base exception for repository search errors."""
-    pass
 
 
 class RepoSearch:
@@ -130,7 +129,6 @@ class RepoSearch:
         Returns:
             List of SearchResult objects with file, line number, and content
         """
-        results = []
 
         # Try git grep first if available
         if self.git_repo is not None:

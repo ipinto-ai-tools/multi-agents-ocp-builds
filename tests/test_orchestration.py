@@ -6,8 +6,7 @@ the Design and Documentation agents through the complete issue-to-docs pipeline.
 
 import os
 import pytest
-from typing import Dict, Any
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 from agents.graph import (
     orchestrate,
@@ -16,7 +15,6 @@ from agents.graph import (
     docs_node,
     should_continue,
 )
-from graph.state import AgentState
 
 
 # Sample test data
