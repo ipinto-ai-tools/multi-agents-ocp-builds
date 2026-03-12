@@ -28,8 +28,11 @@ class AgentState(TypedDict):
     coverage_analysis: str
 
     # Development phase outputs
+    code_files: list  # List of code file dicts with path, content, description
+    test_files: list  # List of test file dicts with path, content
     code_changes: dict[str, str]  # file_path: changes
     files_modified: list[str]
+    pr_description: str
     test_results: dict
 
     # Test execution outputs
