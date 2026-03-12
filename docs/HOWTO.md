@@ -142,7 +142,7 @@ cp .env.example .env
 ```bash
 # Verify agents
 python -c "from agents.design_agent import design_agent; print('✓ Design agent')"
-python -c "from agents.go_k8s_developer import go_k8s_developer; print('✓ Development agent')"  # (Planned)
+python -c "from agents.go_k8s_developer import go_k8s_developer; print('✓ Development agent')"
 python -c "from agents.docs_agent import docs_agent; print('✓ Docs agent')"
 ```
 
@@ -548,7 +548,7 @@ The system uses **LangGraph** for stateful workflow orchestration with specializ
 | Agent                 | Purpose                                      | Input                     | Output                    |
 |-----------------------|----------------------------------------------|---------------------------|---------------------------|
 | **Design Agent**      | Analyze requirements and plan implementation | Issue description, repo   | Implementation plan       |
-| **Development Agent** | Write production Go code (Planned)           | Implementation plan       | Production Go code        |
+| **Development Agent** | Write production Go code                     | Implementation plan       | Production Go code        |
 | **Testing Agent**     | Generate comprehensive test suite            | Implementation plan       | Ginkgo v2 tests           |
 | **Docs Agent**        | Create professional documentation            | Changes, context          | PR summary, release notes |
 
@@ -877,7 +877,7 @@ The Testing Agent is inspired by Red Hat's qualityflow test generation framework
 
 ---
 
-### Development Agent (Planned)
+### Development Agent
 
 **File:** `agents/go_k8s_developer.py`
 

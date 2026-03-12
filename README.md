@@ -14,7 +14,7 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 ### Intelligent Analysis
 
 - **Design Agent**: Analyzes GitHub issues and generates comprehensive design documents using Claude API
-- **Development Agent** (Planned): Writes production-quality Go code for Kubernetes/OpenShift following strict security standards
+- **Development Agent**: Writes production-quality Go code for Kubernetes/OpenShift following strict security standards
 - **Testing Agent**: Generates Ginkgo v2 tests with Data-Driven Testing patterns for unit, integration, and E2E scenarios
 - **Documentation Agent**: Produces PR summaries, release notes, and documentation changes
 - **Repository Analysis**: Examines Shipwright codebase to identify impacted components
@@ -231,7 +231,7 @@ The system uses a multi-agent architecture orchestrated by LangGraph:
 │    Design    │  │  Develop │  │ Testing  │  │   Docs   │
 │    Agent     │─>│  Agent   │─>│  Agent   │─>│  Agent   │
 ├──────────────┤  ├──────────┤  ├──────────┤  ├──────────┤
-│  Claude API  │  │(Planned) │  │Claude API│  │Claude API│
+│  Claude API  │  │Claude API│  │Claude API│  │Claude API│
 └──────┬───────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
        │               │             │             │
        └───────────────┼─────────────┼─────────────┘
@@ -248,7 +248,7 @@ The system uses a multi-agent architecture orchestrated by LangGraph:
 | Agent                  | Input                    | Output                                    | Purpose                                      |
 |------------------------|--------------------------|-------------------------------------------|----------------------------------------------|
 | **Design Agent**       | Issue description, repo  | Implementation plan, analysis             | Strategic planning and architectural review  |
-| **Development Agent**  | Implementation plan      | Production Go code                        | Write secure, maintainable K8s/OpenShift code (Planned) |
+| **Development Agent**  | Implementation plan      | Production Go code                        | Write secure, maintainable K8s/OpenShift code |
 | **Testing Agent**      | Implementation plan      | Ginkgo v2 test suite                      | Comprehensive test coverage                  |
 | **Docs Agent**         | Changes, context         | PR description, release notes             | Professional documentation                   |
 | **Orchestrator**       | User request             | Coordinated agent workflow                | Multi-agent coordination via LangGraph       |
@@ -263,7 +263,7 @@ For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITE
 muilti-agents-ocp-builds/
 ├── agents/               # AI agent implementations
 │   ├── design_agent.py   # Design analysis agent (Claude API)
-│   ├── go_k8s_developer.py  # Production Go code generation (Planned)
+│   ├── go_k8s_developer.py  # Production Go code generation (Claude API)
 │   ├── testing_agent.py  # Test generation agent (Claude API)
 │   ├── docs_agent.py     # Documentation generation agent (Claude API)
 │   └── graph.py          # LangGraph workflow orchestrator
@@ -385,7 +385,7 @@ uv run pytest tests/ -v
 ```bash
 # Test individual agents
 pytest tests/test_agents_validator_design.py -v
-pytest tests/test_agents_validator_develop.py -v  # (Planned)
+pytest tests/test_agents_validator_develop.py -v
 pytest tests/test_agents_validator_testing.py -v
 pytest tests/test_agents_validator_docs.py -v
 
