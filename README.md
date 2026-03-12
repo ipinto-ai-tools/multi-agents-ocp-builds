@@ -262,46 +262,69 @@ For detailed architecture documentation, see [docs/ARCHITECTURE.md](docs/ARCHITE
 ```text
 muilti-agents-ocp-builds/
 ├── agents/               # AI agent implementations
-│   ├── design_agent.py   # Design analysis agent (Claude API)
-│   ├── go_k8s_developer.py  # Production Go code generation (Claude API)
-│   ├── testing_agent.py  # Test generation agent (Claude API)
-│   ├── docs_agent.py     # Documentation generation agent (Claude API)
+│   ├── design_agent.py   # Design analysis agent with SHIP format support
+│   ├── docs_agent.py     # Documentation generation with Agentic RAG
+│   ├── go_k8s_developer.py  # Production Go/K8s code generation
+│   ├── testing_agent.py  # Ginkgo v2 test generation with enhanced patterns
 │   └── graph.py          # LangGraph workflow orchestrator
+├── config/               # Configuration files
+│   ├── agent_prompts.py  # Agent system prompts and templates
+│   ├── auth_config.py    # Authentication configuration and utilities
+│   ├── mock_responses.py # Mock API responses for dry-run mode
+│   ├── testing_config.py # Testing patterns and Ginkgo templates
+│   └── shipwright_components.py  # Shipwright component definitions
 ├── dashboard/            # Real-time monitoring dashboard
 │   ├── backend.py        # FastAPI dashboard server
-│   ├── heartbeat.py      # Heartbeat protocol implementation
 │   ├── enrichers.py      # State enrichment pipeline
-│   └── frontend/         # Web UI
-│       └── index.html    # Dashboard interface
-├── graph/                # LangGraph state management
-│   └── state.py          # Agent state schema
-├── tools/                # Repository analysis tools
-│   ├── repo_search.py    # Code search and analysis
-│   ├── rag_search.py     # Documentation search with RAG
-│   └── git_ops.py        # Git operations
-├── utils/                # Utility modules
-│   └── logging_config.py # Logging configuration and debug support
-├── mcp/                  # MCP server integration stubs
-│   ├── github_stub.py    # GitHub MCP server stub (future)
-│   └── jira_stub.py      # Jira MCP server stub (future)
-├── config/               # Configuration files
-│   ├── agent_prompts.py  # Agent system prompts
-│   ├── testing_config.py # Testing patterns and Ginkgo templates
-│   ├── shipwright_components.py  # Component definitions
-│   └── mock_responses.py # Mock API responses for dry-run mode
-├── tests/                # Test suite
-│   ├── test_design_agent.py
-│   ├── test_docs_agent.py
-│   ├── test_dashboard.py
-│   └── test_orchestration.py
+│   ├── heartbeat.py      # Heartbeat protocol implementation
+│   ├── frontend/         # Web UI
+│   │   └── index.html    # Dashboard interface
+│   └── __init__.py       # Dashboard module initialization
 ├── docs/                 # Documentation
-│   ├── HOWTO.md          # User guide
-│   ├── ARCHITECTURE.md   # System architecture
-│   ├── DASHBOARD_ARCHITECTURE.md  # Dashboard design
+│   ├── ARCHITECTURE.md   # System architecture overview
+│   ├── AUTHENTICATION.md # Authentication and dry-run mode guide
+│   ├── DASHBOARD_ARCHITECTURE.md  # Dashboard design and implementation
+│   ├── DOCS_AGENT_ENHANCEMENTS.md # Docs agent features and usage
+│   ├── GO_K8S_DEVELOPER_AGENT.md  # Go/K8s developer agent guide
+│   ├── HOWTO.md          # Comprehensive user guide with examples
+│   ├── IMPLEMENTATION_SUMMARY.md  # Implementation details and history
+│   ├── TESTING_AGENT.md  # Testing agent capabilities and patterns
 │   └── TESTING_INFRASTRUCTURE.md  # Testing infrastructure guide
+├── examples/             # Example usage scripts
+│   ├── auth_example.py   # Authentication configuration example
+│   └── test_agents_demo.sh  # Demo script for agent testing
+├── graph/                # LangGraph state management
+│   ├── state.py          # Agent state schema and types
+│   └── __init__.py       # Graph module initialization
+├── mcp/                  # MCP server integration stubs
+│   ├── github_stub.py    # GitHub MCP server stub
+│   ├── jira_stub.py      # Jira MCP server stub
+│   └── __init__.py       # MCP module initialization
 ├── scripts/              # Utility scripts
+│   ├── orchestrate.py    # Manual orchestration runner
 │   ├── run_dashboard.py  # Dashboard server launcher
 │   └── test_agents.py    # CLI tool for manual agent testing
+├── tests/                # Comprehensive test suite
+│   ├── conftest.py       # Pytest configuration and fixtures
+│   ├── test_agents_validator_dashboard.py  # Dashboard integration tests
+│   ├── test_agents_validator_design.py     # Design agent validation
+│   ├── test_agents_validator_develop.py    # Go/K8s developer agent tests
+│   ├── test_agents_validator_docs.py       # Docs agent validation
+│   ├── test_agents_validator_docs_enhanced.py  # Enhanced docs tests
+│   ├── test_agents_validator_orchestration.py  # Orchestration tests
+│   ├── test_agents_validator_rag.py        # RAG functionality tests
+│   ├── test_agents_validator_testing.py    # Testing agent validation
+│   ├── test_auth_config.py                 # Authentication config tests
+│   ├── README.md         # Test suite documentation
+│   └── SUMMARY.md        # Test coverage summary
+├── tools/                # Repository analysis tools
+│   ├── git_ops.py        # Git operations and utilities
+│   ├── rag_search.py     # Documentation search with RAG
+│   ├── repo_search.py    # Code search and analysis
+│   └── __init__.py       # Tools module initialization
+├── utils/                # Utility modules
+│   ├── logging_config.py # Logging configuration and debug support
+│   └── __init__.py       # Utils module initialization
 ├── .env.example          # Environment configuration template
 ├── requirements.txt      # Python dependencies
 └── README.md             # This file
