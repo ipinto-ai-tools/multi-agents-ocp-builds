@@ -109,7 +109,7 @@ uv run python scripts/test_agents.py \
 
 # Test with live dashboard (requires dashboard to be running)
 # Terminal 1:
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 
 # Terminal 2:
 uv run python scripts/test_agents.py \
@@ -458,7 +458,7 @@ uv run python scripts/test_agents.py --e2e --title "..." --description "..."
 
 ```bash
 # Terminal 1
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 
 # Terminal 2
 uv run python scripts/test_agents.py --dashboard
@@ -562,7 +562,7 @@ uv run python scripts/test_agents.py \
 
 ```bash
 # Start dashboard
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py &
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py &
 
 # Run E2E with dashboard monitoring
 uv run python scripts/test_agents.py --e2e \

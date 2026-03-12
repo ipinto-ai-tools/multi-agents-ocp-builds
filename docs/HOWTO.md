@@ -486,8 +486,10 @@ Run the dashboard server:
 
 ```bash
 # Start dashboard backend
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 ```
+
+**Note:** The dashboard requires `requests` for heartbeat communication with agents.
 
 The dashboard will be available at:
 - **Web UI**: http://localhost:8080

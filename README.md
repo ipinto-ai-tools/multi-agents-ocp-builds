@@ -190,7 +190,7 @@ This generates a design document with component analysis and recommendations.
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 # Open http://localhost:8080 in your browser
 
 # Terminal 2: Run the workflow
@@ -234,7 +234,8 @@ python scripts/orchestrate.py \
   --description "Detailed description"
 
 # 2. Start the dashboard (for monitoring)
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+# Note: The dashboard requires 'requests' for heartbeat communication with agents
 
 # 3. Run tests
 uv run pytest tests/ -v
@@ -407,7 +408,7 @@ Monitor the workflow in real-time:
 
 ```bash
 # Terminal 1: Start dashboard
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 
 # Terminal 2: Run workflow
 # Option 1: With virtual environment (recommended for repeated use)

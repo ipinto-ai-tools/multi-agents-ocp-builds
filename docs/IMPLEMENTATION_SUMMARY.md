@@ -850,7 +850,7 @@ python scripts/orchestrate.py \
 **Full Orchestration with Dashboard:**
 ```bash
 # Terminal 1: Start dashboard
-uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 
 # Terminal 2: Run workflow
 # Option 1: With virtual environment (recommended for repeated use)
