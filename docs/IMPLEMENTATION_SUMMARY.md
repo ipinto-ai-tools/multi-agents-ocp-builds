@@ -795,11 +795,13 @@ cd muilti-agents-ocp-builds
 
 **Install dependencies:**
 ```bash
-# Using uv (recommended)
-uv pip install -r requirements.txt
-
-# Or using pip
+# Option 1: Create virtual environment with uv
+uv venv
+source .venv/bin/activate
 pip install -r requirements.txt
+
+# Option 2: Use uv sync if pyproject.toml is configured
+uv sync
 ```
 
 **Configure API key:**
@@ -829,6 +831,13 @@ uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
 
 **Design Analysis:**
 ```bash
+# Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
@@ -837,9 +846,15 @@ uv run scripts/orchestrate.py \
 **Full Orchestration with Dashboard:**
 ```bash
 # Terminal 1: Start dashboard
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 
-# Terminal 2: Run workflow
+# Terminal 2: Run workflow (requires dependencies installed)
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Feature Request" \
   --description "Add new capability"
@@ -864,7 +879,9 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          uv pip install -r requirements.txt
+          uv venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
           uv run scripts/orchestrate.py \
             --title "${{ github.event.issue.title }}" \
             --description "${{ github.event.issue.body }}"
@@ -1085,7 +1102,9 @@ jobs:
 ```bash
 git clone https://github.com/ILpinto/multi-agents-ocp-builds.git
 cd multi-agents-ocp-builds
-uv pip install -r requirements.txt
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
 uv run pytest tests/ -v
 ```
 

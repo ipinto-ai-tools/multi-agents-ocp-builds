@@ -241,7 +241,7 @@ DASHBOARD_DB_PATH=/tmp/claude/dashboard.db
 ### Step 1: Start the Dashboard
 
 ```bash
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 ```
 
 Open your browser to <http://localhost:8080>
@@ -249,6 +249,13 @@ Open your browser to <http://localhost:8080>
 ### Step 2: Run Your Agents
 
 ```bash
+# Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add timeout support" \
   --description "Users need build timeout config"
@@ -315,7 +322,7 @@ uv run pytest tests/test_dashboard.py --cov=dashboard --cov-report=html
 
 ### Manual Testing
 
-1. Start dashboard: `uv run python scripts/run_dashboard.py`
+1. Start dashboard: `uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py`
 2. Open browser: http://localhost:8080
 3. Run agent workflow in another terminal
 4. Observe session cards update in real-time

@@ -113,8 +113,13 @@ cd muilti-agents-ocp-builds
 Using `uv` (recommended):
 
 ```bash
-# Install dependencies
-uv pip install -r requirements.txt
+# Option 1: Create virtual environment with uv
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Option 2: Use uv sync if pyproject.toml is configured
+uv sync
 ```
 
 Alternative using standard pip:
@@ -288,6 +293,13 @@ CACHE_TTL=3600
 This runs all four agents in sequence: Design → Development → Testing → Documentation
 
 ```bash
+# Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun" \
   --description "Users need ability to specify build timeout to prevent hanging builds"
@@ -432,7 +444,7 @@ Run the dashboard server:
 
 ```bash
 # Start dashboard backend
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 ```
 
 The dashboard will be available at:
@@ -1881,13 +1893,22 @@ ImportError: anthropic library is required
 **Solution:**
 ```bash
 # Install missing dependencies
-uv pip install -r requirements.txt
+# Option 1: Create virtual environment with uv
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
 # Or install specific package
-uv pip install anthropic
+# For one-time usage:
+uv run --with anthropic python script.py
+
+# For persistent installation in virtual environment:
+uv venv
+source .venv/bin/activate
+pip install anthropic
 
 # Verify installation
-uv run python -c "import anthropic; print('✓ anthropic installed')"
+uv run --with anthropic python -c "import anthropic; print('✓ anthropic installed')"
 ```
 
 ---
@@ -2131,8 +2152,10 @@ uv run pytest tests/integration/
 
 **Manual Testing:**
 
-```python
+```bash
 # Test design agent
+# Requires dependencies from requirements.txt
+# Run after: pip install -r requirements.txt in activated venv
 uv run python -c "
 from agents.design_agent import run_design
 
@@ -2144,6 +2167,8 @@ print(result['design_analysis'])
 "
 
 # Test docs agent
+# Requires dependencies from requirements.txt
+# Run after: pip install -r requirements.txt in activated venv
 uv run python -c "
 from agents.docs_agent import run_docs
 

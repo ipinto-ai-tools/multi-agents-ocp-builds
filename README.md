@@ -78,11 +78,13 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 2. **Install dependencies**
 
    ```bash
-   # Using uv (recommended)
-   uv pip install -r requirements.txt
-
-   # Or using pip
+   # Option 1: Create virtual environment with uv
+   uv venv
+   source .venv/bin/activate
    pip install -r requirements.txt
+
+   # Option 2: Use uv sync if pyproject.toml is configured
+   uv sync
    ```
 
 3. **Configure environment**
@@ -166,6 +168,13 @@ See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for detailed setup.
 **Option 1: Quick design analysis** (no GitHub required)
 
 ```bash
+# Note: Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
@@ -177,10 +186,16 @@ This generates a design document with component analysis and recommendations.
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 # Open http://localhost:8080 in your browser
 
-# Terminal 2: Run the workflow
+# Terminal 2: Run the workflow (requires dependencies installed)
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
@@ -194,12 +209,19 @@ The dashboard shows real-time progress, context usage, and component impacts.
 
 ```bash
 # 1. Run a workflow (most common)
+# Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Your feature title" \
   --description "Detailed description"
 
 # 2. Start the dashboard (for monitoring)
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 
 # 3. Run tests
 uv run pytest tests/ -v
@@ -348,6 +370,13 @@ muilti-agents-ocp-builds/
 Generate a design document for a feature request:
 
 ```bash
+# Requires dependencies from requirements.txt
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add BuildRun timeout support" \
   --description "Users need to configure max execution time for builds"
@@ -361,9 +390,15 @@ Monitor the workflow in real-time:
 
 ```bash
 # Terminal 1: Start dashboard
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 
-# Terminal 2: Run workflow
+# Terminal 2: Run workflow (requires dependencies installed)
+# First time: Create venv and install dependencies
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Then run:
 uv run scripts/orchestrate.py \
   --title "Add BuildRun timeout support" \
   --description "Users need to configure max execution time for builds"
@@ -407,10 +442,10 @@ uv run pytest tests/ -v
 
 ```bash
 # Test individual agents
-pytest tests/test_agents_validator_design.py -v
-pytest tests/test_agents_validator_develop.py -v
-pytest tests/test_agents_validator_testing.py -v
-pytest tests/test_agents_validator_docs.py -v
+uv run pytest tests/test_agents_validator_design.py -v
+uv run pytest tests/test_agents_validator_develop.py -v
+uv run pytest tests/test_agents_validator_testing.py -v
+uv run pytest tests/test_agents_validator_docs.py -v
 
 # Test orchestration
 uv run pytest tests/test_orchestration.py -v

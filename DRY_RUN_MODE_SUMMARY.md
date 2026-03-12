@@ -157,7 +157,7 @@ uv run python scripts/test_agents.py --agent docs --dry-run --debug
 
 ```bash
 # Terminal 1: Start dashboard
-uv run python scripts/run_dashboard.py
+uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 
 # Terminal 2: Test dashboard
 uv run python scripts/test_agents.py --dashboard
