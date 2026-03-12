@@ -27,13 +27,14 @@ The Multi-Agent OpenShift Builds system is a **LangGraph-based orchestration fra
 
 ### What does it do?
 
-The system automates the **design analysis and documentation generation** workflow:
+The system automates the **complete software development workflow** from design to documentation:
 
-1. **Analyzes** feature requests or bug reports
-2. **Identifies** impacted components in the Shipwright codebase
-3. **Assesses** risks and compatibility concerns
-4. **Generates** implementation plans with acceptance criteria
-5. **Produces** documentation artifacts (PR summaries, release notes)
+1. **Design Analysis** - Analyzes feature requests or bug reports
+2. **Component Impact** - Identifies impacted components in the Shipwright codebase
+3. **Risk Assessment** - Assesses risks and compatibility concerns
+4. **Code Generation** - Generates production-quality Go code for Kubernetes/OpenShift
+5. **Test Generation** - Creates comprehensive Ginkgo v2 test suites (unit, integration, E2E)
+6. **Documentation** - Produces PR summaries, release notes, and user-facing JTBD documentation
 
 ### Who should use it?
 
@@ -141,15 +142,18 @@ cp .env.example .env
 
 ```bash
 # Verify agents
-python -c "from agents.design_agent import design_agent; print('✓ Design agent')"
-python -c "from agents.go_k8s_developer import go_k8s_developer; print('✓ Development agent')"
-python -c "from agents.docs_agent import docs_agent; print('✓ Docs agent')"
+python -c "from agents.design_agent import run_design; print('✓ Design agent')"
+python -c "from agents.go_k8s_developer import run_development; print('✓ Development agent')"
+python -c "from agents.testing_agent import run_testing; print('✓ Testing agent')"
+python -c "from agents.docs_agent import run_docs; print('✓ Docs agent')"
 ```
 
 Expected output:
 ```
-✓ Design agent loaded
-✓ Docs agent loaded
+✓ Design agent
+✓ Development agent
+✓ Testing agent
+✓ Docs agent
 ```
 
 ---
@@ -281,7 +285,7 @@ CACHE_TTL=3600
 
 ### Quick Start: Run the Full Workflow
 
-This runs both Design and Documentation agents:
+This runs all four agents in sequence: Design → Development → Testing → Documentation
 
 ```bash
 uv run scripts/orchestrate.py \
@@ -291,11 +295,12 @@ uv run scripts/orchestrate.py \
 
 **What you get:**
 
-1. A complete design document with component analysis
-2. A PR summary ready to paste into GitHub
-3. Release notes for the changelog
+1. **Design Analysis** - Complete design document with component analysis, risks, and implementation plan
+2. **Production Code** - Go code files ready for Kubernetes/OpenShift with TLS 1.3 and security best practices
+3. **Test Suite** - Ginkgo v2 tests (unit, integration, E2E) with data-driven patterns
+4. **Documentation** - PR summary, release notes, and Jobs-to-be-Done user documentation
 
-All three are printed to the console when the workflow finishes.
+All outputs are printed to the console when the workflow completes.
 
 ### Standalone Agent Execution
 
@@ -337,6 +342,41 @@ Then run: `uv run python docs_only.py`
 
 **For most users:** Use `uv run scripts/orchestrate.py` which handles agent coordination automatically.
 
+### Understanding the Complete Workflow
+
+When you run the orchestrator, all four agents execute in sequence with shared state:
+
+**Phase 1: Design Analysis**
+- Input: Issue title and description
+- Agent analyzes requirements, identifies components, assesses risks
+- Output: Implementation plan, acceptance criteria, component list
+
+**Phase 2: Code Generation**
+- Input: Design analysis and implementation plan
+- Agent generates production Go code following K8s/OpenShift patterns
+- Output: Code files, unit tests, PR description
+
+**Phase 3: Test Generation**
+- Input: Design analysis, acceptance criteria, implementation plan
+- Agent creates comprehensive Ginkgo v2 test suite
+- Output: Unit, integration, and E2E tests with test specifications
+
+**Phase 4: Documentation**
+- Input: All previous outputs
+- Agent generates user-facing documentation
+- Output: PR summary, release notes, JTBD docs, upgrade notes
+
+**Workflow visualization:**
+
+```
+Issue → Design Agent → Development Agent → Testing Agent → Docs Agent → Complete
+         |              |                   |               |
+         ↓              ↓                   ↓               ↓
+       Plan           Code               Tests            Docs
+```
+
+Each agent builds on the previous agent's output, creating a cohesive workflow from requirements to documentation.
+
 ### Real-World Examples
 
 **Example 1: Analyze a feature request**
@@ -366,7 +406,13 @@ uv run scripts/orchestrate.py \
   --description "Users need to build from private Git repos using SSH authentication"
 ```
 
-When you provide SHIPWRIGHT_REPO_PATH, agents can analyze actual code structure and identify specific files to modify.
+When you provide `SHIPWRIGHT_REPO_PATH`, agents can:
+
+- Analyze actual code structure and patterns
+- Identify specific files to modify
+- Generate code that matches existing conventions
+- Create tests that use actual test helpers
+- Produce more accurate component impact analysis
 
 ---
 
@@ -525,32 +571,33 @@ The system uses **LangGraph** for stateful workflow orchestration with specializ
          │   (agents/graph.py)   │
          └───────────┬───────────┘
                      │
-         ┌───────────┴───────────┐
-         │                       │
-         ▼                       ▼
-┌────────────────┐    ┌────────────────┐    ┌────────────────┐
-│ Design Agent   │───▶│ Testing Agent  │───▶│ Docs Agent     │
-│ (design_agent) │    │(testing_agent) │    │ (docs_agent)   │
-└────────┬───────┘    └────────┬───────┘    └────────┬───────┘
-         │                     │                      │
-         │ Uses                │ Uses                 │ Uses
-         ▼                     ▼                      ▼
-┌─────────────────────────────────────────┐
-│             Tools                       │
-│  • repo_search (code analysis)          │
-│  • git_ops (git operations)             │
-│  • shipwright_components (domain KB)    │
-└─────────────────────────────────────────┘
+         ┌───────────┴───────────┬───────────────┬───────────┐
+         │                       │               │           │
+         ▼                       ▼               ▼           ▼
+┌────────────────┐    ┌────────────────┐    ┌──────────┐  ┌──────────┐
+│ Design Agent   │───▶│ Development    │───▶│ Testing  │─▶│ Docs     │
+│                │    │ Agent          │    │ Agent    │  │ Agent    │
+└────────┬───────┘    └────────┬───────┘    └─────┬────┘  └─────┬────┘
+         │                     │                   │             │
+         │ Uses                │ Uses              │ Uses        │ Uses
+         ▼                     ▼                   ▼             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         Tools                                   │
+│  • repo_search (code analysis and exploration)                  │
+│  • git_ops (git repository operations)                          │
+│  • shipwright_components (domain knowledge base)                │
+│  • rag_search (agentic RAG for documentation)                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ### Agent Roles
 
-| Agent                 | Purpose                                      | Input                     | Output                    |
-|-----------------------|----------------------------------------------|---------------------------|---------------------------|
-| **Design Agent**      | Analyze requirements and plan implementation | Issue description, repo   | Implementation plan       |
-| **Development Agent** | Write production Go code                     | Implementation plan       | Production Go code        |
-| **Testing Agent**     | Generate comprehensive test suite            | Implementation plan       | Ginkgo v2 tests           |
-| **Docs Agent**        | Create professional documentation            | Changes, context          | PR summary, release notes |
+| Agent                 | Purpose                                               | Input                                    | Output                                                           |
+|-----------------------|-------------------------------------------------------|------------------------------------------|------------------------------------------------------------------|
+| **Design Agent**      | Analyze requirements and plan implementation          | Issue description, repo                  | Design analysis, implementation plan, risks, acceptance criteria |
+| **Development Agent** | Write production Go code with security best practices | Design plan, repo context                | Production Go code, unit tests, PR description                   |
+| **Testing Agent**     | Generate comprehensive Ginkgo v2 test suite           | Design analysis, acceptance criteria     | Test plan, unit/integration/E2E tests, test specifications       |
+| **Docs Agent**        | Create professional documentation with JTBD           | All previous outputs                     | PR summary, release notes, JTBD docs, upgrade notes              |
 
 ### Tools
 
@@ -565,31 +612,30 @@ The system uses **LangGraph** for stateful workflow orchestration with specializ
 The workflow is managed by **LangGraph** with stateful transitions:
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│              LangGraph Orchestrator                 │
-│                                                     │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐     │
-│  │  Design  │ →  │ Develop  │ →  │ Testing  │ →   │
-│  │  Agent   │    │  Agent   │    │  Agent   │     │
-│  └──────────┘    └──────────┘    └──────────┘     │
-│                                        ↓           │
-│                                  ┌──────────┐     │
-│                                  │   Docs   │     │
-│                                  │  Agent   │     │
-│                                  └──────────┘     │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    LangGraph Orchestrator                       │
+│                                                                 │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐ │
+│  │  Design  │ →  │ Develop  │ →  │ Testing  │ →  │   Docs   │ │
+│  │  Agent   │    │  Agent   │    │  Agent   │    │  Agent   │ │
+│  └──────────┘    └──────────┘    └──────────┘    └──────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 
 State flow:
-init → design → design_complete → develop → develop_complete → testing → testing_complete → docs → done
-                                                                                              ↓
-                                                                                            error
+init → design → design_complete → develop → develop_complete →
+       testing → testing_complete → docs → done
+                                       ↓
+                                     error
 ```
 
 **State Schema** (`graph/state.py`):
-- Input: issue details, repo path
-- Design phase: analysis, components, risks, criteria
-- Docs phase: PR summary, release notes, doc changes
-- Control flow: current phase, approval status, messages
+- **Input**: issue details, repo path, issue type
+- **Design phase**: analysis, components, risks, acceptance criteria, implementation plan
+- **Development phase**: code files, test files, code changes, files modified
+- **Testing phase**: test plan, test specifications, unit/integration/E2E tests, coverage analysis
+- **Documentation phase**: PR summary, release notes, JTBD docs, upgrade notes
+- **Control flow**: current phase, session ID, approval status, messages
 
 ---
 
@@ -1556,15 +1602,28 @@ uv run scripts/orchestrate.py \
      - Controller retries failed builds up to maxRetries
      - Each retry is recorded in BuildRun status
 
-2. **Docs Agent generates documentation:**
+2. **Development Agent generates Go code:**
+   - Adds Retry field to BuildRunSpec struct
+   - Implements retry logic in controller reconciliation
+   - Adds validation for retry configuration
+   - Generates unit tests with table-driven patterns
+
+3. **Testing Agent creates comprehensive test suite:**
+   - Unit tests: Retry field validation and edge cases
+   - Integration tests: Controller retry behavior with real K8s cluster
+   - E2E tests: Full retry workflow with actual builds
+   - Test specifications with structured IDs
+
+4. **Docs Agent generates documentation:**
    - PR Summary: "Adds retry support to BuildRun API..."
    - Release Notes: "**Enhancement:** BuildRuns now support automatic retries..."
+   - JTBD Documentation: User-focused task guides for configuring retries
    - Doc Changes: Update `docs/buildrun.md` with retry examples
 
 **Expected Output:**
 
 ```markdown
-DESIGN_ANALYSIS
+=== DESIGN ANALYSIS ===
 # Design: Add automatic retry for failed BuildRuns
 
 ## Problem Statement
@@ -1580,11 +1639,27 @@ BuildRuns currently fail permanently on transient errors...
   **Mitigation**: Enforce maximum retry limit (e.g., 10)
 ...
 
+=== GENERATED CODE ===
+pkg/apis/build/v1/buildrun_types.go
+pkg/controller/buildrun_controller.go
+...
+
+=== TEST SUITE ===
+Unit Tests: 5 files
+Integration Tests: 3 files
+E2E Tests: 2 files
+Coverage: All acceptance criteria mapped
+
+=== DOCUMENTATION ===
 PR_SUMMARY
 This PR adds configurable retry logic to the BuildRun API...
 
 RELEASE_NOTES
 **Enhancement:** BuildRuns now support automatic retries for transient failures...
+
+JTBD_DOCUMENTATION
+## Job: Automatically retry failed builds due to transient errors
+...
 ```
 
 ---
@@ -1608,7 +1683,17 @@ uv run scripts/orchestrate.py \
    - Root cause hypothesis: Event watch issues or race condition
    - Suggests adding reconciliation retry and status validation
 
-2. **Docs Agent prepares bug fix documentation:**
+2. **Development Agent implements the fix:**
+   - Adds defensive status check in reconciliation loop
+   - Implements periodic status sync mechanism
+   - Adds proper error handling and retries
+
+3. **Testing Agent creates regression tests:**
+   - Unit tests: Status update edge cases
+   - Integration tests: Reconciliation with missed events
+   - E2E tests: Full build lifecycle with status validation
+
+4. **Docs Agent prepares bug fix documentation:**
    - PR Summary focuses on the fix
    - Release Notes mention bug fix
    - Upgrade notes: none (backward compatible fix)
@@ -1669,14 +1754,27 @@ uv run scripts/orchestrate.py \
    - Identifies OCI registry code in `pkg/registry/`
    - Generates design considering existing patterns
 
-2. **LangGraph State Management:**
-   - State: `init` → `design` → `design_complete` → `docs` → `done`
-   - Passes design outputs to docs agent
+2. **Development Agent:**
+   - Creates OCI artifact source handler following existing patterns
+   - Implements authentication for OCI registries
+   - Adds API fields to Build CRD for OCI source type
+   - Generates unit tests for new source handler
 
-3. **Docs Agent:**
-   - Receives design analysis
+3. **Testing Agent:**
+   - Creates unit tests for OCI artifact parsing
+   - Generates integration tests for OCI registry operations
+   - Produces E2E test with actual Helm chart as OCI artifact source
+   - Includes test cases for authentication scenarios
+
+4. **LangGraph State Management:**
+   - State: `init` → `design` → `design_complete` → `develop` → `develop_complete` → `testing` → `testing_complete` → `docs` → `done`
+   - Passes outputs between agents via shared state
+
+5. **Docs Agent:**
+   - Receives design analysis, code, and test outputs
    - Generates comprehensive PR description
    - Creates release notes highlighting new capability
+   - Produces JTBD documentation for using OCI artifacts
    - Suggests doc updates for user guide
 
 **Output Structure:**
@@ -2065,32 +2163,54 @@ print(result['pr_summary'])
 
 ```
 muilti-agents-ocp-builds/
-├── agents/               # AI agents
-│   ├── design_agent.py  # Design analysis agent
-│   ├── docs_agent.py    # Documentation agent
-│   └── graph.py         # LangGraph orchestration
-├── config/              # Configuration
-│   ├── agent_prompts.py # System prompts for agents
-│   └── shipwright_components.py  # Domain knowledge
-├── tools/               # Utility tools
-│   ├── repo_search.py   # Code analysis
-│   ├── git_ops.py       # Git operations
+├── agents/                      # AI agents
+│   ├── design_agent.py          # Design analysis agent
+│   ├── go_k8s_developer.py      # Go/K8s development agent
+│   ├── testing_agent.py         # Ginkgo v2 test generation agent
+│   ├── docs_agent.py            # Documentation agent
+│   ├── graph.py                 # LangGraph orchestration
 │   └── __init__.py
-├── graph/               # LangGraph state
-│   ├── state.py         # State schema
+├── config/                      # Configuration
+│   ├── agent_prompts.py         # System prompts for agents
+│   ├── testing_config.py        # Testing agent configuration
+│   ├── auth_config.py           # Authentication configuration
+│   ├── mock_responses.py        # Mock responses for testing
+│   └── shipwright_components.py # Domain knowledge
+├── tools/                       # Utility tools
+│   ├── repo_search.py           # Code analysis and exploration
+│   ├── rag_search.py            # Agentic RAG for documentation
+│   ├── git_ops.py               # Git operations
 │   └── __init__.py
-├── scripts/             # Entry points
-│   └── orchestrate.py   # Main orchestration script
-├── tests/               # Test suite
+├── graph/                       # LangGraph state
+│   ├── state.py                 # State schema
+│   └── __init__.py
+├── dashboard/                   # Real-time monitoring
+│   ├── api.py                   # FastAPI dashboard backend
+│   ├── heartbeat.py             # Heartbeat emission
+│   ├── enrichers.py             # Data enrichment
+│   └── static/                  # Frontend assets
+├── scripts/                     # Entry points
+│   ├── orchestrate.py           # Main orchestration script
+│   ├── run_dashboard.py         # Dashboard server
+│   └── test_agents.py           # Agent testing utility
+├── tests/                       # Test suite
 │   ├── test_design_agent.py
 │   ├── test_docs_agent.py
+│   ├── test_testing_agent.py
+│   ├── test_auth_config.py
+│   ├── test_agents_validator_*.py  # Validation tests
 │   └── integration/
-├── docs/                # Documentation
-│   ├── HOWTO.md         # This file
-│   └── ARCHITECTURE.md  # System architecture
-├── .env.example         # Environment template
-├── requirements.txt     # Python dependencies
-└── README.md            # Project overview
+├── docs/                        # Documentation
+│   ├── HOWTO.md                 # This file
+│   ├── ARCHITECTURE.md          # System architecture
+│   ├── AUTHENTICATION.md        # Authentication guide
+│   ├── TESTING_INFRASTRUCTURE.md # Testing infrastructure
+│   └── DASHBOARD_ARCHITECTURE.md # Dashboard design
+├── examples/                    # Example usage
+│   └── input_files/             # Sample input files
+├── .env.example                 # Environment template
+├── requirements.txt             # Python dependencies
+└── README.md                    # Project overview
 ```
 
 ---
@@ -2265,11 +2385,29 @@ design_file.write_text(result["design_analysis"])
 
 ## Summary
 
-The Multi-Agent OpenShift Builds system streamlines the **design and documentation workflow** for Shipwright Build development:
+The Multi-Agent OpenShift Builds system streamlines the **complete development workflow** for Shipwright Build - from design through code generation, testing, and documentation:
+
+**Four Specialized Agents:**
+
+1. **Design Agent** - Analyzes requirements, identifies impacted components, assesses risks
+2. **Development Agent** - Generates production-quality Go code with security best practices
+3. **Testing Agent** - Creates comprehensive Ginkgo v2 test suites (unit, integration, E2E)
+4. **Documentation Agent** - Produces PR summaries, release notes, and JTBD user docs
+
+**Quick Start:**
 
 1. **Install** with `uv pip install -r requirements.txt`
-2. **Configure** `.env` with your `ANTHROPIC_API_KEY`
+2. **Configure** authentication (Google Vertex AI recommended, or Anthropic API key)
 3. **Run** `uv run scripts/orchestrate.py --title "..." --description "..."`
-4. **Get** comprehensive design analysis and documentation artifacts
+4. **Get** complete outputs: design analysis, production code, tests, and documentation
+
+**Key Features:**
+
+- **LangGraph orchestration** - Stateful workflow with proper phase transitions
+- **Security-first** - TLS 1.3 enforcement, no hardcoded secrets, secure logging
+- **Pattern-aware** - Detects Shipwright build strategies, source types, and test patterns
+- **Real-time monitoring** - Dashboard shows progress, context usage, and component analysis
+- **Comprehensive testing** - Unit, integration, and E2E tests with data-driven patterns
+- **User-focused docs** - Jobs-to-be-Done documentation for every feature
 
 For questions or issues, refer to the [Troubleshooting](#troubleshooting) section or check the project repository.
