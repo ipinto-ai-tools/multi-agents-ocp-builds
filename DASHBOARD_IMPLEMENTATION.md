@@ -249,14 +249,18 @@ Open your browser to <http://localhost:8080>
 ### Step 2: Run Your Agents
 
 ```bash
-# Requires dependencies from requirements.txt
-# First time: Create venv and install dependencies
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add timeout support" \
+  --description "Users need build timeout config"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add timeout support" \
   --description "Users need build timeout config"
 ```

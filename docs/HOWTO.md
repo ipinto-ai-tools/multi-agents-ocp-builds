@@ -294,13 +294,18 @@ This runs all four agents in sequence: Design → Development → Testing → Do
 
 ```bash
 # Requires dependencies from requirements.txt
-# First time: Create venv and install dependencies
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun" \
+  --description "Users need ability to specify build timeout to prevent hanging builds"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun" \
   --description "Users need ability to specify build timeout to prevent hanging builds"
 ```
@@ -394,7 +399,18 @@ Each agent builds on the previous agent's output, creating a cohesive workflow f
 **Example 1: Analyze a feature request**
 
 ```bash
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Implement build output caching" \
+  --description "Allow BuildRuns to cache intermediate build layers to speed up subsequent builds. Should support OCI registry-based caching."
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Implement build output caching" \
   --description "Allow BuildRuns to cache intermediate build layers to speed up subsequent builds. Should support OCI registry-based caching."
 ```
@@ -402,7 +418,18 @@ uv run scripts/orchestrate.py \
 **Example 2: Analyze a bug report**
 
 ```bash
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "BuildRun stuck in Running state" \
+  --description "BuildRuns remain Running even after pod completes. Status reconciliation fails."
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "BuildRun stuck in Running state" \
   --description "BuildRuns remain Running even after pod completes. Status reconciliation fails."
 ```
@@ -413,7 +440,18 @@ uv run scripts/orchestrate.py \
 # Tell agents where to find Shipwright code for deeper analysis
 export SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
 
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add SSH key support for private Git repos" \
+  --description "Users need to build from private Git repos using SSH authentication"
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
   --description "Users need to build from private Git repos using SSH authentication"
 ```
@@ -1599,7 +1637,18 @@ else:
 **Input:**
 
 ```bash
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add automatic retry for failed BuildRuns" \
+  --description "BuildRuns should support configurable retry logic for transient failures. Allow users to specify maxRetries and retryBackoff in BuildRun spec."
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add automatic retry for failed BuildRuns" \
   --description "BuildRuns should support configurable retry logic for transient failures. Allow users to specify maxRetries and retryBackoff in BuildRun spec."
 ```
@@ -1683,7 +1732,18 @@ JTBD_DOCUMENTATION
 **Input:**
 
 ```bash
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "BuildRun stuck in Running state after pod completion" \
+  --description "Observed in production: BuildRun status remains 'Running' even after the Tekton TaskRun completes successfully. The controller appears to miss the completion event."
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "BuildRun stuck in Running state after pod completion" \
   --description "Observed in production: BuildRun status remains 'Running' even after the Tekton TaskRun completes successfully. The controller appears to miss the completion event."
 ```
@@ -1753,7 +1813,18 @@ git clone https://github.com/shipwright-io/build.git shipwright-build
 **Command:**
 
 ```bash
-uv run scripts/orchestrate.py \
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Support OCI artifact sources for builds" \
+  --description "Allow builds to use OCI artifacts (not just container images) as source input. This enables building from Helm charts, WASM modules, and other OCI artifacts stored in registries."
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Support OCI artifact sources for builds" \
   --description "Allow builds to use OCI artifacts (not just container images) as source input. This enables building from Helm charts, WASM modules, and other OCI artifacts stored in registries."
 ```
@@ -2336,7 +2407,17 @@ LOG_LEVEL=DEBUG
 LOG_FILE_PATH=/tmp/muilti-agents-debug.log
 
 # Run and check logs
-uv run scripts/orchestrate.py --title "Test" --description "Test"
+# Option 1: With virtual environment (recommended for repeated use)
+uv venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uv run python scripts/orchestrate.py --title "Test" --description "Test"
+
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py --title "Test" --description "Test"
+
 tail -f /tmp/muilti-agents-debug.log
 ```
 

@@ -168,14 +168,18 @@ See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for detailed setup.
 **Option 1: Quick design analysis** (no GitHub required)
 
 ```bash
-# Note: Requires dependencies from requirements.txt
-# First time: Create venv and install dependencies
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun API" \
+  --description "Users need to specify timeouts for build execution"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
 ```
@@ -189,14 +193,19 @@ This generates a design document with component analysis and recommendations.
 uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 # Open http://localhost:8080 in your browser
 
-# Terminal 2: Run the workflow (requires dependencies installed)
-# First time: Create venv and install dependencies
+# Terminal 2: Run the workflow
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun API" \
+  --description "Users need to specify timeouts for build execution"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun API" \
   --description "Users need to specify timeouts for build execution"
 ```
@@ -209,14 +218,18 @@ The dashboard shows real-time progress, context usage, and component impacts.
 
 ```bash
 # 1. Run a workflow (most common)
-# Requires dependencies from requirements.txt
-# First time: Create venv and install dependencies
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Your feature title" \
+  --description "Detailed description"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Your feature title" \
   --description "Detailed description"
 
@@ -370,14 +383,18 @@ muilti-agents-ocp-builds/
 Generate a design document for a feature request:
 
 ```bash
-# Requires dependencies from requirements.txt
-# First time: Create venv and install dependencies
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add BuildRun timeout support" \
+  --description "Users need to configure max execution time for builds"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add BuildRun timeout support" \
   --description "Users need to configure max execution time for builds"
 ```
@@ -392,14 +409,19 @@ Monitor the workflow in real-time:
 # Terminal 1: Start dashboard
 uv run --with fastapi --with "uvicorn[standard]" python scripts/run_dashboard.py
 
-# Terminal 2: Run workflow (requires dependencies installed)
-# First time: Create venv and install dependencies
+# Terminal 2: Run workflow
+# Option 1: With virtual environment (recommended for repeated use)
 uv venv
 source .venv/bin/activate
 pip install -r requirements.txt
+uv run python scripts/orchestrate.py \
+  --title "Add BuildRun timeout support" \
+  --description "Users need to configure max execution time for builds"
 
-# Then run:
-uv run scripts/orchestrate.py \
+# Option 2: Direct execution with dependencies (one-time use)
+uv run --with anthropic --with langgraph --with langchain-core \
+       --with python-dotenv --with GitPython --with pyyaml \
+python scripts/orchestrate.py \
   --title "Add BuildRun timeout support" \
   --description "Users need to configure max execution time for builds"
 ```
