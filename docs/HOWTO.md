@@ -125,12 +125,15 @@ uv sync
 Alternative using standard pip:
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+# Recommended: Use uv for faster environment creation
+uv venv
+source .venv/bin/activate
 pip install -r requirements.txt
+
+# Alternative: Traditional venv
+# python -m venv venv
+# source venv/bin/activate  # On Windows: venv\Scripts\activate
+# pip install -r requirements.txt
 ```
 
 ### Step 3: Configure Environment Variables
@@ -146,7 +149,8 @@ cp .env.example .env
 ### Step 4: Verify Installation
 
 ```bash
-# Verify agents
+# Note: Run these after activating venv with: source .venv/bin/activate
+# Verify agents can be imported (requires venv with dependencies installed)
 python -c "from agents.design_agent import run_design; print('✓ Design agent')"
 python -c "from agents.go_k8s_developer import run_development; print('✓ Development agent')"
 python -c "from agents.testing_agent import run_testing; print('✓ Testing agent')"
@@ -305,7 +309,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun" \
   --description "Users need ability to specify build timeout to prevent hanging builds"
 ```
@@ -410,7 +414,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "Implement build output caching" \
   --description "Allow BuildRuns to cache intermediate build layers to speed up subsequent builds. Should support OCI registry-based caching."
 ```
@@ -429,7 +433,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "BuildRun stuck in Running state" \
   --description "BuildRuns remain Running even after pod completes. Status reconciliation fails."
 ```
@@ -451,7 +455,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
   --description "Users need to build from private Git repos using SSH authentication"
 ```
@@ -1648,7 +1652,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "Add automatic retry for failed BuildRuns" \
   --description "BuildRuns should support configurable retry logic for transient failures. Allow users to specify maxRetries and retryBackoff in BuildRun spec."
 ```
@@ -1743,7 +1747,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "BuildRun stuck in Running state after pod completion" \
   --description "Observed in production: BuildRun status remains 'Running' even after the Tekton TaskRun completes successfully. The controller appears to miss the completion event."
 ```
@@ -1824,7 +1828,7 @@ uv run python scripts/orchestrate.py \
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py \
+       python scripts/orchestrate.py \
   --title "Support OCI artifact sources for builds" \
   --description "Allow builds to use OCI artifacts (not just container images) as source input. This enables building from Helm charts, WASM modules, and other OCI artifacts stored in registries."
 ```
@@ -2225,9 +2229,8 @@ uv run pytest tests/integration/
 
 ```bash
 # Test design agent
-# Requires dependencies from requirements.txt
-# Run after: pip install -r requirements.txt in activated venv
-uv run python -c "
+# Create a test script
+cat > test_design.py << 'EOF'
 from agents.design_agent import run_design
 
 result = run_design(
@@ -2235,12 +2238,14 @@ result = run_design(
     description='Test description'
 )
 print(result['design_analysis'])
-"
+EOF
+
+# Run with dependencies
+uv run --with anthropic --with langgraph --with langchain-core python test_design.py
 
 # Test docs agent
-# Requires dependencies from requirements.txt
-# Run after: pip install -r requirements.txt in activated venv
-uv run python -c "
+# Create a test script
+cat > test_docs.py << 'EOF'
 from agents.docs_agent import run_docs
 
 context = {
@@ -2250,7 +2255,10 @@ context = {
 }
 result = run_docs(context)
 print(result['pr_summary'])
-"
+EOF
+
+# Run with dependencies
+uv run --with anthropic --with langgraph --with langchain-core python test_docs.py
 ```
 
 ---
@@ -2416,7 +2424,7 @@ uv run python scripts/orchestrate.py --title "Test" --description "Test"
 # Option 2: Direct execution with dependencies (one-time use)
 uv run --with anthropic --with langgraph --with langchain-core \
        --with python-dotenv --with GitPython --with pyyaml \
-python scripts/orchestrate.py --title "Test" --description "Test"
+       python scripts/orchestrate.py --title "Test" --description "Test"
 
 tail -f /tmp/muilti-agents-debug.log
 ```
