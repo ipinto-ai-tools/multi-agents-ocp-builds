@@ -20,6 +20,7 @@ except ImportError:
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from utils.file_logger import get_logger, get_session_logger
 from config.shipwright_components import (
     get_component_info,
     COMPONENTS,
@@ -28,6 +29,9 @@ from config.shipwright_components import (
     OPENSHIFT_INTEGRATIONS,
 )
 from tools.repo_search import RepoSearch
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 class DesignAgentError(Exception):
@@ -66,19 +70,30 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
         ... )
         >>> print(result["design_analysis"])
     """
+    logger.info(f"Starting design analysis for issue: {title}")
+
     # Get configured client (handles both API key and enterprise auth)
     try:
         client = get_anthropic_client()
+        logger.info("Claude client initialized successfully")
     except Exception as e:
+        logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
         raise DesignAgentError(f"Failed to initialize Claude client: {e}") from e
 
     # Gather repository context if path provided
-    repo_context = _gather_repo_context(repo_path) if repo_path else None
+    if repo_path:
+        logger.info(f"Gathering repository context from: {repo_path}")
+        repo_context = _gather_repo_context(repo_path)
+    else:
+        logger.info("No repository path provided, skipping repository context")
+        repo_context = None
 
     # Build component information context
+    logger.debug("Building component context")
     component_context = _build_component_context()
 
     # Construct the analysis prompt
+    logger.debug("Constructing analysis prompt")
     user_prompt = _build_analysis_prompt(
         title=title,
         description=description,
@@ -88,8 +103,11 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
 
     # Call Claude API
     try:
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        logger.info(f"Calling Claude API with model: {model}")
+
         response = client.messages.create(
-            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+            model=model,
             max_tokens=8000,
             system=DESIGN_AGENT_PROMPT,
             messages=[
@@ -102,12 +120,16 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
 
         # Extract the design analysis from response
         design_text = response.content[0].text
+        logger.info(f"Received response from Claude API ({len(design_text)} chars)")
 
     except Exception as e:
+        logger.error(f"Claude API call failed: {e}", exc_info=True)
         raise DesignAgentError(f"Claude API call failed: {e}") from e
 
     # Parse the structured output from the design document
+    logger.debug("Parsing design output")
     parsed_result = _parse_design_output(design_text)
+    logger.info(f"Design analysis completed successfully. Found {len(parsed_result.get('impacted_components', []))} impacted components")
 
     return {
         "design_analysis": design_text,
@@ -138,26 +160,35 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
         searcher = RepoSearch(repo_path)
 
         # Find API types
+        logger.debug("Searching for API types")
         api_results = searcher.search_files("pkg/apis/**/*_types.go")
         context["api_files"] = [r.file_path for r in api_results[:10]]
+        logger.debug(f"Found {len(api_results)} API files")
 
         # Find controllers
+        logger.debug("Searching for controllers")
         controller_results = searcher.search_files("pkg/controller/**/*.go")
         context["controller_files"] = [r.file_path for r in controller_results[:10]]
+        logger.debug(f"Found {len(controller_results)} controller files")
 
         # Find CRD definitions
+        logger.debug("Searching for CRD definitions")
         crd_results = searcher.find_kubernetes_crds()
         context["crd_files"] = [r.file_path for r in crd_results[:10]]
+        logger.debug(f"Found {len(crd_results)} CRD files")
 
         # Analyze package structure
+        logger.debug("Analyzing package structure")
         packages = searcher.analyze_go_packages("pkg")
         context["package_structure"] = [
             {"name": pkg.name, "path": pkg.path, "file_count": len(pkg.files)}
             for pkg in packages[:20]
         ]
+        logger.debug(f"Analyzed {len(packages)} packages")
 
     except Exception as e:
         # If repository analysis fails, continue with component metadata only
+        logger.warning(f"Repository analysis failed: {e}", exc_info=True)
         context["error"] = f"Repository analysis failed: {str(e)}"
 
     return context

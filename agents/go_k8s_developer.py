@@ -23,6 +23,10 @@ except ImportError:
 from config.agent_prompts import DEVELOPMENT_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
+from utils.file_logger import get_logger, get_session_logger
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 class DevelopmentAgentError(Exception):
@@ -79,8 +83,21 @@ def run_development(
         >>> result = run_development(context)
         >>> print(result["pr_description"])
     """
+    # Get session-specific logger
+    session_id = context.get("session_id", "unknown")
+    session_logger = get_session_logger(session_id, "development_agent")
+
+    logger.info(f"Starting development for session {session_id}: {context.get('issue_title', 'N/A')}")
+    session_logger.info(f"Development agent started with context: {context.get('issue_title', 'N/A')}")
+
     # Validate required context
-    _validate_context(context)
+    try:
+        _validate_context(context)
+        logger.debug("Context validation passed")
+    except (DevelopmentAgentError, ValueError) as e:
+        logger.error(f"Context validation failed: {e}", exc_info=True)
+        session_logger.error(f"Context validation failed: {e}")
+        raise
 
     # Emit start heartbeat
     emit_heartbeat("development", {
@@ -91,16 +108,26 @@ def run_development(
     # Get configured client (handles both API key and enterprise auth)
     try:
         client = get_anthropic_client()
+        logger.info("Claude client initialized successfully")
+        session_logger.info("Claude client initialized")
     except Exception as e:
+        logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
+        session_logger.error(f"Failed to initialize Claude client: {e}")
         raise DevelopmentAgentError(f"Failed to initialize Claude client: {e}") from e
 
     # Build the development prompt
+    logger.debug("Building development prompt")
     user_prompt = _build_development_prompt(context, repo_path)
+    session_logger.debug(f"Prompt length: {len(user_prompt)} chars")
 
     # Call Claude API
     try:
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        logger.info(f"Calling Claude API with model: {model}, max_tokens: 16000")
+        session_logger.info(f"API Request: model={model}, max_tokens=16000, temperature=0.2")
+
         response = client.messages.create(
-            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+            model=model,
             max_tokens=16000,  # Large for code generation
             system=DEVELOPMENT_AGENT_PROMPT,
             messages=[
@@ -114,29 +141,42 @@ def run_development(
 
         # Extract the development output from response
         dev_output = response.content[0].text
+        logger.info(f"Received response from Claude API ({len(dev_output)} chars)")
+        session_logger.info(f"Response length: {len(dev_output)} chars")
 
     except APIError as e:
+        logger.error(f"Claude API call failed: {e}", exc_info=True)
+        session_logger.error(f"Claude API call failed: {e}")
         raise DevelopmentAgentError(f"Claude API call failed: {e}") from e
     except Exception as e:
+        logger.error(f"Unexpected error during code generation: {e}", exc_info=True)
+        session_logger.error(f"Unexpected error: {e}")
         raise DevelopmentAgentError(f"Unexpected error during code generation: {e}") from e
 
     # Parse the structured output
+    logger.debug("Parsing development output")
     parsed_result = _parse_development_output(dev_output)
+    logger.info(f"Parsed {len(parsed_result.get('code_files', []))} code files and {len(parsed_result.get('test_files', []))} test files")
+    session_logger.info(f"Generated {len(parsed_result.get('code_files', []))} code files, {len(parsed_result.get('test_files', []))} test files")
 
     # Synthesize code_changes and files_modified from code_files/test_files
+    logger.debug("Synthesizing file tracking information")
     code_changes, files_modified = _synthesize_file_tracking(
         parsed_result.get("code_files", []),
         parsed_result.get("test_files", [])
     )
+    session_logger.info(f"Tracked {len(files_modified)} modified files")
 
     # Emit completion heartbeat
+    files_generated = len(parsed_result.get("code_files", [])) + len(parsed_result.get("test_files", []))
     emit_heartbeat("development", {
         **context,
         "phase": "development_complete",
-        "files_generated": len(parsed_result.get("code_files", [])) + len(
-            parsed_result.get("test_files", [])
-        )
+        "files_generated": files_generated
     })
+
+    logger.info(f"Development agent completed successfully. Generated {files_generated} files")
+    session_logger.info(f"Development complete: {files_generated} files generated")
 
     return {
         "code_files": parsed_result.get("code_files", []),

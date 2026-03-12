@@ -21,6 +21,9 @@
         .header {
             text-align: center;
             margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
         }
 
         .header h1 {
@@ -32,6 +35,47 @@
         .header p {
             color: #8b949e;
             font-size: 1.1em;
+        }
+
+        .header-actions {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .controls {
@@ -272,12 +316,18 @@
     <div class="header">
         <h1>Multi-Agent Dashboard</h1>
         <p>Real-time monitoring for Design, Development, Testing, and Docs agents</p>
+        <div class="header-actions">
+            <button id="clearSessionsBtn" class="btn btn-danger">
+                Clear Completed Sessions
+            </button>
+            <button id="refreshBtn" class="btn btn-primary">
+                Refresh
+            </button>
+        </div>
     </div>
 
     <div class="controls">
-        <button id="refreshBtn">Refresh Now</button>
         <button id="autoRefreshBtn" class="active">Auto-Refresh (5s)</button>
-        <button id="clearBtn">Clear Completed</button>
         <div class="status connected" id="statusIndicator">● Connected</div>
     </div>
 
@@ -302,7 +352,7 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const refreshBtn = document.getElementById('refreshBtn');
         const autoRefreshBtn = document.getElementById('autoRefreshBtn');
-        const clearBtn = document.getElementById('clearBtn');
+        const clearSessionsBtn = document.getElementById('clearSessionsBtn');
 
         // Fetch sessions from API
         async function fetchSessions() {
@@ -456,20 +506,55 @@
             autoRefreshBtn.classList.remove('active');
         }
 
-        // Event listeners
-        refreshBtn.addEventListener('click', fetchSessions);
+        // Clear completed sessions button
+        clearSessionsBtn.addEventListener('click', async () => {
+            // Confirm action
+            if (!confirm('Are you sure you want to clear all completed sessions? This action cannot be undone.')) {
+                return;
+            }
 
+            // Disable button during request
+            clearSessionsBtn.disabled = true;
+            clearSessionsBtn.textContent = 'Clearing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions/completed`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Show success message
+                alert(`Successfully cleared ${result.sessions_cleared} completed session(s)`);
+
+                // Reload sessions
+                fetchSessions();
+            } catch (error) {
+                console.error('Error clearing sessions:', error);
+                alert('Failed to clear completed sessions. Please try again.');
+            } finally {
+                // Re-enable button
+                clearSessionsBtn.disabled = false;
+                clearSessionsBtn.textContent = 'Clear Completed Sessions';
+            }
+        });
+
+        // Refresh button
+        refreshBtn.addEventListener('click', () => {
+            fetchSessions();
+        });
+
+        // Event listeners
         autoRefreshBtn.addEventListener('click', () => {
             if (autoRefresh) {
                 stopAutoRefresh();
             } else {
                 startAutoRefresh();
             }
-        });
-
-        clearBtn.addEventListener('click', async () => {
-            // TODO: Implement clear completed sessions
-            alert('Clear completed sessions - not yet implemented');
         });
 
         // Initialize

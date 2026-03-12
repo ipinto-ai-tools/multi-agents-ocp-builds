@@ -5,7 +5,8 @@ FastAPI server for receiving heartbeats and serving dashboard UI.
 
 import os
 import sqlite3
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
@@ -15,7 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from dashboard.enrichers import enrich_heartbeat
+from utils.file_logger import get_logger
 
+
+# Logger
+logger = get_logger('dashboard.backend')
 
 # Database path
 DB_PATH = os.getenv("DASHBOARD_DB_PATH", "/tmp/claude/dashboard.db")
@@ -53,14 +58,20 @@ class Database:
             db_path: Path to SQLite database file
         """
         self.db_path = db_path
+        self.conn = None
         self._ensure_db_dir()
         self._init_schema()
+        self._init_connection()
 
     def _ensure_db_dir(self):
         """Ensure database directory exists."""
         db_dir = os.path.dirname(self.db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
+
+    def _init_connection(self):
+        """Initialize persistent database connection for cleanup operations."""
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
 
     def _init_schema(self):
         """Initialize database schema."""
@@ -245,21 +256,152 @@ class Database:
         conn.close()
         return session
 
+    def cleanup_old_sessions(self, max_age_hours: int = 24) -> dict:
+        """Clean up completed sessions older than max_age_hours.
+
+        Args:
+            max_age_hours: Maximum age in hours
+
+        Returns:
+            dict with counts of deleted sessions and heartbeats
+        """
+        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+        cutoff_timestamp = cutoff_time.isoformat()
+
+        # Get session IDs to delete
+        cursor = self.conn.execute("""
+            SELECT DISTINCT session_id FROM heartbeats
+            WHERE timestamp < ?
+            AND (
+                json_extract(raw_state, '$.phase') = 'done'
+                OR json_extract(raw_state, '$.phase') = 'error'
+            )
+        """, (cutoff_timestamp,))
+
+        session_ids = [row[0] for row in cursor.fetchall()]
+
+        if not session_ids:
+            logger.info(f"No sessions to clean up (older than {max_age_hours}h)")
+            return {"sessions_deleted": 0, "heartbeats_deleted": 0}
+
+        # Delete heartbeats
+        placeholders = ','.join('?' * len(session_ids))
+        heartbeats_cursor = self.conn.execute(
+            f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
+            session_ids
+        )
+
+        # Delete sessions
+        sessions_cursor = self.conn.execute(
+            f"DELETE FROM sessions WHERE id IN ({placeholders})",
+            session_ids
+        )
+
+        self.conn.commit()
+
+        result = {
+            "sessions_deleted": sessions_cursor.rowcount,
+            "heartbeats_deleted": heartbeats_cursor.rowcount
+        }
+
+        logger.info(
+            f"Cleaned up {result['sessions_deleted']} sessions "
+            f"and {result['heartbeats_deleted']} heartbeats "
+            f"(older than {max_age_hours}h)"
+        )
+
+        return result
+
+    def clear_completed_sessions(self) -> dict:
+        """Clear all completed sessions (phase='done' or 'error').
+
+        Returns:
+            dict with count of cleared sessions
+        """
+        # Get all completed session IDs
+        cursor = self.conn.execute("""
+            SELECT DISTINCT session_id FROM heartbeats
+            WHERE json_extract(raw_state, '$.phase') = 'done'
+            OR json_extract(raw_state, '$.phase') = 'error'
+        """)
+
+        session_ids = [row[0] for row in cursor.fetchall()]
+
+        if not session_ids:
+            logger.info("No completed sessions to clear")
+            return {"sessions_cleared": 0}
+
+        # Delete heartbeats for these sessions
+        placeholders = ','.join('?' * len(session_ids))
+        self.conn.execute(
+            f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
+            session_ids
+        )
+
+        # Delete sessions
+        sessions_cursor = self.conn.execute(
+            f"DELETE FROM sessions WHERE id IN ({placeholders})",
+            session_ids
+        )
+
+        self.conn.commit()
+
+        result = {"sessions_cleared": sessions_cursor.rowcount}
+
+        logger.info(f"Cleared {result['sessions_cleared']} completed sessions")
+
+        return result
+
 
 # Global database instance
 db = Database()
+
+# Global background task
+cleanup_task = None
+
+
+async def periodic_cleanup():
+    """Background task to clean up old sessions every 6 hours."""
+    while True:
+        try:
+            # Wait 6 hours
+            await asyncio.sleep(6 * 60 * 60)
+
+            # Clean up sessions older than 24 hours
+            result = db.cleanup_old_sessions(max_age_hours=24)
+            logger.info(f"Automatic cleanup: {result}")
+        except asyncio.CancelledError:
+            logger.info("Periodic cleanup task cancelled")
+            break
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}", exc_info=True)
 
 
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
+    global cleanup_task
+
     # Startup
-    print(f"Dashboard backend starting on http://localhost:8080")
-    print(f"Database: {db.db_path}")
+    logger.info(f"Dashboard backend starting on http://localhost:8080")
+    logger.info(f"Database: {db.db_path}")
+
+    # Start background cleanup task
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    logger.info("Started automatic cleanup task (runs every 6 hours)")
+
     yield
+
     # Shutdown
-    print("Dashboard backend shutting down")
+    logger.info("Dashboard backend shutting down")
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Stopped automatic cleanup task")
 
 
 # FastAPI app
@@ -307,6 +449,11 @@ async def receive_heartbeat(heartbeat: HeartbeatRequest):
     # Insert heartbeat
     db.insert_heartbeat(enriched)
 
+    logger.debug(
+        f"Received heartbeat: session={enriched['session_id']}, "
+        f"agent={enriched['agent']}, phase={enriched['phase']}"
+    )
+
     return {"status": "ok"}
 
 
@@ -321,6 +468,7 @@ async def get_sessions(limit: int = 100):
         List of sessions
     """
     sessions = db.get_sessions(limit=limit)
+    logger.debug(f"Retrieved {len(sessions)} sessions")
     return sessions
 
 
@@ -339,8 +487,37 @@ async def get_session(session_id: str):
     """
     session = db.get_session(session_id)
     if not session:
+        logger.warning(f"Session not found: {session_id}")
         raise HTTPException(status_code=404, detail="Session not found")
+    logger.debug(f"Retrieved session: {session_id}")
     return session
+
+
+@app.delete("/api/sessions/cleanup")
+async def cleanup_completed_sessions(max_age_hours: int = 24):
+    """Clean up completed sessions older than specified hours.
+
+    Args:
+        max_age_hours: Maximum age in hours for completed sessions (default: 24)
+
+    Returns:
+        Number of sessions and heartbeats deleted
+    """
+    logger.info(f"Manual cleanup requested (max_age_hours={max_age_hours})")
+    result = db.cleanup_old_sessions(max_age_hours=max_age_hours)
+    return result
+
+
+@app.delete("/api/sessions/completed")
+async def clear_completed_sessions():
+    """Clear all sessions with phase='done' or phase='error'.
+
+    Returns:
+        Number of sessions cleared
+    """
+    logger.info("Clear all completed sessions requested")
+    result = db.clear_completed_sessions()
+    return result
 
 
 @app.get("/api/health")

@@ -209,3 +209,10 @@ $RECYCLE.BIN/
 # Documentation build artifacts
 # docs/_build/
 # docs/.doctrees/
+
+# Logs directory - keep structure, ignore files
+logs/**/*.log
+logs/**/*.txt
+logs/**/session_*.json
+logs/**/*
+!logs/*/.gitkeep

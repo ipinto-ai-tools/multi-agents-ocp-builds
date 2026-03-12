@@ -20,6 +20,7 @@ except ImportError:
 
 from config.agent_prompts import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from utils.file_logger import get_logger, get_session_logger
 from config.testing_config import (
     detect_patterns_in_description,
     get_strategy_pattern,
@@ -28,6 +29,9 @@ from config.testing_config import (
     GINKGO_IMPORTS,
     TEST_TYPES,
 )
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 class TestingAgentError(Exception):
@@ -76,29 +80,55 @@ def run_testing(context: Dict[str, Any]) -> Dict[str, Any]:
         >>> result = run_testing(context)
         >>> print(result["test_plan"])
     """
+    # Get session-specific logger
+    session_id = context.get("session_id", "unknown")
+    session_logger = get_session_logger(session_id, "testing_agent")
+
+    logger.info(f"Starting test generation for session {session_id}: {context.get('issue_title', 'N/A')}")
+    session_logger.info(f"Testing agent started with context: {context.get('issue_title', 'N/A')}")
+
     # Validate required context
-    _validate_context(context)
+    try:
+        _validate_context(context)
+        logger.debug("Context validation passed")
+    except TestingAgentError as e:
+        logger.error(f"Context validation failed: {e}", exc_info=True)
+        session_logger.error(f"Context validation failed: {e}")
+        raise
 
     # Get configured client (handles both API key and enterprise auth)
     try:
         client = get_anthropic_client()
+        logger.info("Claude client initialized successfully")
+        session_logger.info("Claude client initialized")
     except Exception as e:
+        logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
+        session_logger.error(f"Failed to initialize Claude client: {e}")
         raise TestingAgentError(f"Failed to initialize Claude client: {e}") from e
 
     # Detect patterns in the issue description
     patterns_detected = {}
     if context.get("issue_description"):
+        logger.debug("Detecting patterns in issue description")
         patterns_detected = detect_patterns_in_description(
             context["issue_description"] + "\n" + context.get("design_analysis", "")
         )
+        logger.info(f"Detected patterns: {list(patterns_detected.keys())}")
+        session_logger.info(f"Patterns detected: {patterns_detected}")
 
     # Build the test generation prompt
+    logger.debug("Building test generation prompt")
     user_prompt = _build_testing_prompt(context, patterns_detected)
+    session_logger.debug(f"Prompt length: {len(user_prompt)} chars")
 
     # Call Claude API
     try:
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        logger.info(f"Calling Claude API with model: {model}, max_tokens: 16000")
+        session_logger.info(f"API Request: model={model}, max_tokens=16000")
+
         response = client.messages.create(
-            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+            model=model,
             max_tokens=16000,  # Larger for code generation
             system=TESTING_AGENT_PROMPT,
             messages=[
@@ -111,12 +141,25 @@ def run_testing(context: Dict[str, Any]) -> Dict[str, Any]:
 
         # Extract the test output from response
         test_output = response.content[0].text
+        logger.info(f"Received response from Claude API ({len(test_output)} chars)")
+        session_logger.info(f"Response length: {len(test_output)} chars")
 
     except Exception as e:
+        logger.error(f"Claude API call failed: {e}", exc_info=True)
+        session_logger.error(f"Claude API call failed: {e}")
         raise TestingAgentError(f"Claude API call failed: {e}") from e
 
     # Parse the structured output
+    logger.debug("Parsing test output")
     parsed_result = _parse_test_output(test_output)
+
+    unit_count = len(parsed_result.get("unit_tests", {}))
+    integration_count = len(parsed_result.get("integration_tests", {}))
+    e2e_count = len(parsed_result.get("e2e_tests", {}))
+    total_count = unit_count + integration_count + e2e_count
+
+    logger.info(f"Test generation completed: {unit_count} unit, {integration_count} integration, {e2e_count} e2e tests")
+    session_logger.info(f"Generated {total_count} test files (unit: {unit_count}, integration: {integration_count}, e2e: {e2e_count})")
 
     return {
         "test_plan": parsed_result.get("test_plan", ""),

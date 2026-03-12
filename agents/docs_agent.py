@@ -19,6 +19,10 @@ from anthropic import Anthropic, APIError
 from config.agent_prompts import DOCS_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from tools.rag_search import RAGSearch, RAGSearchError
+from utils.file_logger import get_logger, get_session_logger
+
+# Initialize logger
+logger = get_logger(__name__)
 
 
 def run_docs(
@@ -68,46 +72,73 @@ def run_docs(
         ValueError: If required context is missing
         RuntimeError: If Claude API call fails
     """
+    # Get session-specific logger
+    session_id = context.get("session_id", "unknown")
+    session_logger = get_session_logger(session_id, "docs_agent")
+
+    logger.info(f"Starting documentation generation for session {session_id}: {context.get('issue_title', 'N/A')}")
+    session_logger.info(f"Docs agent started - format: {output_format}, RAG: {enable_rag}")
+
     # Validate required context
     required_keys = ["design_analysis", "code_changes", "test_results"]
     missing_keys = [key for key in required_keys if key not in context]
     if missing_keys:
+        logger.error(f"Missing required context keys: {missing_keys}")
+        session_logger.error(f"Missing required keys: {missing_keys}")
         raise ValueError(f"Missing required context keys: {missing_keys}")
+
+    logger.debug("Context validation passed")
 
     # Initialize RAG search if enabled
     rag_context = {}
     if enable_rag and "repo_path" in context:
+        logger.info(f"RAG search enabled for repo: {context['repo_path']}")
         try:
             rag_context = _fetch_rag_context(context, input_files)
+            logger.info(f"RAG context fetched: {list(rag_context.keys())}")
+            session_logger.info(f"RAG context: {len(rag_context.get('related_docs', []))} docs, {len(rag_context.get('code_examples', []))} examples")
         except RAGSearchError as e:
-            print(f"Warning: RAG search failed: {e}. Continuing without RAG context.")
+            logger.warning(f"RAG search failed: {e}. Continuing without RAG context.", exc_info=True)
+            session_logger.warning(f"RAG search failed: {e}")
 
     # Process input files if provided
     input_file_context = {}
     if input_files:
+        logger.info(f"Processing {len(input_files)} input files")
         input_file_context = _process_input_files(
             input_files,
             context.get("repo_path", ".")
         )
+        session_logger.info(f"Processed {len(input_file_context.get('file_contents', {}))} input files")
 
     # Build context message for Claude
+    logger.debug("Building context message for Claude")
     context_message = _build_context_message(
         context,
         rag_context,
         input_file_context,
         output_format
     )
+    session_logger.debug(f"Context message length: {len(context_message)} chars")
 
     # Get configured client (handles both API key and enterprise auth)
     try:
         client = get_anthropic_client()
+        logger.info("Claude client initialized successfully")
+        session_logger.info("Claude client initialized")
     except Exception as e:
+        logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
+        session_logger.error(f"Failed to initialize Claude client: {e}")
         raise RuntimeError(f"Failed to initialize Claude client: {e}") from e
 
     try:
         # Call Claude API
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        logger.info(f"Calling Claude API with model: {model}, max_tokens: 8192, temperature: 0.3")
+        session_logger.info(f"API Request: model={model}, max_tokens=8192, temperature=0.3")
+
         response = client.messages.create(
-            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+            model=model,
             max_tokens=8192,  # Increased for comprehensive documentation
             system=DOCS_AGENT_PROMPT,
             messages=[
@@ -121,8 +152,11 @@ def run_docs(
 
         # Extract response text
         response_text = response.content[0].text
+        logger.info(f"Received response from Claude API ({len(response_text)} chars)")
+        session_logger.info(f"Response length: {len(response_text)} chars")
 
         # Parse structured output
+        logger.debug("Parsing documentation response")
         docs_output = _parse_docs_response(response_text, output_format)
 
         # Add metadata about processing
@@ -130,11 +164,18 @@ def run_docs(
         docs_output["rag_enabled"] = enable_rag
         docs_output["output_format"] = output_format
 
+        logger.info(f"Documentation generation completed successfully. Format: {output_format}")
+        session_logger.info(f"Docs generation complete - sections: {list(docs_output.keys())}")
+
         return docs_output
 
     except APIError as e:
+        logger.error(f"Claude API call failed: {e}", exc_info=True)
+        session_logger.error(f"Claude API call failed: {e}")
         raise RuntimeError(f"Claude API call failed: {e}") from e
     except Exception as e:
+        logger.error(f"Unexpected error in docs agent: {e}", exc_info=True)
+        session_logger.error(f"Unexpected error: {e}")
         raise RuntimeError(f"Unexpected error in docs agent: {e}") from e
 
 
@@ -157,13 +198,16 @@ def _fetch_rag_context(
     """
     repo_path = context.get("repo_path")
     if not repo_path:
+        logger.debug("No repo_path in context, skipping RAG")
         return {}
 
+    logger.debug(f"Initializing RAG search for repo: {repo_path}")
     rag_search = RAGSearch(repo_path)
     rag_context: Dict[str, Any] = {}
 
     # Search Shipwright documentation
     if "issue_title" in context:
+        logger.debug(f"Searching Shipwright docs for: {context['issue_title']}")
         doc_matches = rag_search.search_shipwright_docs(
             query=context["issue_title"],
             max_results=3
@@ -176,10 +220,12 @@ def _fetch_rag_context(
             }
             for match in doc_matches
         ]
+        logger.debug(f"Found {len(doc_matches)} related docs")
 
     # Extract code examples from modified files or input files
     files_to_analyze = input_files or context.get("files_modified", [])
     if files_to_analyze:
+        logger.debug(f"Extracting code examples from {len(files_to_analyze)} files")
         code_examples = rag_search.extract_code_examples(files_to_analyze)
         rag_context["code_examples"] = [
             {
@@ -190,9 +236,11 @@ def _fetch_rag_context(
             }
             for ex in code_examples[:5]  # Top 5 examples
         ]
+        logger.debug(f"Extracted {len(code_examples)} code examples")
 
     # Search for similar implementations
     if files_to_analyze:
+        logger.debug("Searching for similar code implementations")
         similar = rag_search.search_similar_code(
             reference_files=files_to_analyze[:3],  # Top 3 files
             max_results=5
@@ -201,10 +249,12 @@ def _fetch_rag_context(
             {"file": res.file_path, "line": res.line_number}
             for res in similar
         ]
+        logger.debug(f"Found {len(similar)} similar implementations")
 
     # Find API usage patterns (extract from design analysis)
     api_names = _extract_api_names(context.get("design_analysis", ""))
     if api_names:
+        logger.debug(f"Searching API patterns for: {api_names[:3]}")
         api_patterns = rag_search.search_api_patterns(
             api_names=api_names[:3],  # Top 3 APIs
             file_pattern="**/*.go"
@@ -218,6 +268,7 @@ def _fetch_rag_context(
             }
             for pattern in api_patterns[:5]  # Top 5 patterns
         ]
+        logger.debug(f"Found {len(api_patterns)} API patterns")
 
     return rag_context
 
@@ -268,6 +319,7 @@ def _process_input_files(
         full_path = repo_root / file_path
 
         if not full_path.exists():
+            logger.warning(f"Input file does not exist: {file_path}")
             continue
 
         try:
@@ -276,14 +328,18 @@ def _process_input_files(
 
             # Truncate large files
             if len(content) > 5000:
+                logger.debug(f"Truncating large input file: {file_path} ({len(content)} chars)")
                 content = content[:5000] + "\n... (truncated)"
 
             file_contents[file_path] = content
+            logger.debug(f"Processed input file: {file_path} ({len(content)} chars)")
 
         except (IOError, UnicodeDecodeError) as e:
+            logger.warning(f"Error reading input file {file_path}: {e}")
             file_contents[file_path] = f"Error reading file: {e}"
 
     input_context["file_contents"] = file_contents
+    logger.info(f"Processed {len(file_contents)} input files")
     return input_context
 
 
