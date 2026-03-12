@@ -1,7 +1,13 @@
 """LangGraph orchestrator for multi-agent workflow.
 
 This module implements the main orchestration workflow using LangGraph to coordinate
-the Design and Documentation agents in a stateful workflow.
+the Design, Development, Testing, and Documentation agents in a stateful workflow.
+
+Workflow phases:
+1. Design: Analyze requirements and create implementation plan
+2. Development: Generate production-quality Go code
+3. Testing: Generate Ginkgo v2 test suite
+4. Documentation: Create PR summaries and release notes
 """
 
 from typing import Any, Dict, Literal
@@ -10,6 +16,7 @@ import uuid
 from langgraph.graph import StateGraph, END
 from graph.state import AgentState
 from agents.design_agent import run_design
+from agents.go_k8s_developer import run_development
 from agents.testing_agent import run_testing
 from agents.docs_agent import run_docs
 from dashboard.heartbeat import emit_heartbeat
@@ -56,6 +63,53 @@ def design_node(state: AgentState) -> Dict[str, Any]:
         # Emit error heartbeat
         complete_state = {**state, **error_state}
         emit_heartbeat("design", complete_state)
+
+        return error_state
+
+
+def develop_node(state: AgentState) -> Dict[str, Any]:
+    """Execute the Development Agent phase.
+
+    Takes implementation plan from Design Agent and generates:
+    - Production-quality Go code
+    - Unit tests with table-driven patterns
+    - PR description with security notes
+
+    Args:
+        state: Current agent state with design outputs
+
+    Returns:
+        Updated state with development outputs
+    """
+    try:
+        # Run development agent
+        development_output = run_development(state)
+
+        # Update state with development outputs
+        updated_state = {
+            "code_files": development_output.get("code_files", []),
+            "test_files": development_output.get("test_files", []),
+            "code_changes": development_output.get("code_changes", {}),
+            "files_modified": development_output.get("files_modified", []),
+            "pr_description": development_output.get("pr_description", ""),
+            "current_phase": "develop_complete",
+        }
+
+        # Emit heartbeat to dashboard
+        complete_state = {**state, **updated_state}
+        emit_heartbeat("develop", complete_state)
+
+        return updated_state
+    except Exception as e:
+        error_state = {
+            "code_files": [],
+            "current_phase": "error",
+            "error": f"Error in development phase: {str(e)}",
+        }
+
+        # Emit error heartbeat
+        complete_state = {**state, **error_state}
+        emit_heartbeat("develop", complete_state)
 
         return error_state
 
@@ -178,8 +232,10 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
         return error_state
 
 
-def should_continue(state: AgentState) -> Literal["testing", "docs", "end"]:
+def should_continue(state: AgentState) -> Literal["develop", "testing", "docs", "end"]:
     """Determine if workflow should continue to next phase.
+
+    Workflow: Design → Development → Testing → Docs
 
     Args:
         state: Current agent state
@@ -189,8 +245,12 @@ def should_continue(state: AgentState) -> Literal["testing", "docs", "end"]:
     """
     phase = state.get("current_phase", "")
 
-    # If design completed successfully, proceed to testing
+    # If design completed successfully, proceed to development
     if phase == "design_complete":
+        return "develop"
+
+    # If development completed successfully, proceed to testing
+    if phase == "develop_complete":
         return "testing"
 
     # If testing completed successfully, proceed to docs
@@ -212,6 +272,7 @@ def build_workflow() -> StateGraph:
 
     # Add nodes
     workflow.add_node("design", design_node)
+    workflow.add_node("develop", develop_node)
     workflow.add_node("testing", testing_node)
     workflow.add_node("docs", docs_node)
 
@@ -221,6 +282,16 @@ def build_workflow() -> StateGraph:
     # Add conditional edges from design
     workflow.add_conditional_edges(
         "design",
+        should_continue,
+        {
+            "develop": "develop",
+            "end": END,
+        }
+    )
+
+    # Add conditional edges from develop
+    workflow.add_conditional_edges(
+        "develop",
         should_continue,
         {
             "testing": "testing",

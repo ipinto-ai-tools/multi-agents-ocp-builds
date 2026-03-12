@@ -271,7 +271,7 @@
 <body>
     <div class="header">
         <h1>Multi-Agent Dashboard</h1>
-        <p>Real-time monitoring for Design, Testing, and Docs agents</p>
+        <p>Real-time monitoring for Design, Development, Testing, and Docs agents</p>
     </div>
 
     <div class="controls">
@@ -354,19 +354,27 @@
             if (status === 'complete') statusClass = 'complete';
             else if (status === 'error') statusClass = 'error';
 
-            // Design, Testing, and Docs agent status
+            // Design, Development, Testing, and Docs agent status
             const designStatus =
-                hb.agent === 'design' || status === 'design_done' || status === 'testing_done' || status === 'complete' ? 'complete' :
-                (hb.agent === 'design' ? 'in-progress' : 'pending');
+                hb.agent === 'design' || hb.phase === 'design_complete' ||
+                hb.phase === 'develop_complete' || hb.phase === 'testing_complete' ||
+                status === 'complete' ? 'complete' :
+                hb.phase === 'design' ? 'in-progress' : 'pending';
+
+            const developStatus =
+                hb.agent === 'development' || hb.agent === 'go-k8s-developer' ||
+                hb.phase === 'develop_complete' || hb.phase === 'testing_complete' ||
+                status === 'complete' ? 'complete' :
+                hb.phase === 'develop' ? 'in-progress' : 'pending';
 
             const testingStatus =
-                status === 'complete' || status === 'testing_done' ? 'complete' :
-                (hb.agent === 'testing' || status === 'design_done') ? 'in-progress' :
+                status === 'complete' || hb.phase === 'testing_complete' ? 'complete' :
+                (hb.agent === 'testing' || hb.phase === 'develop_complete') ? 'in-progress' :
                 'pending';
 
             const docsStatus =
                 status === 'complete' ? 'complete' :
-                (hb.agent === 'docs' || status === 'testing_done') ? 'in-progress' :
+                (hb.agent === 'docs' || hb.phase === 'testing_complete') ? 'in-progress' :
                 'pending';
 
             return `
@@ -382,6 +390,9 @@
                     <div class="agents-status">
                         <div class="agent-badge ${designStatus}">
                             Design Agent ${designStatus === 'complete' ? '✓' : designStatus === 'in-progress' ? '⏳' : '⏸'}
+                        </div>
+                        <div class="agent-badge ${developStatus}">
+                            Development Agent ${developStatus === 'complete' ? '✓' : developStatus === 'in-progress' ? '⏳' : '⏸'}
                         </div>
                         <div class="agent-badge ${testingStatus}">
                             Testing Agent ${testingStatus === 'complete' ? '✓' : testingStatus === 'in-progress' ? '⏳' : '⏸'}
