@@ -37,8 +37,9 @@ class ModelInfoEnricher(Enricher):
         Returns:
             Heartbeat with model field added
         """
-        # Default model from environment or hardcoded
-        heartbeat["model"] = "claude-sonnet-4-20250514"
+        import os
+        # Get model from environment or use default
+        heartbeat["model"] = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
         return heartbeat
 
 

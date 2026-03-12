@@ -17,7 +17,7 @@ class AgentState(TypedDict):
     impacted_components: list[str]
     risks: list[str]
     acceptance_criteria: list[str]
-    implementation_plan: str
+    implementation_plan: list[str]
 
     # Testing phase outputs
     test_plan: str

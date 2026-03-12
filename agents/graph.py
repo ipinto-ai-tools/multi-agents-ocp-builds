@@ -179,7 +179,7 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
         Updated state with documentation outputs
     """
     try:
-        # Prepare context for docs agent
+        # Prepare context for docs agent (includes repo_path for RAG)
         context = {
             "design_analysis": state.get("design_analysis", ""),
             "implementation_plan": state.get("implementation_plan", ""),
@@ -201,6 +201,7 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
             "issue_title": state.get("issue_title", ""),
             "issue_description": state.get("issue_description", ""),
             "issue_type": state.get("issue_type", "feature"),
+            "repo_path": state.get("repo_path", "."),
         }
 
         # Run docs agent

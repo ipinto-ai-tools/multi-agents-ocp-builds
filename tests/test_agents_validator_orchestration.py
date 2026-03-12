@@ -276,9 +276,15 @@ class TestWorkflowNodes:
                 "test_results": {},
                 "issue_title": "Title",
                 "issue_description": "Description",
+                "repo_path": "/test/repo",
             }
 
             result = docs_node(state)
+
+            # Validate that repo_path was passed to docs agent
+            context_arg = mock_docs.call_args[0][0]
+            assert "repo_path" in context_arg
+            assert context_arg["repo_path"] == "/test/repo"
 
             # Validate outputs
             assert result["pr_summary"] == SAMPLE_DOCS_OUTPUT["pr_summary"]
@@ -295,6 +301,7 @@ class TestWorkflowNodes:
                 "design_analysis": "Content",
                 "code_changes": {},
                 "test_results": {},
+                "repo_path": "/test/repo",
             }
 
             result = docs_node(state)

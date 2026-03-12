@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 
 from anthropic import Anthropic, APIError
 from config.agent_prompts import DOCS_AGENT_PROMPT
+from config.auth_config import get_anthropic_client
 from tools.rag_search import RAGSearch, RAGSearchError
 
 
@@ -73,14 +74,6 @@ def run_docs(
     if missing_keys:
         raise ValueError(f"Missing required context keys: {missing_keys}")
 
-    # Get API key from environment
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY environment variable not set. "
-            "Please set it to use the Documentation Agent."
-        )
-
     # Initialize RAG search if enabled
     rag_context = {}
     if enable_rag and "repo_path" in context:
@@ -105,13 +98,16 @@ def run_docs(
         output_format
     )
 
-    # Initialize Anthropic client
-    client = Anthropic(api_key=api_key)
+    # Get configured client (handles both API key and enterprise auth)
+    try:
+        client = get_anthropic_client()
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize Claude client: {e}") from e
 
     try:
         # Call Claude API
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=8192,  # Increased for comprehensive documentation
             system=DOCS_AGENT_PROMPT,
             messages=[

@@ -221,7 +221,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -234,7 +234,8 @@ class TestDocsAgent:
                 call_args = mock_client.messages.create.call_args
 
                 # Validate request structure
-                assert call_args.kwargs["model"] == "claude-sonnet-4-20250514"
+                expected_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+                assert call_args.kwargs["model"] == expected_model
                 assert call_args.kwargs["max_tokens"] == 8192  # Increased for enhanced features
                 assert call_args.kwargs["temperature"] == 0.3
                 assert len(call_args.kwargs["messages"]) == 1
@@ -265,7 +266,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -292,7 +293,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -310,7 +311,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -330,7 +331,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -527,7 +528,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic docs")]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -544,7 +545,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -562,7 +563,7 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
@@ -576,7 +577,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = []  # Empty content
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -617,7 +618,7 @@ class TestIntegration:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.Anthropic") as mock_anthropic:
+        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client

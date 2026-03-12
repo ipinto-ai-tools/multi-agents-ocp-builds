@@ -19,6 +19,7 @@ except ImportError:
     )
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT
+from config.auth_config import get_anthropic_client
 from config.shipwright_components import (
     get_component_info,
     COMPONENTS,
@@ -65,19 +66,11 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
         ... )
         >>> print(result["design_analysis"])
     """
-    # Validate API key
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise DesignAgentError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "Please set it with your Claude API key."
-        )
-
-    # Initialize Anthropic client
+    # Get configured client (handles both API key and enterprise auth)
     try:
-        client = Anthropic(api_key=api_key)
+        client = get_anthropic_client()
     except Exception as e:
-        raise DesignAgentError(f"Failed to initialize Anthropic client: {e}") from e
+        raise DesignAgentError(f"Failed to initialize Claude client: {e}") from e
 
     # Gather repository context if path provided
     repo_context = _gather_repo_context(repo_path) if repo_path else None
@@ -96,7 +89,7 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
     # Call Claude API
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=8000,
             system=DESIGN_AGENT_PROMPT,
             messages=[

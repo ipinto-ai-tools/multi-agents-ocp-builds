@@ -122,10 +122,10 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
-            mock_anthropic.return_value = mock_client
+            mock_get_client.return_value = mock_client
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                 result = run_design(
@@ -138,7 +138,8 @@ class TestDesignAgent:
                 call_args = mock_client.messages.create.call_args
 
                 # Validate request structure
-                assert call_args.kwargs["model"] == "claude-sonnet-4-20250514"
+                expected_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+                assert call_args.kwargs["model"] == expected_model
                 assert call_args.kwargs["max_tokens"] == 8000
                 assert len(call_args.kwargs["messages"]) == 1
 
@@ -153,10 +154,10 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
-            mock_anthropic.return_value = mock_client
+            mock_get_client.return_value = mock_client
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                 result = run_design(
@@ -174,7 +175,7 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             with patch("agents.design_agent.RepoSearch") as mock_repo_search:
                 # Mock repository search results
                 mock_searcher = Mock()
@@ -187,7 +188,7 @@ class TestDesignAgent:
 
                 mock_client = Mock()
                 mock_client.messages.create.return_value = mock_response
-                mock_anthropic.return_value = mock_client
+                mock_get_client.return_value = mock_client
 
                 with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                     result = run_design(
@@ -342,10 +343,10 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic analysis")]
 
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
-            mock_anthropic.return_value = mock_client
+            mock_get_client.return_value = mock_client
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                 result = run_design(
@@ -357,10 +358,10 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
-            mock_anthropic.return_value = mock_client
+            mock_get_client.return_value = mock_client
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
                 with pytest.raises(DesignAgentError, match="Claude API call failed"):
@@ -368,8 +369,8 @@ class TestEdgeCases:
 
     def test_invalid_anthropic_client_initialization(self):
         """Test handling of client initialization errors."""
-        with patch("agents.design_agent.Anthropic") as mock_anthropic:
-            mock_anthropic.side_effect = Exception("Invalid API key")
+        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+            mock_get_client.side_effect = Exception("Invalid API key")
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "invalid-key"}):
                 with pytest.raises(DesignAgentError, match="Failed to initialize"):

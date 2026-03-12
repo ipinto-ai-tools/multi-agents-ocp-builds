@@ -329,7 +329,7 @@ class TestTestingAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_TEST_OUTPUT)]
 
-        with patch("agents.testing_agent.Anthropic") as mock_anthropic:
+        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -342,7 +342,8 @@ class TestTestingAgent:
                 call_args = mock_client.messages.create.call_args
 
                 # Validate request structure
-                assert call_args.kwargs["model"] == "claude-sonnet-4-20250514"
+                expected_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+                assert call_args.kwargs["model"] == expected_model
                 assert call_args.kwargs["max_tokens"] == 16000
                 assert len(call_args.kwargs["messages"]) == 1
 
@@ -553,7 +554,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic test output")]
 
-        with patch("agents.testing_agent.Anthropic") as mock_anthropic:
+        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -564,7 +565,7 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.testing_agent.Anthropic") as mock_anthropic:
+        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
@@ -575,7 +576,7 @@ class TestEdgeCases:
 
     def test_invalid_anthropic_client_initialization(self):
         """Test handling of client initialization errors."""
-        with patch("agents.testing_agent.Anthropic") as mock_anthropic:
+        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
             mock_anthropic.side_effect = Exception("Invalid API key")
 
             with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "invalid-key"}):

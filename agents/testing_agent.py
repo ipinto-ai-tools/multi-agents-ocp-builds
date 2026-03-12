@@ -19,6 +19,7 @@ except ImportError:
     )
 
 from config.agent_prompts import TESTING_AGENT_PROMPT
+from config.auth_config import get_anthropic_client
 from config.testing_config import (
     detect_patterns_in_description,
     get_strategy_pattern,
@@ -78,19 +79,11 @@ def run_testing(context: Dict[str, Any]) -> Dict[str, Any]:
     # Validate required context
     _validate_context(context)
 
-    # Validate API key
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise TestingAgentError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "Please set it with your Claude API key."
-        )
-
-    # Initialize Anthropic client
+    # Get configured client (handles both API key and enterprise auth)
     try:
-        client = Anthropic(api_key=api_key)
+        client = get_anthropic_client()
     except Exception as e:
-        raise TestingAgentError(f"Failed to initialize Anthropic client: {e}") from e
+        raise TestingAgentError(f"Failed to initialize Claude client: {e}") from e
 
     # Detect patterns in the issue description
     patterns_detected = {}
@@ -105,7 +98,7 @@ def run_testing(context: Dict[str, Any]) -> Dict[str, Any]:
     # Call Claude API
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=16000,  # Larger for code generation
             system=TESTING_AGENT_PROMPT,
             messages=[
