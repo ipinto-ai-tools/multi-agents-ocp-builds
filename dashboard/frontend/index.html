@@ -19,30 +19,55 @@
         }
 
         .header {
-            text-align: center;
-            margin-bottom: 40px;
             display: flex;
-            flex-direction: column;
-            position: relative;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        .header h1 {
+        .header-content {
+            flex: 1;
+        }
+
+        .header-content h1 {
             font-size: 2.5em;
-            margin-bottom: 10px;
-            color: #58a6ff;
+            margin: 0 0 10px 0;
+            color: white;
         }
 
-        .header p {
-            color: #8b949e;
+        .header-content p {
+            color: rgba(255, 255, 255, 0.9);
             font-size: 1.1em;
+            margin: 0;
         }
 
         .header-actions {
-            position: absolute;
-            top: 10px;
-            right: 20px;
             display: flex;
             gap: 10px;
+            margin-left: 20px;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                margin-left: 0;
+                margin-top: 15px;
+                width: 100%;
+            }
+
+            .header-actions .btn {
+                flex: 1;
+            }
         }
 
         .btn {
@@ -314,8 +339,10 @@
 </head>
 <body>
     <div class="header">
-        <h1>Multi-Agent Dashboard</h1>
-        <p>Real-time monitoring for Design, Development, Testing, and Docs agents</p>
+        <div class="header-content">
+            <h1>Multi-Agent Dashboard</h1>
+            <p>Real-time monitoring for Design, Development, Testing, and Docs agents</p>
+        </div>
         <div class="header-actions">
             <button id="clearSessionsBtn" class="btn btn-danger">
                 Clear Completed Sessions
