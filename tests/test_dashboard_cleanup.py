@@ -34,7 +34,7 @@ def insert_test_session(db: Database, session_id: str, phase: str, hours_ago: in
 
     # Prepare test data
     raw_state = {
-        "phase": phase,
+        "current_phase": phase,
         "issue_number": 123,
         "issue_title": f"Test Session {session_id}",
         "issue_type": "feature"

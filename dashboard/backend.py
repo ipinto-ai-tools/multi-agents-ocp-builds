@@ -273,8 +273,8 @@ class Database:
             SELECT DISTINCT session_id FROM heartbeats
             WHERE timestamp < ?
             AND (
-                json_extract(raw_state, '$.phase') = 'done'
-                OR json_extract(raw_state, '$.phase') = 'error'
+                json_extract(raw_state, '$.current_phase') = 'done'
+                OR json_extract(raw_state, '$.current_phase') = 'error'
             )
         """, (cutoff_timestamp,))
 
@@ -313,27 +313,26 @@ class Database:
         return result
 
     def clear_completed_sessions(self) -> dict:
-        """Clear all completed sessions (phase='done' or 'error').
+        """Clear all completed or failed sessions (phase='done' or 'error').
 
         Returns:
-            dict with count of cleared sessions
+            dict with count of cleared sessions and their IDs
         """
-        # Get all completed session IDs
+        # Get all completed/error session IDs
         cursor = self.conn.execute("""
             SELECT DISTINCT session_id FROM heartbeats
-            WHERE json_extract(raw_state, '$.phase') = 'done'
-            OR json_extract(raw_state, '$.phase') = 'error'
+            WHERE json_extract(raw_state, '$.current_phase') IN ('done', 'error')
         """)
 
         session_ids = [row[0] for row in cursor.fetchall()]
 
         if not session_ids:
-            logger.info("No completed sessions to clear")
-            return {"sessions_cleared": 0}
+            logger.info("No completed/error sessions to clear")
+            return {"sessions_cleared": 0, "session_ids": []}
 
         # Delete heartbeats for these sessions
         placeholders = ','.join('?' * len(session_ids))
-        self.conn.execute(
+        heartbeats_cursor = self.conn.execute(
             f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
             session_ids
         )
@@ -346,9 +345,16 @@ class Database:
 
         self.conn.commit()
 
-        result = {"sessions_cleared": sessions_cursor.rowcount}
+        result = {
+            "sessions_cleared": sessions_cursor.rowcount,
+            "heartbeats_deleted": heartbeats_cursor.rowcount,
+            "session_ids": session_ids
+        }
 
-        logger.info(f"Cleared {result['sessions_cleared']} completed sessions")
+        logger.info(
+            f"Cleared {result['sessions_cleared']} completed/error sessions "
+            f"({result['heartbeats_deleted']} heartbeats): {session_ids}"
+        )
 
         return result
 
@@ -513,10 +519,11 @@ async def clear_completed_sessions():
     """Clear all sessions with phase='done' or phase='error'.
 
     Returns:
-        Number of sessions cleared
+        dict with sessions_cleared count, heartbeats_deleted count, and session_ids list
     """
-    logger.info("Clear all completed sessions requested")
+    logger.info("Clear all completed/error sessions requested")
     result = db.clear_completed_sessions()
+    logger.info(f"Manual session cleanup: {result}")
     return result
 
 
