@@ -1,0 +1,211 @@
+# ============================================================================
+# Python-specific
+# ============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.log
+
+# Translations
+*.mo
+*.pot
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# ============================================================================
+# Virtual Environments
+# ============================================================================
+# Common Python virtual environment directories
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ============================================================================
+# Environment Variables
+# ============================================================================
+# Environment files containing sensitive data (API keys, credentials, etc.)
+.env
+.env.local
+.env.*.local
+.envrc
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+# VS Code
+.vscode/
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# JetBrains IDEs (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+*.un~
+
+# Emacs
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Eclipse
+.project
+.pydevproject
+.settings/
+
+# ============================================================================
+# Claude Code
+# ============================================================================
+# User-specific Claude Code configuration and cache
+.claude/
+
+# ============================================================================
+# Build and Distribution
+# ============================================================================
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.whl
+
+# ============================================================================
+# Database
+# ============================================================================
+# SQLite databases (often used for local development/testing)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Project-specific database (if it's a local testing database)
+# Uncomment if dashboard.db should not be committed:
+# dashboard.db
+
+# ============================================================================
+# Temporary Files
+# ============================================================================
+# General temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Temporary directory
+/tmp/
+temp/
+
+# ============================================================================
+# OS-specific
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# ============================================================================
+# Project-specific
+# ============================================================================
+# Examples directory (if it contains test outputs or generated files)
+# examples/output/
+# examples/temp/
+
+# MCP server artifacts (if any)
+# mcp/cache/
+# mcp/*.log
+
+# Documentation build artifacts
+# docs/_build/
+# docs/.doctrees/
