@@ -53,7 +53,17 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
   ```
 
 - **Git**: 2.0 or higher
-- **Anthropic API Key**: Get yours at [console.anthropic.com](https://console.anthropic.com/settings/keys)
+- **Google Cloud CLI**: For Vertex AI authentication
+  ```bash
+  # Install gcloud CLI - see: https://cloud.google.com/sdk/docs/install
+
+  # Authenticate
+  gcloud auth application-default login
+  gcloud auth application-default set-quota-project your-gcp-project-id
+  ```
+- **Claude Authentication**: Configured via one of:
+  - **Google Vertex AI** (recommended): Uses gcloud authentication
+  - **Individual API Key**: Personal API key from console.anthropic.com
 
 ### Installation
 
@@ -78,33 +88,77 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 
    ```bash
    cp .env.example .env
-   # Edit .env and add your ANTHROPIC_API_KEY
+   # Edit .env and configure your Claude authentication
    ```
 
 ### Configuration
 
 Create a `.env` file in the project root:
 
-```bash
-# Required: Get your API key from https://console.anthropic.com/settings/keys
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+**Option 1: Google Vertex AI (Recommended)**
 
-# Optional: Enable deeper code analysis (leave blank to skip)
+```bash
+# Google Vertex AI Authentication
+# Uses gcloud authentication (no API keys needed!)
+ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+CLOUD_ML_REGION=  # Optional, defaults to us-east5
+
+# Authenticate with gcloud:
+# gcloud auth application-default login
+# gcloud auth application-default set-quota-project your-gcp-project-id
+
+# Optional: Repository paths for code analysis
 SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
 OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
 
-# Optional: Adjust logging (defaults shown)
-LOG_LEVEL=INFO
-LOG_FORMAT=text
-
-# Optional: Change AI model (default is claude-sonnet-4)
+# Optional: Model configuration
 CLAUDE_MODEL=claude-sonnet-4-20250514
 CLAUDE_MAX_TOKENS=8000
 ```
 
-**Quick setup**: Copy `.env.example` to `.env` and add your API key. Everything else has sensible defaults.
+**Option 2: Individual API Key**
 
-See [`.env.example`](.env.example) for all available options.
+```bash
+# Individual API Key (alternative to Vertex AI)
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+
+# Optional: Repository paths for code analysis
+SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
+OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
+
+# Optional: Model configuration
+CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_MAX_TOKENS=8000
+```
+
+**Option 3: Custom Enterprise Endpoint**
+
+```bash
+# Custom enterprise endpoint (alternative)
+ANTHROPIC_BASE_URL=https://your-endpoint.com
+ANTHROPIC_AUTH_TOKEN=your-auth-token
+
+# Optional: Repository paths for code analysis
+SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
+OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
+
+# Optional: Model configuration
+CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_MAX_TOKENS=8000
+```
+
+**For Vertex AI setup:**
+1. Install Google Cloud CLI
+2. Run authentication commands (see Prerequisites)
+3. Set your GCP project ID in `.env`
+4. No API keys needed!
+
+**For Individual API Key:**
+- Get your API key at [console.anthropic.com](https://console.anthropic.com/settings/keys)
+
+**Quick setup**: Copy `.env.example` to `.env` and configure your authentication method. Everything else has sensible defaults.
+
+See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for detailed setup.
 
 ### Running Your First Analysis
 
@@ -222,10 +276,16 @@ muilti-agents-ocp-builds/
 │   ├── repo_search.py    # Code search and analysis
 │   ├── rag_search.py     # Documentation search with RAG
 │   └── git_ops.py        # Git operations
+├── utils/                # Utility modules
+│   └── logging_config.py # Logging configuration and debug support
+├── mcp/                  # MCP server integration stubs
+│   ├── github_stub.py    # GitHub MCP server stub (future)
+│   └── jira_stub.py      # Jira MCP server stub (future)
 ├── config/               # Configuration files
 │   ├── agent_prompts.py  # Agent system prompts
 │   ├── testing_config.py # Testing patterns and Ginkgo templates
-│   └── shipwright_components.py  # Component definitions
+│   ├── shipwright_components.py  # Component definitions
+│   └── mock_responses.py # Mock API responses for dry-run mode
 ├── tests/                # Test suite
 │   ├── test_design_agent.py
 │   ├── test_docs_agent.py
@@ -234,9 +294,11 @@ muilti-agents-ocp-builds/
 ├── docs/                 # Documentation
 │   ├── HOWTO.md          # User guide
 │   ├── ARCHITECTURE.md   # System architecture
-│   └── DASHBOARD_ARCHITECTURE.md  # Dashboard design
+│   ├── DASHBOARD_ARCHITECTURE.md  # Dashboard design
+│   └── TESTING_INFRASTRUCTURE.md  # Testing infrastructure guide
 ├── scripts/              # Utility scripts
-│   └── run_dashboard.py  # Dashboard server launcher
+│   ├── run_dashboard.py  # Dashboard server launcher
+│   └── test_agents.py    # CLI tool for manual agent testing
 ├── .env.example          # Environment configuration template
 ├── requirements.txt      # Python dependencies
 └── README.md             # This file
@@ -331,7 +393,13 @@ uv run pytest tests/test_orchestration.py -v
 ### Run with Real Claude API
 
 ```bash
+# For Enterprise
+export ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
+export ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
+
+# Or for Individual API Key
 export ANTHROPIC_API_KEY=your_key_here
+
 uv run pytest tests/ -v
 ```
 
@@ -342,6 +410,30 @@ uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
 ```
 
 See [tests/README.md](tests/README.md) for detailed testing documentation.
+
+### Manual Agent Testing
+
+Test agents individually or as a complete workflow using the test CLI:
+
+```bash
+# Test with dry-run (no API calls, uses mock responses)
+uv run python scripts/test_agents.py --e2e --dry-run --debug
+
+# Test specific agent
+uv run python scripts/test_agents.py --agent design --dry-run
+
+# Test dashboard
+uv run python scripts/test_agents.py --dashboard
+```
+
+**Features:**
+- Dry-run mode with mock responses (no API calls, no authentication needed)
+- Debug mode with verbose logging
+- Local artifact storage
+- Individual agent or E2E testing
+- Dashboard functionality validation
+
+See [docs/TESTING_INFRASTRUCTURE.md](docs/TESTING_INFRASTRUCTURE.md) for complete testing documentation.
 
 ---
 

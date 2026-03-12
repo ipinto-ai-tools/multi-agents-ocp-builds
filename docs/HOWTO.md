@@ -54,12 +54,40 @@ The system automates the **design analysis and documentation generation** workfl
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 - **Git**: 2.0 or higher
+- **Google Cloud CLI**: For Vertex AI authentication (recommended)
+  ```bash
+  # Install gcloud CLI - see: https://cloud.google.com/sdk/docs/install
 
-### Required API Keys
+  # Authenticate
+  gcloud auth application-default login
+  gcloud auth application-default set-quota-project your-gcp-project-id
+  ```
 
-- **Anthropic API Key**: Get yours from [Anthropic Console](https://console.anthropic.com/settings/keys)
-  - Required for Claude AI integration
-  - Supports models: `claude-sonnet-4-20250514` (default)
+### Claude Authentication
+
+Choose one of the following authentication methods:
+
+**Option 1: Google Vertex AI (Recommended)**
+
+- **No API keys needed!** Uses gcloud authentication
+- **GCP Project ID**: Your Google Cloud project ID
+- **Region**: GCP region (optional, defaults to us-east5)
+- Authenticate via: `gcloud auth application-default login`
+- Find your project ID: `gcloud projects list`
+
+**Option 2: Individual API Key**
+
+- **Anthropic API Key**: Personal API key from [Anthropic Console](https://console.anthropic.com/settings/keys)
+- Supports models: `claude-sonnet-4-20250514` (default)
+
+**Option 3: Custom Enterprise Endpoint**
+
+- **Enterprise API endpoint**: Custom base URL for your organization
+- **Enterprise auth token**: Organization-specific authentication token
+- **Organization ID**: Optional, may be required by your enterprise setup
+- Contact your enterprise administrator for these credentials
+
+**Note**: Dry-run mode does not require any authentication
 
 ### Optional
 
@@ -105,8 +133,8 @@ pip install -r requirements.txt
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env with your API key
-# Required: ANTHROPIC_API_KEY
+# Edit .env with your Claude authentication
+# Choose either enterprise auth or individual API key
 ```
 
 ### Step 4: Verify Installation
@@ -133,10 +161,49 @@ The `.env` file controls all system behavior. Copy from `.env.example` and custo
 
 #### Required Configuration
 
+Choose one authentication method:
+
+**Option 1: Google Vertex AI (Recommended)**
+
 ```bash
-# Anthropic Claude API Key (REQUIRED)
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Google Vertex AI Authentication
+# Uses gcloud authentication (no API keys needed!)
+ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+CLOUD_ML_REGION=  # Optional, defaults to us-east5
 ```
+
+Setup steps:
+1. Install Google Cloud CLI: https://cloud.google.com/sdk/docs/install
+2. Authenticate: `gcloud auth application-default login`
+3. Set quota project: `gcloud auth application-default set-quota-project your-gcp-project-id`
+4. Find your project ID: `gcloud projects list`
+
+**Option 2: Individual API Key**
+
+```bash
+# Personal API key
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+```
+
+Get your API key at [console.anthropic.com](https://console.anthropic.com/settings/keys)
+
+**Option 3: Custom Enterprise Endpoint**
+
+```bash
+# Enterprise API endpoint
+ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
+
+# Enterprise authentication token
+ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
+
+# Optional organization ID
+ANTHROPIC_ORG_ID=your_org_id
+```
+
+Contact your enterprise administrator for:
+- Enterprise API endpoint URL (`ANTHROPIC_BASE_URL`)
+- Enterprise authentication token (`ANTHROPIC_AUTH_TOKEN`)
+- Organization ID if required (`ANTHROPIC_ORG_ID`)
 
 #### Optional Repository Paths
 
@@ -203,8 +270,9 @@ CACHE_TTL=3600
 
 1. **Never commit** `.env` to version control (already in `.gitignore`)
 2. **Use `.env.local`** for personal configurations
-3. **Rotate API keys** regularly
+3. **Rotate credentials** regularly (API keys or enterprise tokens)
 4. **Set restrictive permissions**: `chmod 600 .env`
+5. **Enterprise users**: Follow your organization's security policies for token management
 
 ---
 
@@ -1559,23 +1627,64 @@ result = {
 
 ## Troubleshooting
 
-### API Key Not Set
+### Authentication Not Configured
 
 **Error:**
 ```
-DesignAgentError: ANTHROPIC_API_KEY environment variable is not set
+DesignAgentError: No Claude authentication configured
 ```
 
 **Solution:**
+
+Choose one authentication method:
+
+**For Google Vertex AI (Recommended):**
+```bash
+# Authenticate with gcloud
+gcloud auth application-default login
+gcloud auth application-default set-quota-project your-gcp-project-id
+
+# Check if .env file exists
+ls -la .env
+
+# Ensure Vertex AI project ID is set
+grep ANTHROPIC_VERTEX_PROJECT_ID .env
+
+# Or export directly
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+export CLOUD_ML_REGION=  # Optional
+```
+
+**For Individual API Key:**
 ```bash
 # Check if .env file exists
 ls -la .env
 
-# Ensure ANTHROPIC_API_KEY is set
+# Ensure API key is set
 grep ANTHROPIC_API_KEY .env
 
 # Or export directly
-export ANTHROPIC_API_KEY=sk-ant-your-key-here
+export ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+```
+
+**For Custom Enterprise Endpoint:**
+```bash
+# Check if .env file exists
+ls -la .env
+
+# Ensure enterprise auth is set
+grep ANTHROPIC_BASE_URL .env
+grep ANTHROPIC_AUTH_TOKEN .env
+
+# Or export directly
+export ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
+export ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
+```
+
+**For Dry-Run Mode (No Authentication Needed):**
+```bash
+# Use dry-run mode for testing without authentication
+uv run python scripts/test_agents.py --e2e --dry-run
 ```
 
 ---
@@ -1826,8 +1935,15 @@ uv run pytest --cov=agents --cov=tools tests/
 **Integration Tests:**
 
 ```bash
-# Test with actual API (requires ANTHROPIC_API_KEY)
+# Test with actual API (requires authentication)
+# Option 1: Google Vertex AI (recommended)
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+# Ensure gcloud auth is configured: gcloud auth application-default login
+
+# Option 2: Individual API key
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Run tests
 uv run pytest tests/integration/
 ```
 
@@ -1925,7 +2041,9 @@ CLAUDE_MODEL=claude-3-5-sonnet-20241022
 - **Docs Agent**: ~4,000 tokens output + input (design + test results)
 - **Estimated cost per run**: $0.05-0.20 (Sonnet 4)
 
-Monitor usage at [Anthropic Console](https://console.anthropic.com/usage).
+**Monitoring usage:**
+- **Vertex AI**: Check GCP billing console and quotas
+- **Individual API Key**: Monitor at [Anthropic Console](https://console.anthropic.com/usage)
 
 ---
 
