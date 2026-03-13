@@ -1,5 +1,5 @@
 # Core AI/LLM dependencies
-anthropic>=0.40.0
+anthropic[vertex]>=0.40.0  # Include Vertex AI support for Google Cloud
 langgraph>=0.2.0
 langchain-core>=0.3.0
 
