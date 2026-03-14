@@ -50,37 +50,22 @@ def get_anthropic_client() -> AnthropicVertex:
         ValueError: If authentication is not configured or if initialization fails
 
     """
-    # use_vertex = os.getenv("CLAUDE_CODE_USE_VERTEX") == "1"
-    # project_id = os.getenv("ANTHROPIC_VERTEX_PROJECT_ID")
-
-    # if not project_id and not use_vertex:
-    #     raise ValueError(
-    #         "No Claude authentication configured. Please set:\n"
-    #         "  export ANTHROPIC_VERTEX_PROJECT_ID='your-gcp-project-id'\n"
-    #         "  export CLOUD_ML_REGION='us-east5'  # Optional, defaults to us-east5\n"
-    #         "\n"
-    #         "Note: Vertex AI uses gcloud credentials automatically.\n"
-    #         "Make sure you've run: gcloud auth application-default login\n"
-    #         "\n"
-    #         "See .env.example for configuration details."
-    #     )
-
-    use_vertex=True
-    project_id="itpc-gcp-pnd-pe-eng-claude"
-    if not project_id:
+    use_vertex = os.getenv("CLAUDE_CODE_USE_VERTEX") == "1"
+    project_id = os.getenv("ANTHROPIC_VERTEX_PROJECT_ID")
+    region = os.getenv("CLOUD_ML_REGION", "us-east5")
+ 
+    if not project_id and not use_vertex:
         raise ValueError(
-            "ANTHROPIC_VERTEX_PROJECT_ID is required for Vertex AI authentication.\n"
-            "\n"
-            "Please set:\n"
+            "No Claude authentication configured. Please set:\n"
             "  export ANTHROPIC_VERTEX_PROJECT_ID='your-gcp-project-id'\n"
             "  export CLOUD_ML_REGION='us-east5'  # Optional, defaults to us-east5\n"
             "\n"
             "Note: Vertex AI uses gcloud credentials automatically.\n"
-            "Make sure you've run: gcloud auth application-default login"
+            "Make sure you've run: gcloud auth application-default login\n"
+            "\n"
+            "See .env.example for configuration details."
         )
-
-    region = os.getenv("CLOUD_ML_REGION", "us-east5")
-
+           
     try:
         client = AnthropicVertex(region=region, project_id=project_id)
         logger.info(
