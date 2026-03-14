@@ -182,22 +182,22 @@ uv run python scripts/test_agents.py --e2e --dry-run
 
 All artifacts are saved to the output directory (default: `/tmp/claude/agent-tests`):
 
-| File | Description |
-|------|-------------|
-| `test_YYYYMMDD_HHMMSS.log` | Complete test execution log with timestamps |
-| `design_output.json` | Design agent output (analysis, risks, acceptance criteria, implementation plan) |
-| `development_output.json` | Development agent output (Go code files, unit tests, PR description) |
-| `testing_output.json` | Testing agent output (test plan, Ginkgo v2 test suites) |
-| `docs_output.json` | Docs agent output (PR summary, release notes, documentation changes) |
-| `e2e_result.json` | Complete E2E workflow results (all 4 agents) |
-| `dashboard_test_results.json` | Dashboard test summary |
+| File                          | Description                                                                     |
+|-------------------------------|---------------------------------------------------------------------------------|
+| `test_YYYYMMDD_HHMMSS.log`    | Complete test execution log with timestamps                                     |
+| `design_output.json`          | Design agent output (analysis, risks, acceptance criteria, implementation plan) |
+| `development_output.json`     | Development agent output (Go code files, unit tests, PR description)            |
+| `testing_output.json`         | Testing agent output (test plan, Ginkgo v2 test suites)                         |
+| `docs_output.json`            | Docs agent output (PR summary, release notes, documentation changes)            |
+| `e2e_result.json`             | Complete E2E workflow results (all 4 agents)                                    |
+| `dashboard_test_results.json` | Dashboard test summary                                                          |
 
 ## Key Features
 
 ### 1. Dry-Run Mode
 
 - **No API calls**: Uses pre-configured mock responses for design, testing, and docs agents
-- **No authentication needed**: Works without any Claude credentials (no Vertex AI, API key, or enterprise auth required)
+- **No authentication needed**: Works without any Claude credentials (no Vertex AI configuration required)
 - **Fast execution**: Instant results without network latency
 - **Predictable output**: Same mock data every time for supported agents
 - **CI/CD friendly**: No external dependencies

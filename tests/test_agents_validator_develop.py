@@ -14,6 +14,8 @@ import os
 import pytest
 from unittest.mock import Mock, patch
 
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
 from agents.go_k8s_developer import (
     run_development,
     DevelopmentAgentError,
@@ -395,8 +397,8 @@ class TestDevelopmentAgent:
                 run_development(SAMPLE_CONTEXT)
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set - using mock instead"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_development_agent_with_real_api(self):
         """Test development agent with real Claude API (if key available)."""
@@ -435,8 +437,8 @@ class TestDevelopmentAgent:
         print(f"\nDependencies: {result['dependencies']}")
 
     @pytest.mark.skipif(
-        bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY is set - skipping mock test"
+        HAS_ANTHROPIC_AUTH,
+        reason="Anthropic authentication is configured - skipping mock test"
     )
     def test_development_agent_with_mock(self):
         """Test development agent with mocked Claude API."""
@@ -448,7 +450,7 @@ class TestDevelopmentAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_development(SAMPLE_CONTEXT)
 
                 # Validate mock was called
@@ -486,7 +488,7 @@ class TestDevelopmentAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_development(SAMPLE_CONTEXT)
 
                 # Verify all required fields exist
@@ -523,7 +525,7 @@ class TestDevelopmentAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_development(SAMPLE_CONTEXT)
 
                 # Verify footer is present
@@ -598,7 +600,7 @@ class TestDevelopmentAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_development(SAMPLE_CONTEXT, repo_path="/fake/repo/path")
 
                 # Should still generate valid output
@@ -867,7 +869,7 @@ class TestEdgeCases:
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(DevelopmentAgentError, match="Unexpected error"):
                     run_development(SAMPLE_CONTEXT)
 
@@ -876,7 +878,7 @@ class TestEdgeCases:
         with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
             mock_get_client.side_effect = Exception("Invalid API key")
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "invalid-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(DevelopmentAgentError, match="Failed to initialize"):
                     run_development(SAMPLE_CONTEXT)
 
@@ -890,7 +892,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises((DevelopmentAgentError, IndexError)):
                     run_development(SAMPLE_CONTEXT)
 
@@ -958,7 +960,7 @@ Simple change.
                 mock_client.messages.create.return_value = mock_response
                 mock_get_client.return_value = mock_client
 
-                with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+                with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                     run_development(SAMPLE_CONTEXT)
 
                     # Should emit at least 2 heartbeats (start and complete)
@@ -1001,7 +1003,7 @@ class TestIntegration:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_development(full_context)
 
                 # Validate comprehensive output

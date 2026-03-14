@@ -342,13 +342,13 @@ def orchestrate(
         Final state containing all agent outputs
 
     Example:
-        >>> result = orchestrate(
-        ...     title="Add timeout support",
-        ...     description="Users need build timeout configuration",
-        ...     repo_path="/path/to/repo"
-        ... )
-        >>> print(result["design_analysis"])
-        >>> print(result["pr_summary"])
+         result = orchestrate(
+            title="Add timeout support",
+            description="Users need build timeout configuration",
+            repo_path="/path/to/repo"
+        )
+        print(result["design_analysis"])
+        print(result["pr_summary"])
     """
     # Generate session ID for dashboard tracking
     session_id = str(uuid.uuid4())

@@ -8,8 +8,9 @@ output types), and generates structured test plans along with working Ginkgo v2 
 """
 
 import os
-import yaml
 from typing import Dict, Any, List, Optional
+
+import yaml
 
 try:
     from anthropic import Anthropic
@@ -23,11 +24,6 @@ from config.auth_config import get_anthropic_client
 from utils.file_logger import get_logger, get_session_logger
 from config.testing_config import (
     detect_patterns_in_description,
-    get_strategy_pattern,
-    get_test_type_config,
-    generate_test_id,
-    GINKGO_IMPORTS,
-    TEST_TYPES,
 )
 
 # Initialize logger

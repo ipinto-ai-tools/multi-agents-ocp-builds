@@ -10,6 +10,9 @@ import os
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
 import uvicorn
 from dashboard.backend import app
 

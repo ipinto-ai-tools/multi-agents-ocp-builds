@@ -62,9 +62,7 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
   gcloud auth application-default login
   gcloud auth application-default set-quota-project your-gcp-project-id
   ```
-- **Claude Authentication**: Configured via one of:
-  - **Google Vertex AI** (recommended): Uses gcloud authentication
-  - **Individual API Key**: Personal API key from console.anthropic.com
+- **Claude Authentication**: Google Vertex AI (uses gcloud authentication)
 
 ### Installation
 
@@ -98,7 +96,7 @@ The Multi-Agent OpenShift Builds system automates the design analysis and docume
 
 Create a `.env` file in the project root:
 
-**Option 1: Google Vertex AI (Recommended)**
+**Google Vertex AI Authentication**
 
 ```bash
 # Google Vertex AI Authentication
@@ -119,47 +117,13 @@ CLAUDE_MODEL=claude-sonnet-4-20250514
 CLAUDE_MAX_TOKENS=8000
 ```
 
-**Option 2: Individual API Key**
-
-```bash
-# Individual API Key (alternative to Vertex AI)
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-
-# Optional: Repository paths for code analysis
-SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
-OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
-
-# Optional: Model configuration
-CLAUDE_MODEL=claude-sonnet-4-20250514
-CLAUDE_MAX_TOKENS=8000
-```
-
-**Option 3: Custom Enterprise Endpoint**
-
-```bash
-# Custom enterprise endpoint (alternative)
-ANTHROPIC_BASE_URL=https://your-endpoint.com
-ANTHROPIC_AUTH_TOKEN=your-auth-token
-
-# Optional: Repository paths for code analysis
-SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
-OPENSHIFT_BUILDS_REPO_PATH=/path/to/openshift-builds
-
-# Optional: Model configuration
-CLAUDE_MODEL=claude-sonnet-4-20250514
-CLAUDE_MAX_TOKENS=8000
-```
-
-**For Vertex AI setup:**
+**Setup steps:**
 1. Install Google Cloud CLI
 2. Run authentication commands (see Prerequisites)
 3. Set your GCP project ID in `.env`
 4. No API keys needed!
 
-**For Individual API Key:**
-- Get your API key at [console.anthropic.com](https://console.anthropic.com/settings/keys)
-
-**Quick setup**: Copy `.env.example` to `.env` and configure your authentication method. Everything else has sensible defaults.
+**Quick setup**: Copy `.env.example` to `.env` and set your `ANTHROPIC_VERTEX_PROJECT_ID`. Everything else has sensible defaults.
 
 See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md) for detailed setup.
 
@@ -477,12 +441,9 @@ uv run pytest tests/test_orchestration.py -v
 ### Run with Real Claude API
 
 ```bash
-# For Enterprise
-export ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
-export ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
-
-# Or for Individual API Key
-export ANTHROPIC_API_KEY=your_key_here
+# Set up Vertex AI authentication
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+gcloud auth application-default login
 
 uv run pytest tests/ -v
 ```

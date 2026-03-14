@@ -8,6 +8,8 @@ import os
 import pytest
 from unittest.mock import Mock, patch
 
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
 from agents.testing_agent import (
     run_testing,
     TestingAgentError,
@@ -235,10 +237,10 @@ var _ = Describe("BuildRun Timeout E2E", func() {
 class TestTestingAgent:
     """Test suite for Testing Agent functionality."""
 
-    def test_testing_agent_without_api_key(self):
-        """Test that testing agent fails gracefully without API key."""
+    def test_testing_agent_without_auth(self):
+        """Test that testing agent fails gracefully without Vertex AI auth."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(TestingAgentError, match="ANTHROPIC_API_KEY"):
+            with pytest.raises(TestingAgentError, match="ANTHROPIC_VERTEX_PROJECT_ID"):
                 run_testing(SAMPLE_CONTEXT)
 
     def test_testing_agent_missing_context(self):
@@ -283,8 +285,8 @@ class TestTestingAgent:
             })
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set - using mock instead"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_testing_agent_with_real_api(self):
         """Test testing agent with real Claude API (if key available)."""
@@ -321,8 +323,8 @@ class TestTestingAgent:
         print(f"E2E Tests Files: {len(result['e2e_tests'])}")
 
     @pytest.mark.skipif(
-        bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY is set - skipping mock test"
+        HAS_ANTHROPIC_AUTH,
+        reason="Anthropic authentication is configured - skipping mock test"
     )
     def test_testing_agent_with_mock(self):
         """Test testing agent with mocked Claude API."""
@@ -334,7 +336,7 @@ class TestTestingAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_testing(SAMPLE_CONTEXT)
 
                 # Validate mock was called
@@ -559,7 +561,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_testing(minimal_context)
                 assert "test_plan" in result
 
@@ -570,7 +572,7 @@ class TestEdgeCases:
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(TestingAgentError, match="Claude API call failed"):
                     run_testing(SAMPLE_CONTEXT)
 
@@ -579,7 +581,7 @@ class TestEdgeCases:
         with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
             mock_anthropic.side_effect = Exception("Invalid API key")
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "invalid-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(TestingAgentError, match="Failed to initialize"):
                     run_testing(SAMPLE_CONTEXT)
 

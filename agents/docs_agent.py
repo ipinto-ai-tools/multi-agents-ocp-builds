@@ -15,7 +15,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic, APIError
+from anthropic import APIError
+
 from config.agent_prompts import DOCS_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from tools.rag_search import RAGSearch, RAGSearchError

@@ -8,6 +8,8 @@ import os
 import pytest
 from unittest.mock import patch
 
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
 from agents import graph
 
 # Import commonly used functions
@@ -107,8 +109,8 @@ class TestOrchestration:
     """Test suite for orchestration workflow."""
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set - using mock instead"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_full_orchestration_with_real_api(self):
         """Test full orchestration with real Claude API (if key available)."""
@@ -148,8 +150,8 @@ class TestOrchestration:
             print(f"\nDocs Changes: {list(result['docs_changes'].keys())}")
 
     @pytest.mark.skipif(
-        bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY is set - skipping mock test"
+        HAS_ANTHROPIC_AUTH,
+        reason="Anthropic authentication is configured - skipping mock test"
     )
     def test_full_orchestration_with_mock(self):
         """Test full orchestration with mocked agents."""
@@ -783,8 +785,8 @@ class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_shipwright_timeout_feature(self):
         """Test with real Shipwright timeout feature request."""

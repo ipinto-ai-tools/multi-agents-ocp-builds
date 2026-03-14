@@ -20,7 +20,7 @@ except ImportError:
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
-from utils.file_logger import get_logger, get_session_logger
+from utils.file_logger import get_logger
 from config.shipwright_components import (
     get_component_info,
     COMPONENTS,
@@ -63,12 +63,12 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
         DesignAgentError: If API key is missing or analysis fails
 
     Example:
-        >>> result = run_design(
-        ...     title="Add timeout support to BuildRun",
-        ...     description="Users need to specify build timeout to prevent hanging builds",
-        ...     repo_path="/path/to/shipwright-build"
-        ... )
-        >>> print(result["design_analysis"])
+        result = run_design(
+             title="Add timeout support to BuildRun",
+             description="Users need to specify build timeout to prevent hanging builds",
+             repo_path="/path/to/shipwright-build"
+        )
+        print(result["design_analysis"])
     """
     logger.info(f"Starting design analysis for issue: {title}")
 
@@ -124,6 +124,11 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
 
     except Exception as e:
         logger.error(f"Claude API call failed: {e}", exc_info=True)
+        if "google.auth" in str(e) or "anthropic[vertex]" in str(e):
+            raise DesignAgentError(
+                f"Claude API call failed: Missing Vertex AI dependencies. "
+                f"Set ANTHROPIC_VERTEX_PROJECT_ID and install: pip install anthropic[vertex]"
+            ) from e
         raise DesignAgentError(f"Claude API call failed: {e}") from e
 
     # Parse the structured output from the design document

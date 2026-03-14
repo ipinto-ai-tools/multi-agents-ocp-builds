@@ -1740,28 +1740,22 @@ When `current_phase="error"`:
 **File**: `config/auth_config.py`
 
 ```python
-def get_anthropic_client() -> Anthropic:
-    """Get configured Anthropic client."""
+def get_anthropic_client() -> AnthropicVertex:
+    """Get configured Anthropic client via Google Vertex AI."""
+    from anthropic import AnthropicVertex
 
-    # Check for Vertex AI configuration
-    if os.getenv("GOOGLE_CLOUD_PROJECT"):
-        from anthropic import AnthropicVertex
-        return AnthropicVertex(
-            project_id=os.getenv("GOOGLE_CLOUD_PROJECT"),
-            region=os.getenv("GOOGLE_CLOUD_REGION", "us-central1")
-        )
+    project_id = os.getenv("ANTHROPIC_VERTEX_PROJECT_ID")
+    if not project_id:
+        raise ValueError("ANTHROPIC_VERTEX_PROJECT_ID environment variable not set")
 
-    # Check for API key
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-
-    return Anthropic(api_key=api_key)
+    return AnthropicVertex(
+        project_id=project_id,
+        region=os.getenv("CLOUD_ML_REGION", "us-east5")
+    )
 ```
 
-**Supported Backends**:
-1. **Direct API Key**: Set `ANTHROPIC_API_KEY`
-2. **Vertex AI**: Set `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_REGION`
+**Authentication Backend**:
+- **Google Vertex AI**: Set `ANTHROPIC_VERTEX_PROJECT_ID` and authenticate via `gcloud auth application-default login`
 
 ### Agent Prompts
 
@@ -1777,13 +1771,12 @@ Contains system prompts for each agent:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `ANTHROPIC_API_KEY` | Claude API key | (required) |
+| `ANTHROPIC_VERTEX_PROJECT_ID` | GCP project ID for Vertex AI | (required) |
+| `CLOUD_ML_REGION` | GCP region for Vertex AI | `us-east5` |
 | `CLAUDE_MODEL` | Model version | `claude-sonnet-4-20250514` |
 | `DASHBOARD_URL` | Dashboard backend URL | `http://localhost:8080` |
 | `DASHBOARD_ENABLED` | Enable heartbeats | `true` |
 | `DASHBOARD_DB_PATH` | SQLite database path | `/tmp/claude/dashboard.db` |
-| `GOOGLE_CLOUD_PROJECT` | GCP project for Vertex AI | (optional) |
-| `GOOGLE_CLOUD_REGION` | GCP region for Vertex AI | `us-central1` |
 
 ---
 

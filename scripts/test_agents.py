@@ -37,6 +37,9 @@ from typing import Any, Dict, Optional
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
 from config.mock_responses import get_mock_response
 from utils.logging_config import (
     setup_logging,

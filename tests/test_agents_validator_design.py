@@ -9,6 +9,8 @@ import os
 import pytest
 from unittest.mock import Mock, patch
 
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
 from agents.design_agent import (
     run_design,
     DesignAgentError,
@@ -72,15 +74,15 @@ Users cannot specify build timeouts, leading to hung builds consuming cluster re
 class TestDesignAgent:
     """Test suite for Design Agent functionality."""
 
-    def test_design_agent_without_api_key(self):
-        """Test that design agent fails gracefully without API key."""
+    def test_design_agent_without_auth(self):
+        """Test that design agent fails gracefully without Vertex AI auth."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(DesignAgentError, match="ANTHROPIC_API_KEY"):
+            with pytest.raises(DesignAgentError, match="ANTHROPIC_VERTEX_PROJECT_ID"):
                 run_design(SAMPLE_ISSUE_TITLE, SAMPLE_ISSUE_DESCRIPTION)
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set - using mock instead"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_design_agent_with_real_api(self):
         """Test design agent with real Claude API (if key available)."""
@@ -114,8 +116,8 @@ class TestDesignAgent:
         print("Acceptance Criteria Count:", len(result["acceptance_criteria"]))
 
     @pytest.mark.skipif(
-        bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY is set - skipping mock test"
+        HAS_ANTHROPIC_AUTH,
+        reason="Anthropic authentication is configured - skipping mock test"
     )
     def test_design_agent_with_mock(self):
         """Test design agent with mocked Claude API."""
@@ -127,7 +129,7 @@ class TestDesignAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_design(
                     title=SAMPLE_ISSUE_TITLE,
                     description=SAMPLE_ISSUE_DESCRIPTION,
@@ -159,7 +161,7 @@ class TestDesignAgent:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_design(
                     title=SAMPLE_ISSUE_TITLE,
                     description=SAMPLE_ISSUE_DESCRIPTION,
@@ -190,7 +192,7 @@ class TestDesignAgent:
                 mock_client.messages.create.return_value = mock_response
                 mock_get_client.return_value = mock_client
 
-                with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+                with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                     result = run_design(
                         title=SAMPLE_ISSUE_TITLE,
                         description=SAMPLE_ISSUE_DESCRIPTION,
@@ -348,7 +350,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_design(
                     title="Simple issue",
                     description="",  # Empty description
@@ -363,7 +365,7 @@ class TestEdgeCases:
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_get_client.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(DesignAgentError, match="Claude API call failed"):
                     run_design("Title", "Description")
 
@@ -372,7 +374,7 @@ class TestEdgeCases:
         with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
             mock_get_client.side_effect = Exception("Invalid API key")
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "invalid-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(DesignAgentError, match="Failed to initialize"):
                     run_design("Title", "Description")
 

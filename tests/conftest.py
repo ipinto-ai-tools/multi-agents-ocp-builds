@@ -7,17 +7,21 @@ import os
 import pytest
 from typing import Dict, Any
 
-
-@pytest.fixture
-def mock_api_key(monkeypatch):
-    """Fixture to set mock API key for tests."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-api-key-12345")
+from tests.auth_helper import has_anthropic_auth, HAS_ANTHROPIC_AUTH
 
 
 @pytest.fixture
-def no_api_key(monkeypatch):
-    """Fixture to ensure API key is not set."""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def mock_vertex_auth(monkeypatch):
+    """Fixture to set mock Vertex AI auth for tests."""
+    monkeypatch.setenv("ANTHROPIC_VERTEX_PROJECT_ID", "test-project-id")
+    monkeypatch.setenv("CLOUD_ML_REGION", "us-east5")
+
+
+@pytest.fixture
+def no_anthropic_auth(monkeypatch):
+    """Fixture to ensure no Anthropic authentication is configured."""
+    monkeypatch.delenv("ANTHROPIC_VERTEX_PROJECT_ID", raising=False)
+    monkeypatch.delenv("CLOUD_ML_REGION", raising=False)
 
 
 @pytest.fixture
@@ -174,7 +178,7 @@ def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
         "markers",
-        "real_api: mark test as requiring real Anthropic API (skip if key not set)"
+        "real_api: mark test as requiring real Anthropic API (skip if Vertex AI not configured)"
     )
     config.addinivalue_line(
         "markers",
@@ -189,10 +193,10 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """Modify test collection to add markers based on conditions."""
     skip_real_api = pytest.mark.skip(
-        reason="ANTHROPIC_API_KEY not set - set to run real API tests"
+        reason="No Vertex AI authentication configured (set ANTHROPIC_VERTEX_PROJECT_ID)"
     )
 
     for item in items:
-        # Auto-skip real API tests if key not set
-        if "real_api" in item.keywords and not os.getenv("ANTHROPIC_API_KEY"):
+        # Auto-skip real API tests if no auth configured
+        if "real_api" in item.keywords and not HAS_ANTHROPIC_AUTH:
             item.add_marker(skip_real_api)

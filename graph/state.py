@@ -4,8 +4,12 @@ from typing import TypedDict, Annotated, Sequence
 from langgraph.graph import add_messages
 
 
-class AgentState(TypedDict):
-    """State shared across all agents in the workflow."""
+class AgentState(TypedDict, total=False):
+    """State shared across all agents in the workflow.
+
+    Using total=False makes all fields optional, which is required for LangGraph's
+    StateGraph to properly handle partial state updates during workflow execution.
+    """
 
     # Input
     issue_title: str

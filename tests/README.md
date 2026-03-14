@@ -8,9 +8,9 @@ This directory contains comprehensive tests for the Design Agent, Documentation 
 Tests for the Design Agent that analyzes feature requests and produces design documents.
 
 **Test Coverage:**
-- Design agent with/without API key
-- Real API integration (when `ANTHROPIC_API_KEY` is set)
-- Mocked API responses (when key not set)
+- Design agent with/without Vertex AI configuration
+- Real API integration (when `ANTHROPIC_VERTEX_PROJECT_ID` is set)
+- Mocked API responses (when not configured)
 - Component-only analysis (without repository)
 - Repository-based analysis
 - Helper function validation
@@ -26,8 +26,8 @@ Tests for the Documentation Agent that generates PR summaries, release notes, an
 
 **Test Coverage:**
 - Docs agent with complete context
-- Real API integration (when `ANTHROPIC_API_KEY` is set)
-- Mocked API responses (when key not set)
+- Real API integration (when `ANTHROPIC_VERTEX_PROJECT_ID` is set)
+- Mocked API responses (when not configured)
 - Context with test failures
 - Context with coverage gaps
 - Response parsing
@@ -80,14 +80,15 @@ uv run pytest tests/ -v -s
 
 ### Run Only Fast Tests (skip real API calls)
 ```bash
-# This automatically skips tests that require ANTHROPIC_API_KEY
-ANTHROPIC_API_KEY= uv run pytest tests/ -v
+# This automatically skips tests that require ANTHROPIC_VERTEX_PROJECT_ID
+ANTHROPIC_VERTEX_PROJECT_ID= uv run pytest tests/ -v
 ```
 
 ### Run with Real API
 ```bash
-# Set your API key first
-export ANTHROPIC_API_KEY=your-key-here
+# Set up Vertex AI authentication
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+gcloud auth application-default login
 uv run pytest tests/ -v
 ```
 
@@ -102,26 +103,26 @@ uv run pytest tests/test_design_agent.py::TestDesignAgent::test_design_agent_wit
 uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
 ```
 
-## Test Behavior with/without API Key
+## Test Behavior with/without Vertex AI
 
-The test suite intelligently adapts based on whether `ANTHROPIC_API_KEY` is set:
+The test suite intelligently adapts based on whether `ANTHROPIC_VERTEX_PROJECT_ID` is set:
 
-### Without API Key (Default)
+### Without Vertex AI (Default)
 - Tests use mocked Claude API responses
 - Fast execution (no network calls)
 - Validates code structure and logic
 - Tests error handling with mock failures
 
-### With API Key
-- Tests make real Claude API calls
+### With Vertex AI
+- Tests make real Claude API calls via Vertex AI
 - Validates actual API integration
 - Tests real design analysis quality
 - Tests real documentation generation
 - Slower execution (network latency)
 
 **The tests will automatically:**
-- Skip real API tests if key is not set
-- Run mock tests if key is set (to validate mocking logic)
+- Skip real API tests if Vertex AI is not configured
+- Run mock tests regardless (to validate mocking logic)
 - Use `@pytest.mark.skipif` to conditionally run tests
 
 ## Fixtures
@@ -130,7 +131,7 @@ The `conftest.py` file provides shared fixtures:
 
 ### API Key Fixtures
 - `mock_api_key`: Sets a mock API key for tests
-- `no_api_key`: Ensures API key is not set
+- `no_anthropic_auth`: Ensures no Anthropic authentication is configured (clears ANTHROPIC_VERTEX_PROJECT_ID)
 
 ### Data Fixtures
 - `sample_issue_data`: Sample GitHub issue
@@ -154,7 +155,7 @@ def test_with_fixtures(sample_issue_data, sample_design_output):
 
 Custom pytest markers for organizing tests:
 
-- `@pytest.mark.real_api`: Tests requiring real API key
+- `@pytest.mark.real_api`: Tests requiring real Vertex AI configuration
 - `@pytest.mark.integration`: Integration tests
 - `@pytest.mark.slow`: Slow-running tests
 
@@ -224,7 +225,7 @@ class TestNewFeature:
             )
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project"}):
                 result = new_feature()
                 assert result is not None
 ```
@@ -240,10 +241,11 @@ class TestNewFeature:
 
 ## Troubleshooting
 
-### Tests Failing with API Key
-- Check API key is valid: `echo $ANTHROPIC_API_KEY`
+### Tests Failing with Vertex AI
+- Check project ID is set: `echo $ANTHROPIC_VERTEX_PROJECT_ID`
+- Verify gcloud authentication: `gcloud auth application-default print-access-token`
 - Verify network connectivity
-- Check API rate limits
+- Check API rate limits in GCP console
 - Review API error messages in test output
 
 ### Mock Tests Failing
@@ -271,15 +273,15 @@ These tests are designed to run in CI environments:
   run: |
     uv run pytest tests/ -v --cov=agents --cov=graph
   env:
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
 ```
 
-**Without API key in CI:**
+**Without Vertex AI in CI:**
 - Tests will use mocks
 - Fast execution
 - No external dependencies
 
-**With API key in CI:**
+**With Vertex AI in CI:**
 - Tests validate real integration
 - Catches API breaking changes
 - Requires rate limit consideration

@@ -1,4 +1,8 @@
 import argparse
+
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
+
 from agents.graph import orchestrate
 
 parser = argparse.ArgumentParser()

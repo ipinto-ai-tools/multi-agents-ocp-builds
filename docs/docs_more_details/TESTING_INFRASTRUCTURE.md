@@ -238,24 +238,11 @@ Dry-run mode enables testing without making API calls or external service connec
 # Dry-run: Uses mocks, no authentication needed
 uv run python scripts/test_agents.py --e2e --dry-run
 
-# Live with Google Vertex AI (recommended)
+# Live with Google Vertex AI
 export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
-export CLOUD_ML_REGION=  # Optional
+export CLOUD_ML_REGION=  # Optional, defaults to us-east5
 # Ensure gcloud authentication is configured:
 # gcloud auth application-default login
-uv run python scripts/test_agents.py --e2e \
-  --title "Add timeout" \
-  --description "Users need timeout config"
-
-# Live with Individual API Key
-export ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-uv run python scripts/test_agents.py --e2e \
-  --title "Add timeout" \
-  --description "Users need timeout config"
-
-# Live with Custom Enterprise Endpoint
-export ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
-export ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
 uv run python scripts/test_agents.py --e2e \
   --title "Add timeout" \
   --description "Users need timeout config"
@@ -407,7 +394,7 @@ uv run python scripts/test_agents.py \
 uv run python scripts/test_agents.py --e2e --dry-run
 ```
 
-**Option 2: Configure Google Vertex AI authentication (recommended)**
+**Option 2: Configure Google Vertex AI authentication**
 ```bash
 # Authenticate with gcloud
 gcloud auth application-default login
@@ -415,18 +402,7 @@ gcloud auth application-default set-quota-project your-gcp-project-id
 
 # Set project ID
 export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
-export CLOUD_ML_REGION=  # Optional
-```
-
-**Option 3: Configure individual API key**
-```bash
-export ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-```
-
-**Option 4: Configure custom enterprise endpoint**
-```bash
-export ANTHROPIC_BASE_URL=https://your-enterprise-endpoint.anthropic.com
-export ANTHROPIC_AUTH_TOKEN=your_enterprise_auth_token
+export CLOUD_ML_REGION=  # Optional, defaults to us-east5
 ```
 
 ### Artifacts not found for sequential agent tests

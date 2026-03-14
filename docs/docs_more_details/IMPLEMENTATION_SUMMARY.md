@@ -804,10 +804,11 @@ pip install -r requirements.txt
 uv sync
 ```
 
-**Configure API key:**
+**Configure authentication:**
 ```bash
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env and add your ANTHROPIC_VERTEX_PROJECT_ID
+# Authenticate with: gcloud auth application-default login
 ```
 
 ### 2. Run Tests
@@ -817,8 +818,9 @@ cp .env.example .env
 # Run all tests (uses mocks)
 uv run pytest tests/ -v
 
-# Run with real API
-export ANTHROPIC_API_KEY=your-key-here
+# Run with real API (Vertex AI)
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+# Ensure gcloud auth is configured: gcloud auth application-default login
 uv run pytest tests/ -v
 
 # Run with coverage
@@ -886,7 +888,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run design analysis
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
         run: |
           uv venv
           source .venv/bin/activate

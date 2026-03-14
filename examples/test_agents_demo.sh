@@ -12,14 +12,15 @@ echo ""
 # Check if user wants dry-run or live mode
 echo "Select testing mode:"
 echo "1) Dry-run (mock responses, no API calls)"
-echo "2) Live (real API calls, requires ANTHROPIC_API_KEY)"
+echo "2) Live (real API calls, requires Vertex AI authentication)"
 read -p "Enter choice [1-2]: " mode_choice
 
 if [ "$mode_choice" = "2" ]; then
-    if [ -z "$ANTHROPIC_API_KEY" ]; then
+    if [ -z "$ANTHROPIC_VERTEX_PROJECT_ID" ]; then
         echo ""
-        echo "Error: ANTHROPIC_API_KEY not set"
-        echo "Please set it with: export ANTHROPIC_API_KEY=sk-ant-api03-xxxxx"
+        echo "Error: ANTHROPIC_VERTEX_PROJECT_ID not set"
+        echo "Please set it with: export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id"
+        echo "And ensure gcloud auth is configured: gcloud auth application-default login"
         exit 1
     fi
     DRY_RUN=""

@@ -15,7 +15,7 @@ Comprehensive test suite for the Multi-Agent OpenShift Builds system with **57 t
 ```
 
 **Status:** All mock tests passing
-**Skipped:** Real API tests (require `ANTHROPIC_API_KEY`)
+**Skipped:** Real API tests (require `ANTHROPIC_VERTEX_PROJECT_ID`)
 
 ### Test Distribution
 
@@ -89,7 +89,7 @@ uv run pytest tests/test_design_agent.py -v
 ### With Real API
 ```bash
 # Set your API key
-export ANTHROPIC_API_KEY=your-key-here
+export ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
 
 # Run all tests including real API integration
 uv run pytest tests/ -v
@@ -98,7 +98,7 @@ uv run pytest tests/ -v
 ### Selective Execution
 ```bash
 # Run only fast tests (skip real API)
-ANTHROPIC_API_KEY= uv run pytest tests/ -v
+ANTHROPIC_VERTEX_PROJECT_ID= uv run pytest tests/ -v
 
 # Run specific test class
 uv run pytest tests/test_orchestration.py::TestOrchestration -v

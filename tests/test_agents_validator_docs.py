@@ -9,6 +9,8 @@ import os
 import pytest
 from unittest.mock import Mock, patch
 
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
 from agents.docs_agent import (
     run_docs,
     _build_context_message,
@@ -160,15 +162,15 @@ class TestDocsAgent:
         with pytest.raises(ValueError, match="Missing required context keys"):
             run_docs(incomplete_context)
 
-    def test_docs_agent_missing_api_key(self):
-        """Test that docs agent fails gracefully without API key."""
+    def test_docs_agent_missing_auth(self):
+        """Test that docs agent fails gracefully without Vertex AI auth."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+            with pytest.raises(RuntimeError, match="ANTHROPIC_VERTEX_PROJECT_ID"):
                 run_docs(SAMPLE_CONTEXT)
 
     @pytest.mark.skipif(
-        not bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY not set - using mock instead"
+        not HAS_ANTHROPIC_AUTH,
+        reason="No Anthropic authentication configured"
     )
     def test_docs_agent_with_real_api(self):
         """Test docs agent with real Claude API (if key available)."""
@@ -213,8 +215,8 @@ class TestDocsAgent:
         print(result["jtbd_documentation"])
 
     @pytest.mark.skipif(
-        bool(os.getenv("ANTHROPIC_API_KEY")),
-        reason="ANTHROPIC_API_KEY is set - skipping mock test"
+        HAS_ANTHROPIC_AUTH,
+        reason="Anthropic authentication is configured - skipping mock test"
     )
     def test_docs_agent_with_mock(self):
         """Test docs agent with mocked Claude API."""
@@ -226,7 +228,7 @@ class TestDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(SAMPLE_CONTEXT)
 
                 # Validate mock was called
@@ -271,7 +273,7 @@ class TestDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(context_with_failures)
 
                 # Should still generate docs
@@ -298,7 +300,7 @@ class TestDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 run_docs(context_with_gaps)
 
                 # Check that context message includes gaps
@@ -316,7 +318,7 @@ class TestDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(SAMPLE_CONTEXT, output_format="jtbd", enable_rag=False)
 
                 # Validate JTBD key exists
@@ -336,7 +338,7 @@ class TestDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(SAMPLE_CONTEXT, output_format="jtbd", enable_rag=False)
 
                 # JTBD structure validation depends on Claude's actual response
@@ -533,7 +535,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(context)
                 assert "pr_summary" in result
 
@@ -550,7 +552,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(context)
 
                 # Should still generate docs
@@ -568,7 +570,7 @@ class TestEdgeCases:
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(RuntimeError, match="Unexpected error"):
                     run_docs(SAMPLE_CONTEXT)
 
@@ -582,7 +584,7 @@ class TestEdgeCases:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises((RuntimeError, IndexError)):
                     run_docs(SAMPLE_CONTEXT)
 
@@ -623,7 +625,7 @@ class TestIntegration:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(full_context)
 
                 # Validate comprehensive output

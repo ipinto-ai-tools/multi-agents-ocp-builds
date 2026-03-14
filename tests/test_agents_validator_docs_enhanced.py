@@ -152,7 +152,7 @@ class TestEnhancedDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     output_format="ship",
@@ -173,7 +173,7 @@ class TestEnhancedDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     output_format="jtbd",
@@ -193,7 +193,7 @@ class TestEnhancedDocsAgent:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     output_format="all",
@@ -228,7 +228,7 @@ type BuildRun struct {
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     input_files=["input.go"],
@@ -260,7 +260,7 @@ type BuildRun struct {
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     enable_rag=True
@@ -287,7 +287,7 @@ type BuildRun struct {
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 # Should not raise error, just continue without RAG
                 result = run_docs(
                     context=sample_context,
@@ -541,7 +541,7 @@ class TestMetadata:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 result = run_docs(
                     context=sample_context,
                     input_files=["test.go"],
@@ -571,7 +571,7 @@ class TestErrorHandling:
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
 
-            with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}):
+            with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 # Should work without RAG context
                 result = run_docs(
                     context=context_no_repo,
