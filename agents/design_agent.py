@@ -11,13 +11,6 @@ implementation planning.
 import os
 from typing import Dict, Any, Optional
 
-try:
-    from anthropic import Anthropic
-except ImportError:
-    raise ImportError(
-        "anthropic library is required. Install with: uv pip install anthropic"
-    )
-
 from config.agent_prompts import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from utils.file_logger import get_logger

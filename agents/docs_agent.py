@@ -12,6 +12,7 @@ Enhanced with:
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -283,8 +284,6 @@ def _extract_api_names(design_text: str) -> List[str]:
     Returns:
         List of API/type names
     """
-    import re
-
     # Look for capitalized identifiers (likely type names)
     # Pattern: words that start with capital letter and have at least 2 more letters
     api_names = re.findall(r'\b([A-Z][a-z]+[A-Z]\w+)\b', design_text)

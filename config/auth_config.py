@@ -53,7 +53,7 @@ def get_anthropic_client() -> AnthropicVertex:
     use_vertex = os.getenv("CLAUDE_CODE_USE_VERTEX") == "1"
     project_id = os.getenv("ANTHROPIC_VERTEX_PROJECT_ID")
     region = os.getenv("CLOUD_ML_REGION", "us-east5")
- 
+
     if not project_id and not use_vertex:
         raise ValueError(
             "No Claude authentication configured. Please set:\n"

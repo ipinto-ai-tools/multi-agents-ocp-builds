@@ -12,13 +12,6 @@ from typing import Dict, Any, List, Optional
 
 import yaml
 
-try:
-    from anthropic import Anthropic
-except ImportError:
-    raise ImportError(
-        "anthropic library is required. Install with: uv pip install anthropic"
-    )
-
 from config.agent_prompts import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from utils.file_logger import get_logger, get_session_logger

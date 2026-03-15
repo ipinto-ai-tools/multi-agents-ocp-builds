@@ -3,6 +3,7 @@
 FastAPI server for receiving heartbeats and serving dashboard UI.
 """
 
+import json
 import os
 import sqlite3
 import asyncio
@@ -146,8 +147,6 @@ class Database:
         Args:
             enriched: Enriched heartbeat dictionary
         """
-        import json
-
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
@@ -182,8 +181,6 @@ class Database:
         Returns:
             List of session dictionaries
         """
-        import json
-
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -222,8 +219,6 @@ class Database:
         Returns:
             Session dictionary with heartbeats, or None if not found
         """
-        import json
-
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()

@@ -14,7 +14,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 try:
-    from anthropic import Anthropic, APIError
+    from anthropic import APIError
 except ImportError:
     raise ImportError(
         "anthropic library is required. Install with: uv pip install anthropic"
