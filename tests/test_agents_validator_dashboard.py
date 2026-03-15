@@ -1,7 +1,7 @@
 """Tests for dashboard components."""
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 from dashboard.heartbeat import (
@@ -324,7 +324,7 @@ class TestEnrichers:
 
         # Test with valid timestamp
         heartbeat = {
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         result = enricher.enrich(heartbeat)
@@ -358,7 +358,7 @@ class TestEnricherPipeline:
             "session_id": "test",
             "agent": "design",
             "phase": "init",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "raw_state": {
                 "issue_title": "Test Issue",
                 "issue_type": "feature",
@@ -392,7 +392,7 @@ class TestEnricherPipeline:
             "session_id": "test",
             "agent": "design",
             "phase": "init",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "raw_state": {}
         }
 

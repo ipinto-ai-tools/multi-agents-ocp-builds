@@ -110,8 +110,12 @@ class HeartbeatEmitter:
                 timeout=self.config.timeout_seconds
             )
             return response.status_code == 200
-        except requests.exceptions.RequestException:
-            # Dashboard not available - fail silently
+        except Exception:
+            # Dashboard not available or any other error - fail silently
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to emit heartbeat to dashboard", exc_info=True
+            )
             return False
 
     def emit_from_state(

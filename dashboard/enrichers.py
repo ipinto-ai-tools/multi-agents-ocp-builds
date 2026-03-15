@@ -6,7 +6,7 @@ information from raw agent state in heartbeats.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Enricher(ABC):
@@ -225,7 +225,7 @@ class TimestampEnricher(Enricher):
         Returns:
             Human-readable relative time (e.g., "2m ago")
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         diff = now - timestamp
 
         seconds = diff.total_seconds()

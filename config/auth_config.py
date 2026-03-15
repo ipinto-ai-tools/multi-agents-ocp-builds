@@ -65,6 +65,11 @@ def get_anthropic_client() -> AnthropicVertex:
             "\n"
             "See .env.example for configuration details."
         )
+
+    if use_vertex and not project_id:
+        raise ValueError(
+            "ANTHROPIC_VERTEX_PROJECT_ID is required when using Vertex AI"
+        )
            
     try:
         client = AnthropicVertex(region=region, project_id=project_id)
