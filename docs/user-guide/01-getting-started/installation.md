@@ -135,4 +135,4 @@ SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
 
 ---
 
-[Next: Quick Start →](quick-start.md)
+[← User Guide](../README.md) | [Next: Quick Start →](quick-start.md)
