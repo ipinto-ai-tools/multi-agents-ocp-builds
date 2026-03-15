@@ -64,6 +64,15 @@ uv run pytest tests/ -v
 uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
 ```
 
+### Run with Manual Approval
+
+```bash
+# Run with manual approval (pause between phases to review)
+MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun API" \
+  --description "Users need to specify timeouts for build execution"
+```
+
 ### Dry Run (No API Credentials Needed)
 
 ```bash
@@ -82,7 +91,7 @@ The system runs four Claude AI agents in a sequential LangGraph pipeline:
 Issue → Design Agent → Development Agent → Testing Agent → Docs Agent → Done
 ```
 
-Each agent reads from the shared `AgentState` and writes its outputs back before the next agent begins. See [Architecture](docs/user-guide/02-concepts/architecture.md) for a full breakdown.
+Each agent reads from the shared `AgentState` and writes its outputs back before the next agent begins. Each phase includes automatic output validation — the workflow stops immediately if required outputs are missing, rather than silently passing bad data forward. See [Architecture](docs/user-guide/02-concepts/architecture.md) for a full breakdown.
 
 ---
 
@@ -106,5 +115,6 @@ Each agent reads from the shared `AgentState` and writes its outputs back before
 | `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-20250514`) |
 | `DASHBOARD_ENABLED` | Enable heartbeats to dashboard (default: `true`) |
 | `SHIPWRIGHT_REPO_PATH` | Path to Shipwright Build repo for deeper analysis |
+| `MANUAL_APPROVAL` | Pause for user approval between phases (default: `false`) |
 
 See [Configuration](docs/user-guide/01-getting-started/configuration.md) for the full reference.

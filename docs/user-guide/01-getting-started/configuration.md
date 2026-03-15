@@ -99,6 +99,7 @@ API_TIMEOUT=120
 |----------|---------|-------------|
 | `ENABLE_REPO_ANALYSIS` | `true` | Enable repository code analysis |
 | `DESIGN_OUTPUT_FORMAT` | `markdown` | Design output format: `markdown` or `json` |
+| `MANUAL_APPROVAL` | `false` | Pause for user approval between agent phases |
 
 ---
 
@@ -128,6 +129,9 @@ LOG_FORMAT=text
 # Performance
 API_TIMEOUT=60
 MAX_REPO_FILES=100
+
+# Workflow control
+MANUAL_APPROVAL=false
 ```
 
 ---

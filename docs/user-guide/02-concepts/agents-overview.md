@@ -147,4 +147,17 @@ For full parameter documentation, see each agent's dedicated page:
 
 ---
 
+## Validation & Approval Between Phases
+
+After each agent completes, the orchestrator:
+
+1. **Validates outputs** — checks required fields are non-empty using `agents/validators.py`
+2. **Prints a phase summary** — shows key metrics and any warnings
+3. **Stops on failure** — if required fields are missing, the workflow stops immediately
+4. **Asks for approval** (if `MANUAL_APPROVAL=true`) — prompts `[Y/n]` before the next phase
+
+This ensures bad data from one agent never silently flows into the next agent.
+
+---
+
 [← Previous: Architecture](architecture.md) | [Next: State Management →](state-management.md)

@@ -121,6 +121,41 @@ Final state returned to caller
 
 ---
 
+## Output Validation Gates
+
+After each agent completes, its outputs are validated before the next phase begins.
+This prevents silent cascading failures where an agent returns empty data and
+subsequent agents produce garbage outputs.
+
+**Validation flow:**
+
+```text
+Agent completes
+     ↓
+validate_phase(phase, state)
+     ↓
+  ┌──┴──┐
+PASS    FAIL
+  ↓      ↓
+Next   Stop workflow with
+Phase  clear error message
+```
+
+**Validation rules per phase:**
+
+| Phase | Blocks on (required) | Warns on (optional) |
+|-------|---------------------|---------------------|
+| Design | Empty `design_analysis`, empty `implementation_plan` | No risks, components, or criteria |
+| Development | Empty `code_files` | Short `pr_description` |
+| Testing | Empty `test_plan` | No unit/integration tests |
+| Documentation | Empty `pr_summary` | No `release_notes` |
+
+Validation logic lives in `agents/validators.py`. Each phase has its own validator
+that returns a `ValidationResult` with `passed`, `issues` (blocking), `warnings`
+(non-blocking), and a `summary` dict of key metrics.
+
+---
+
 ## Supporting Components
 
 ### Dashboard

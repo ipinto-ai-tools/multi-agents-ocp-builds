@@ -45,6 +45,10 @@ init → design_complete → develop_complete → testing_complete → done
 
 If an agent raises an unhandled exception, the workflow sets `current_phase = "error"` and stops early. The final state contains the error message.
 
+> **Note:** After each phase, outputs are automatically validated. If required fields
+> are missing or empty, the workflow stops immediately with a clear error rather than
+> silently passing bad data to the next agent.
+
 ### What You Get
 
 When the workflow completes, four outputs are printed to the console:
@@ -53,6 +57,43 @@ When the workflow completes, four outputs are printed to the console:
 2. **Production Code** - Go code for Kubernetes/OpenShift with TLS 1.3 and security best practices
 3. **Test Suite** - Ginkgo v2 tests (unit, integration, E2E) with data-driven patterns
 4. **Documentation** - PR summary, release notes, and Jobs-to-be-Done user documentation
+
+---
+
+## Run with Manual Approval
+
+Set `MANUAL_APPROVAL=true` to pause after each phase and review the output before continuing:
+
+```bash
+MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun API" \
+  --description "Users need to specify timeouts for build execution"
+```
+
+After each phase completes, you'll see a summary and a prompt:
+
+```text
+──────────────────────────────────────────────────────────
+  Phase: DESIGN  |  Validation: PASSED
+──────────────────────────────────────────────────────────
+  Analysis length: 1243 chars
+  Implementation plan steps: 5
+  Impacted components: 3
+  Risks identified: 2
+  Acceptance criteria: 4
+
+  Next phase: DEVELOPMENT
+
+  Continue to development? [Y/n]:
+```
+
+Type `Y` (or press Enter) to continue, or `n` to stop the workflow. The completed phases are kept.
+
+> **When to use manual approval:**
+>
+> - Reviewing design analysis before committing to code generation (saves API costs)
+> - Quality-checking in sensitive environments
+> - Step-by-step debugging of the agent pipeline
 
 ---
 
