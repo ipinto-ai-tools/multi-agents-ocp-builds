@@ -62,6 +62,12 @@ This system automates the design, development, testing, and documentation workfl
 | ---- | ----------- |
 | [Examples](07-examples/README.md) | Runnable scripts for testing agents, auth, logging, and the dashboard API |
 
+### Section 8 - Testing
+
+| Page                          | Description                                                                         |
+|-------------------------------|-------------------------------------------------------------------------------------|
+| [Testing](08-testing/README.md) | Test suite overview, dual-mode execution, fixtures, markers, and writing new tests |
+
 ---
 
 ## Quick Navigation by Use Case
