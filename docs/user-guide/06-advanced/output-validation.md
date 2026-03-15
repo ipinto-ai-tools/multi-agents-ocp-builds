@@ -35,6 +35,89 @@ Validation is split into two categories:
 
 ---
 
+## The Validators Module (`agents/validators.py`)
+
+The validation logic lives entirely in `agents/validators.py`. Understanding this module is useful when you need to add a new agent phase or tighten quality thresholds.
+
+### `ValidationResult` dataclass
+
+Every validator returns a `ValidationResult`:
+
+```python
+@dataclass
+class ValidationResult:
+    phase: str           # Which phase was validated (design, develop, testing, docs)
+    passed: bool         # True if no blocking issues found
+    issues: list[str]    # Blocking failures that stop the workflow
+    warnings: list[str]  # Non-blocking issues printed as warnings
+    summary: dict        # Key metrics from the phase output (e.g. "Code files generated: 3")
+```
+
+`passed` is `True` only when `issues` is empty. Warnings do not affect `passed`.
+
+### Per-phase validator functions
+
+| Function | Blocking checks | Warning checks |
+| -------- | --------------- | -------------- |
+| `validate_design_output(state)` | `design_analysis` >= 50 chars, `implementation_plan` non-empty list | Missing `impacted_components`, `risks`, `acceptance_criteria` |
+| `validate_develop_output(state)` | `code_files` non-empty list | `pr_description` < 20 chars |
+| `validate_testing_output(state)` | `test_plan` non-empty string | No `unit_tests` or `integration_tests` |
+| `validate_docs_output(state)` | `pr_summary` non-empty string | Empty `release_notes` |
+
+Each function accepts the full LangGraph `state` dict and reads only the fields it needs.
+
+### `validate_phase(phase, state)` — the unified entry point
+
+The orchestrator always calls `validate_phase()` rather than individual validator functions directly:
+
+```python
+from agents.validators import validate_phase
+
+result = validate_phase("design", state)
+if not result.passed:
+    print(result.issues)   # Blocking failures
+print(result.warnings)     # Non-blocking issues
+print(result.summary)      # Metrics for the phase summary block
+```
+
+If no validator is registered for the given phase name, `validate_phase()` returns a passing result with a `"No validator for this phase"` note in `summary`, so unregistered phases never block the workflow unexpectedly.
+
+### `VALIDATORS` registry
+
+```python
+VALIDATORS = {
+    "design":   validate_design_output,
+    "develop":  validate_develop_output,
+    "testing":  validate_testing_output,
+    "docs":     validate_docs_output,
+}
+```
+
+`validate_phase()` looks up the phase name in this dict at runtime. Adding a new agent means adding one entry here — the orchestrator picks it up automatically with no other changes required.
+
+### Configuration (validation thresholds)
+
+Minimum character thresholds are defined as inline constants inside `agents/validators.py`:
+
+| Field | Threshold | Location in source |
+| ----- | --------- | ------------------ |
+| `design_analysis` | 50 chars | `validate_design_output` |
+| `pr_description` | 20 chars | `validate_develop_output` |
+| `test_plan` | 20 chars | `validate_testing_output` |
+| `pr_summary` | 20 chars | `validate_docs_output` |
+
+To tighten or relax a threshold, edit the integer literal directly in the corresponding function in `agents/validators.py`.
+
+### How to extend
+
+When adding a new agent phase:
+
+1. Add a `validate_<phase>_output(state)` function in `agents/validators.py` that returns a `ValidationResult`.
+2. Register it in the `VALIDATORS` dict using the phase name string as the key.
+3. The orchestrator calls `validate_phase("<phase>", state)` automatically — no other changes needed.
+
+---
+
 ## Phase Summary Output
 
 After each phase, a summary block is printed to stdout regardless of whether manual approval is enabled. This gives you visibility into what each agent produced without having to inspect raw state.
