@@ -154,6 +154,25 @@ Validation logic lives in `agents/validators.py`. Each phase has its own validat
 that returns a `ValidationResult` with `passed`, `issues` (blocking), `warnings`
 (non-blocking), and a `summary` dict of key metrics.
 
+```python
+from agents.validators import validate_phase
+
+result = validate_phase("design", state)
+# result.passed   → bool
+# result.issues   → list[str]  (blocking - stops workflow)
+# result.warnings → list[str]  (non-blocking - printed as warning)
+# result.summary  → dict       (key metrics, e.g. "Code files generated: 3")
+```
+
+**Extending validation:** To add a validator for a new agent phase, add a
+`validate_<phase>_output(state)` function in `agents/validators.py` and register
+it in the `VALIDATORS` dict. The orchestrator picks it up automatically via
+`validate_phase()`.
+
+→ See [Output Validation & Manual Approval](../06-advanced/output-validation.md)
+for the full reference, including `ValidationResult` fields, per-phase threshold
+configuration, and manual approval mode.
+
 ---
 
 ## Supporting Components
@@ -185,7 +204,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 
 ```text
 muilti-agents-ocp-builds/
-├── agents/          # Agent implementations + LangGraph graph
+├── agents/          # Agent implementations, LangGraph graph, output validators
 ├── config/          # Prompts, auth, patterns, mock data
 ├── dashboard/       # FastAPI backend, enrichers, heartbeat, frontend
 ├── graph/           # AgentState schema (state.py)
