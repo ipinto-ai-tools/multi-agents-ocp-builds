@@ -56,6 +56,12 @@ This system automates the design, development, testing, and documentation workfl
 | [Logging](06-advanced/logging.md) | Log files, levels, and session logs |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
 
+### Section 7 - Examples
+
+| Page | Description |
+| ---- | ----------- |
+| [Examples](07-examples/README.md) | Runnable scripts for testing agents, auth, logging, and the dashboard API |
+
 ---
 
 ## Quick Navigation by Use Case
