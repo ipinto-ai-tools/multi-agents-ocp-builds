@@ -189,4 +189,4 @@ INFO  | multi_agent_testing | Artifact saved: /tmp/claude/agent-tests/design_out
 
 ---
 
-[← Previous: API Key](../05-authentication/api-key.md) | [Next: Logging →](logging.md)
+[← Previous: API Key](../05-authentication/api-key.md) | [Next: Logging →](logging.md) | [Output Validation →](output-validation.md)

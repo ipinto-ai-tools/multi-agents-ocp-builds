@@ -54,6 +54,7 @@ This system automates the design, development, testing, and documentation workfl
 |------|-------------|
 | [Dry Run Mode](06-advanced/dry-run-mode.md) | Test without API calls |
 | [Logging](06-advanced/logging.md) | Log files, levels, and session logs |
+| [Output Validation](06-advanced/output-validation.md) | Per-phase validation and manual approval |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
 
 ### Section 7 - Examples
