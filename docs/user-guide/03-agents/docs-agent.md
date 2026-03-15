@@ -7,6 +7,23 @@ The Documentation Agent generates all documentation artifacts from the combined 
 
 ---
 
+## System Prompt
+
+The Documentation Agent is driven by `DOCS_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+
+The prompt instructs the agent to:
+
+- Only document what has been implemented and tested — never speculate
+- Produce a PR Summary (what changed, why, testing, rollout)
+- Generate release notes with category, title, description, and migration notes
+- Write Jobs-to-be-Done (JTBD) documentation organized around user outcomes
+- Produce SHIP format documents (Solution, Highlight, Impact, Plan) for stakeholder communication
+- Generate a High-Level Design document as implementation guidance
+
+To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/agent_prompts.py`.
+
+---
+
 ## Inputs
 
 ### Context Dictionary

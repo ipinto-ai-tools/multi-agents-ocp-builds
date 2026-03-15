@@ -7,6 +7,22 @@ The Testing Agent generates comprehensive Ginkgo v2 test suites including unit, 
 
 ---
 
+## System Prompt
+
+The Testing Agent is driven by `TESTING_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+
+The prompt instructs the agent to:
+
+- Detect Shipwright patterns (build strategies: kaniko, buildkit, buildpacks, buildah, s2i; source types: git, bundle, registry; output types: image, imagestream)
+- Generate Ginkgo v2 test suites with Data-Driven Testing (DDT) using `DescribeTable` and `Entry`
+- Use Gomega assertions and Shipwright test helpers (`libfactory`, `libk8s`)
+- Tag each test with a unique `[test_id:BUILD-NNN]` identifier
+- Produce unit, integration, and e2e test files as separate Go source files
+
+To customize Testing Agent behavior, edit `TESTING_AGENT_PROMPT` in `config/agent_prompts.py`.
+
+---
+
 ## Inputs
 
 | Key | Type | Required | Description |
