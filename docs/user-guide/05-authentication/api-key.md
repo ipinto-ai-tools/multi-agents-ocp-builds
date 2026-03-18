@@ -1,9 +1,5 @@
 # API Key Authentication
 
-> **Note:** The system currently uses Google Vertex AI as its authentication method. This page describes the intended future configuration if direct API key support is added, and also covers third-party API tokens used by MCP integrations.
-
----
-
 ## Current State
 
 The system initializes an `AnthropicVertex` client in `config/auth_config.py`. The `get_anthropic_client()` function checks for `ANTHROPIC_VERTEX_PROJECT_ID` and raises a `ValueError` if it is not set.
