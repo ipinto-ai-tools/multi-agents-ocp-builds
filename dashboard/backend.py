@@ -46,6 +46,8 @@ class SessionResponse(BaseModel):
     issue_type: str
     status: str
     latest_heartbeat: Optional[Dict[str, Any]] = None
+    jira_ticket_id: Optional[str] = None
+    jira_ticket_url: Optional[str] = None
 
 
 # Database operations
@@ -205,6 +207,9 @@ class Database:
             session = dict(row)
             if session["latest_heartbeat"]:
                 session["latest_heartbeat"] = json.loads(session["latest_heartbeat"])
+                hb = session["latest_heartbeat"]
+                session["jira_ticket_id"] = hb.get("jira_ticket_id") or None
+                session["jira_ticket_url"] = hb.get("jira_ticket_url") or None
             sessions.append(session)
 
         conn.close()

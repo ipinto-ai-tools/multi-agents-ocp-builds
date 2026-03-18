@@ -335,6 +335,21 @@
         .empty-state h2 {
             margin-bottom: 10px;
         }
+
+        .jira-badge {
+            display: inline-block;
+            background: #0052CC;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+            margin-left: 8px;
+        }
+        .jira-badge:hover {
+            background: #0065FF;
+        }
     </style>
 </head>
 <body>
@@ -431,6 +446,12 @@
             if (status === 'complete') statusClass = 'complete';
             else if (status === 'error') statusClass = 'error';
 
+            // Jira ticket badge
+            const jiraHtml = session.jira_ticket_id ? `
+                <a href="${session.jira_ticket_url || '#'}" target="_blank" class="jira-badge">
+                    ${session.jira_ticket_id}
+                </a>` : '';
+
             // Design, Development, Testing, and Docs agent status
             const designStatus =
                 hb.agent === 'design' || hb.phase === 'design_complete' ||
@@ -461,7 +482,7 @@
                         <span class="session-id">${session.id.substring(0, 8)}</span>
                     </div>
 
-                    <div class="issue-title">${session.issue_title || 'Unknown Task'}</div>
+                    <div class="issue-title">${session.issue_title || 'Unknown Task'}${jiraHtml}</div>
                     <span class="issue-type ${session.issue_type || 'feature'}">${session.issue_type || 'feature'}</span>
 
                     <div class="agents-status">
