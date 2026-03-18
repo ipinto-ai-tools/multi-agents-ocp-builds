@@ -1,6 +1,6 @@
 # API Key Authentication
 
-> **Note:** The system currently uses Google Vertex AI as its authentication method. Direct Anthropic API key authentication is not yet implemented in the codebase. This page describes the intended future configuration if direct API key support is added.
+> **Note:** The system currently uses Google Vertex AI as its authentication method. This page describes the intended future configuration if direct API key support is added, and also covers third-party API tokens used by MCP integrations.
 
 ---
 
@@ -47,6 +47,58 @@ The existing validation function in `auth_config.py` already returns an `auth_ty
 ## Setting Up Vertex AI Instead
 
 For most users, Vertex AI is the recommended path. See [Vertex AI Setup](vertex-ai.md) for complete instructions.
+
+---
+
+## GitHub Personal Access Token
+
+A GitHub token is used by the GitHub MCP server to read and create issues, open pull requests, and interact with the GitHub API on your behalf.
+
+### Token Format
+
+| Token type | Prefix | Recommendation |
+| --- | --- | --- |
+| Fine-grained PAT | `github_pat_` | Recommended — narrower permissions, newer format |
+| Classic PAT | `ghp_` | Not recommended — broad permissions, legacy format |
+
+Always use a fine-grained token when possible. Classic tokens grant access to all repositories in your account and cannot be scoped to specific repos.
+
+### How to Create a Fine-Grained Token
+
+1. Go to **GitHub** → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens**
+2. Click **Generate new token**
+3. Set a token name, expiration date, and the repository scope (select only the repos this system needs)
+4. Under **Permissions**, grant:
+   - **Repository permissions**: `Contents` (Read), `Issues` (Read and write), `Pull requests` (Read and write)
+5. Click **Generate token** and copy the value — it will start with `github_pat_`
+6. Add it to your `.env` file:
+
+```bash
+GITHUB_TOKEN=github_pat_your_token_here
+```
+
+> **Note:** Fine-grained tokens expire. Set a reminder to rotate yours before it lapses.
+
+---
+
+## Jira API Token
+
+Used for future Jira MCP server integration to create and manage Jira issues automatically.
+
+### How to Create a Jira API Token
+
+1. Go to your Atlassian Cloud account's Security tab:
+   [https://id.atlassian.com/manage-profile/security](https://id.atlassian.com/manage-profile/security)
+   > **Note:** You need VPN access to reach this URL
+2. Follow the prompts on that screen to generate your token
+3. Copy the token and add it to your `.env` file:
+
+```bash
+JIRA_API_TOKEN=your-generated-token
+JIRA_BASE_URL=https://your-org.atlassian.net
+```
+
+> **Note:** Jira integration is not yet active — this prepares for future MCP server support.
 
 ---
 

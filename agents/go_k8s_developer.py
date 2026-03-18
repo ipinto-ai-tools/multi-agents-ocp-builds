@@ -74,14 +74,14 @@ def run_development(
         ValueError: If required context fields are invalid
 
     Example:
-        >>> context = {
-        ...     "issue_title": "Add timeout support to BuildRun",
-        ...     "implementation_plan": "1. Add timeout field to BuildRun spec...",
-        ...     "design_analysis": "# Design for timeout feature...",
-        ...     "impacted_components": ["buildrun_api", "buildrun_controller"],
-        ... }
-        >>> result = run_development(context)
-        >>> print(result["pr_description"])
+        context = {
+             "issue_title": "Add timeout support to BuildRun",
+             "implementation_plan": "1. Add timeout field to BuildRun spec...",
+             "design_analysis": "# Design for timeout feature...",
+             "impacted_components": ["buildrun_api", "buildrun_controller"],
+         }
+        result = run_development(context)
+        print(result["pr_description"])
     """
     # Get session-specific logger
     session_id = context.get("session_id", "unknown")
