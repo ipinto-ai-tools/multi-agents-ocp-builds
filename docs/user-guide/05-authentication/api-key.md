@@ -83,7 +83,7 @@ GITHUB_TOKEN=github_pat_your_token_here
 
 ## Jira API Token
 
-Used for future Jira MCP server integration to create and manage Jira issues automatically.
+Used to authenticate with the Jira REST API when passing `--jira-ticket` to the orchestrator.
 
 ### How to Create a Jira API Token
 
@@ -96,9 +96,10 @@ Used for future Jira MCP server integration to create and manage Jira issues aut
 ```bash
 JIRA_API_TOKEN=your-generated-token
 JIRA_BASE_URL=https://your-org.atlassian.net
+JIRA_USER_EMAIL=your-email@company.com
 ```
 
-> **Note:** Jira integration is not yet active — this prepares for future MCP server support.
+See [Jira & Rovo Integration](../09-integrations/jira-rovo.md) for full setup and usage.
 
 ---
 

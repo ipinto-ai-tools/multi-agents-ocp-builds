@@ -60,6 +60,24 @@ When the workflow completes, four outputs are printed to the console:
 
 ---
 
+## Run from a Jira Ticket
+
+If your team tracks work in Jira, pass a ticket ID instead of `--title` and `--description`. The system fetches all ticket data automatically.
+
+> **Requires:** Jira configured in `.env` and VPN access. See [Jira & Rovo Integration](../09-integrations/jira-rovo.md).
+
+```bash
+uv run python scripts/orchestrate.py --jira-ticket SHIP-123
+```
+
+To test without VPN, add `--dry-run` — it returns a mock SHIP-123 ticket with no credentials needed:
+
+```bash
+uv run python scripts/orchestrate.py --jira-ticket SHIP-123 --dry-run
+```
+
+---
+
 ## Run with Manual Approval
 
 Set `MANUAL_APPROVAL=true` to pause after each phase and review the output before continuing:
