@@ -69,6 +69,12 @@ This system automates the design, development, testing, and documentation workfl
 |-------------------------------|-------------------------------------------------------------------------------------|
 | [Testing](08-testing/README.md) | Test suite overview, dual-mode execution, fixtures, markers, and writing new tests |
 
+### Section 9 - Integrations
+
+| Page | Description |
+|------|-------------|
+| [Jira & Rovo](09-integrations/jira-rovo.md) | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup |
+
 ---
 
 ## Quick Navigation by Use Case
@@ -85,6 +91,7 @@ This system automates the design, development, testing, and documentation workfl
 | Test without making API calls | [Dry Run Mode](06-advanced/dry-run-mode.md) |
 | Debug a failing workflow | [Troubleshooting](06-advanced/troubleshooting.md) |
 | Understand how state flows between agents | [State Management](02-concepts/state-management.md) |
+| Use a Jira ticket as workflow input | [Jira & Rovo Integration](09-integrations/jira-rovo.md) |
 
 ---
 

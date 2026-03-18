@@ -192,6 +192,30 @@ class IssueInfoEnricher(Enricher):
         return heartbeat
 
 
+class JiraInfoEnricher(Enricher):
+    """Extracts Jira ticket information from agent state."""
+
+    def enrich(self, heartbeat: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract Jira ticket information if present.
+
+        Args:
+            heartbeat: Raw heartbeat
+
+        Returns:
+            Heartbeat with Jira fields added when available
+        """
+        data = heartbeat.get("raw_state", {})
+
+        # Extract Jira ticket info if present
+        if "jira_ticket_id" in data:
+            heartbeat["jira_ticket_id"] = data.get("jira_ticket_id", "")
+            heartbeat["jira_ticket_url"] = data.get("jira_ticket_url", "")
+            heartbeat["jira_priority"] = data.get("jira_priority", "")
+            heartbeat["jira_labels"] = data.get("jira_labels", [])
+
+        return heartbeat
+
+
 class TimestampEnricher(Enricher):
     """Adds formatted timestamp information."""
 
@@ -265,6 +289,7 @@ class EnricherPipeline:
             ComponentsEnricher(),
             RisksEnricher(),
             IssueInfoEnricher(),
+            JiraInfoEnricher(),
             TimestampEnricher()
         ]
 

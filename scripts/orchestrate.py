@@ -70,10 +70,12 @@ def print_final_summary(completed_phases: list[str], state: dict) -> None:
 # -- main workflow ------------------------------------------------------------
 
 def orchestrate(
-    title: str,
-    description: str,
+    title: str = None,
+    description: str = None,
     issue_type: str = "feature",
     repo_path: str = None,
+    jira_ticket: str = None,
+    dry_run: bool = False,
 ) -> dict:
     """Run the full multi-agent workflow with validation and optional approval.
 
@@ -82,6 +84,8 @@ def orchestrate(
         description: Issue/feature description.
         issue_type: Type of issue ("feature", "bug", or "refactor").
         repo_path: Optional path to the Shipwright repository for code analysis.
+        jira_ticket: Optional Jira ticket ID to fetch title/description from.
+        dry_run: If True, use mock data instead of real API calls.
 
     Returns:
         Final accumulated state dictionary. The key ``current_phase`` will be
@@ -99,11 +103,47 @@ def orchestrate(
         "current_phase": "init",
     }
 
-    print_header(f"Multi-Agent Workflow: {title}")
+    print_header(f"Multi-Agent Workflow: {title or jira_ticket or 'TBD'}")
     print(f"  Session: {session_id}")
     print(f"  Manual approval: {'ON' if MANUAL_APPROVAL else 'OFF'}")
     if MANUAL_APPROVAL:
         print("  You will be asked to approve each phase before continuing.")
+
+    # -- Pre-phase: Jira ticket fetch ----------------------------------------
+    if jira_ticket:
+        print_header(f"Fetching Jira Ticket: {jira_ticket}")
+        _dry_run_set_by_us = False
+        if dry_run and os.getenv("DRY_RUN", "").lower() != "true":
+            os.environ["DRY_RUN"] = "true"
+            _dry_run_set_by_us = True
+        try:
+            from mcp.jira_stub import fetch_ticket
+            from tools.jira_client import map_ticket_to_state
+            ticket_data = fetch_ticket(jira_ticket)
+
+            jira_state = map_ticket_to_state(ticket_data)
+            state.update(jira_state)
+            title = state["issue_title"]
+            description = state["issue_description"]
+            issue_type = state["issue_type"]
+
+            print(f"  Ticket:   {jira_ticket}")
+            print(f"  Title:    {title}")
+            print(f"  Priority: {state.get('jira_priority', 'N/A')}")
+            labels = ', '.join(state.get('jira_labels', [])) or 'none'
+            print(f"  Labels:   {labels}")
+            linked = ', '.join(state.get('jira_linked_issues', [])) or 'none'
+            print(f"  Linked:   {linked}")
+            print(f"  URL:      {state.get('jira_ticket_url', '')}")
+        except ConnectionError as e:
+            print(f"\n  ERROR: {e}")
+            return state
+        except Exception as e:
+            print(f"\n  Failed to fetch Jira ticket: {e}")
+            return state
+        finally:
+            if _dry_run_set_by_us:
+                os.environ.pop("DRY_RUN", None)
 
     # -- Phase 1: Design ------------------------------------------------------
     print_header("Phase 1: Design Agent")
@@ -231,10 +271,12 @@ def main() -> None:
 Examples:
   uv run python scripts/orchestrate.py --title "Add timeout support" --description "..."
   MANUAL_APPROVAL=true uv run python scripts/orchestrate.py --title "..." --description "..."
+  uv run python scripts/orchestrate.py --jira-ticket SHIP-123
+  uv run python scripts/orchestrate.py --jira-ticket SHIP-123 --dry-run
         """,
     )
-    parser.add_argument("--title", required=True, help="Issue/feature title")
-    parser.add_argument("--description", required=True, help="Issue/feature description")
+    parser.add_argument("--title", default=None, help="Issue/feature title")
+    parser.add_argument("--description", default=None, help="Issue/feature description")
     parser.add_argument(
         "--issue-type",
         default="feature",
@@ -246,13 +288,29 @@ Examples:
         default=None,
         help="Path to Shipwright repository for code analysis",
     )
+    parser.add_argument(
+        "--jira-ticket",
+        default=None,
+        metavar="TICKET_ID",
+        help="Jira ticket ID to fetch (e.g. SHIP-123). Fetches title, description, and acceptance criteria automatically.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Use mock data instead of real API calls (no Jira or Claude API calls).",
+    )
     args = parser.parse_args()
+
+    if not args.jira_ticket and not args.title:
+        parser.error("either --title or --jira-ticket is required")
 
     result = orchestrate(
         title=args.title,
         description=args.description,
         issue_type=args.issue_type,
         repo_path=args.repo_path,
+        jira_ticket=args.jira_ticket,
+        dry_run=args.dry_run,
     )
     sys.exit(0 if result.get("current_phase") == "done" else 1)
 

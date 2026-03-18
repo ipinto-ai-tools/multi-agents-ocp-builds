@@ -385,11 +385,43 @@ If your build is being terminated before completion:
 }
 
 
+MOCK_JIRA_TICKET: dict = {
+    "ticket_id": "SHIP-123",
+    "ticket_url": "https://issues.redhat.com/browse/SHIP-123",
+    "summary": "Add timeout configuration for BuildRun",
+    "description": (
+        "As an OpenShift Build user, I need to configure per-BuildRun timeouts "
+        "so that long-running builds are automatically cancelled.\n\n"
+        "Currently, builds can run indefinitely if a step hangs."
+    ),
+    "issue_type": "Story",
+    "status": "In Progress",
+    "priority": "Major",
+    "labels": ["shipwright", "buildrun", "timeout"],
+    "assignee": "Jane Developer",
+    "reporter": "John Product",
+    "acceptance_criteria": [
+        "Users can set a timeout field on BuildRun spec",
+        "Builds exceeding the timeout are cancelled with a clear status message",
+        "Default timeout is configurable via controller flags",
+        "Unit tests cover timeout enforcement logic",
+        "E2E tests validate timeout behaviour",
+    ],
+    "comments": [
+        "Jane Developer: Started investigation — timeout logic will live in buildrun-controller.",
+        "John Product: Confirm: default should be 1 hour as per the RFC.",
+    ],
+    "linked_issues": ["SHIP-100", "SHIP-101"],
+    "components": ["buildrun-controller"],
+    "fix_versions": ["v0.14.0"],
+}
+
+
 def get_mock_response(agent_type: str) -> dict:
     """Get mock response for specified agent type.
 
     Args:
-        agent_type: One of 'design', 'testing', 'docs'
+        agent_type: One of 'design', 'testing', 'docs', 'jira_ticket'
 
     Returns:
         Dictionary with mock agent output
@@ -400,7 +432,8 @@ def get_mock_response(agent_type: str) -> dict:
     mock_responses = {
         "design": MOCK_DESIGN_STRUCTURED,
         "testing": MOCK_TESTING_STRUCTURED,
-        "docs": MOCK_DOCS_STRUCTURED
+        "docs": MOCK_DOCS_STRUCTURED,
+        "jira_ticket": MOCK_JIRA_TICKET,
     }
 
     if agent_type not in mock_responses:

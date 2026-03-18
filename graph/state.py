@@ -65,3 +65,11 @@ class AgentState(TypedDict, total=False):
     # Repository context
     repo_path: str
     target_branch: str
+
+    # Jira integration
+    jira_ticket_id: str             # e.g. "SHIP-123"
+    jira_ticket_url: str            # e.g. "https://issues.redhat.com/browse/SHIP-123"
+    jira_priority: str              # e.g. "Critical", "Major"
+    jira_labels: list[str]          # ticket labels
+    jira_linked_issues: list[str]   # related ticket IDs
+    jira_comments_summary: str      # concatenated comments (capped at 10)

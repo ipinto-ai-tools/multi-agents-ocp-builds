@@ -1177,3 +1177,34 @@ Your code generation output should be structured as:
 
 All Go code should be production-ready, secure, and follow Kubernetes/OpenShift conventions.
 """
+
+
+def build_jira_context_block(state: dict) -> str:
+    """Build a Jira context section for injection into agent prompts.
+
+    Returns empty string if no Jira ticket in state.
+    """
+    ticket_id = state.get("jira_ticket_id", "")
+    if not ticket_id:
+        return ""
+
+    lines = [
+        "## Jira Ticket Context",
+        f"Ticket: {ticket_id}",
+        f"URL: {state.get('jira_ticket_url', '')}",
+        f"Priority: {state.get('jira_priority', 'N/A')}",
+    ]
+
+    labels = state.get("jira_labels", [])
+    if labels:
+        lines.append(f"Labels: {', '.join(labels)}")
+
+    linked = state.get("jira_linked_issues", [])
+    if linked:
+        lines.append(f"Linked Issues: {', '.join(linked)}")
+
+    comments = state.get("jira_comments_summary", "")
+    if comments:
+        lines.append(f"\n### Discussion Summary\n{comments}")
+
+    return "\n".join(lines)

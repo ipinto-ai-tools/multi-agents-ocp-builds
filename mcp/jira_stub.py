@@ -8,11 +8,14 @@ When fully implemented, this will enable agents to interact with Jira for:
 - Searching and filtering issues
 - Managing sprints and boards
 
-Current Status: STUB - Not yet implemented
+Current Status: STUB - delegates to tools.jira_client when configured
 Future Implementation: Will use MCP protocol to communicate with Jira MCP server
 """
 
+import logging
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class JiraMCPClient:
@@ -206,32 +209,98 @@ class JiraMCPClient:
 
 
 # Integration points for agents
-def get_jira_client() -> JiraMCPClient:
-    """Get Jira MCP client instance.
+def get_jira_client():
+    """Get Jira client instance.
+
+    Tries to use the real tools.jira_client when Jira is configured,
+    falling back to the stub JiraMCPClient when not configured.
 
     Returns:
-        Jira MCP client (currently stub)
+        Real JiraClient if configured, otherwise stub JiraMCPClient
 
     Example:
         >>> client = get_jira_client()
         >>> # Future: client.create_issue("SHIP", "Title", "Description")
     """
-    # TODO: Initialize from configuration
-    # Will read MCP endpoint from environment or config
-    return JiraMCPClient()
+    try:
+        from tools.jira_client import get_jira_client as _real_get_jira_client
+        return _real_get_jira_client()
+    except (ImportError, Exception):
+        logger.debug("tools.jira_client not available, falling back to stub JiraMCPClient")
+        return JiraMCPClient()
+
+
+def is_jira_configured() -> bool:
+    """Check if Jira is configured and accessible.
+
+    Delegates to tools.jira_client.is_jira_configured when available,
+    otherwise returns False.
+
+    Returns:
+        True if Jira is configured and reachable, False otherwise
+
+    Example:
+        >>> if is_jira_configured():
+        ...     client = get_jira_client()
+        ...     # Use client
+    """
+    try:
+        from tools.jira_client import is_jira_configured as _real_is_configured
+        return _real_is_configured()
+    except (ImportError, Exception):
+        return False
 
 
 def is_jira_mcp_available() -> bool:
     """Check if Jira MCP server is available.
 
-    Returns:
-        True if MCP server is running and accessible
+    Deprecated alias for is_jira_configured(). Kept for backward compatibility.
 
-    Example:
-        >>> if is_jira_mcp_available():
-        ...     client = get_jira_client()
-        ...     # Use client
+    Returns:
+        True if Jira is configured and reachable, False otherwise
     """
-    # TODO: Implement health check
-    # Will ping MCP server to verify availability
-    return False
+    return is_jira_configured()
+
+
+def fetch_ticket(ticket_id: str) -> dict:
+    """Fetch a Jira ticket, using mock data in dry-run mode.
+
+    Args:
+        ticket_id: Jira ticket ID, e.g. "SHIP-123"
+
+    Returns:
+        Dictionary with ticket fields matching JiraClient.fetch_ticket() schema
+
+    Raises:
+        ConnectionError: If Jira is unreachable (not on VPN, etc.)
+    """
+    import os
+    import requests
+
+    if os.getenv("DRY_RUN", "false").lower() == "true":
+        from config.mock_responses import MOCK_JIRA_TICKET
+        mock = dict(MOCK_JIRA_TICKET)
+        mock["ticket_id"] = ticket_id
+        mock["ticket_url"] = f"{mock['ticket_url'].rsplit('/', 1)[0]}/{ticket_id}"
+        logger.info(f"[DRY-RUN] Returning mock Jira ticket for {ticket_id}")
+        return mock
+
+    try:
+        from tools.jira_client import get_jira_client as _real_get_jira_client
+        client = _real_get_jira_client()
+        return client.fetch_ticket(ticket_id)
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError(
+            f"Cannot reach Jira. Are you connected to VPN?\n"
+            f"To test without VPN, use --dry-run flag."
+        )
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code if e.response is not None else "?"
+        if status == 404:
+            raise ValueError(f"Jira ticket '{ticket_id}' not found. Check the ticket ID.")
+        if status in (401, 403):
+            raise ValueError(
+                f"Jira authentication failed (HTTP {status}). "
+                "Check JIRA_USER_EMAIL and JIRA_API_TOKEN in your .env file."
+            )
+        raise

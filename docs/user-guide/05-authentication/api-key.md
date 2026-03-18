@@ -1,9 +1,5 @@
 # API Key Authentication
 
-> **Note:** The system currently uses Google Vertex AI as its authentication method. This page describes the intended future configuration if direct API key support is added, and also covers third-party API tokens used by MCP integrations.
-
----
-
 ## Current State
 
 The system initializes an `AnthropicVertex` client in `config/auth_config.py`. The `get_anthropic_client()` function checks for `ANTHROPIC_VERTEX_PROJECT_ID` and raises a `ValueError` if it is not set.
@@ -83,7 +79,7 @@ GITHUB_TOKEN=github_pat_your_token_here
 
 ## Jira API Token
 
-Used for future Jira MCP server integration to create and manage Jira issues automatically.
+Used to authenticate with the Jira REST API when passing `--jira-ticket` to the orchestrator.
 
 ### How to Create a Jira API Token
 
@@ -96,9 +92,10 @@ Used for future Jira MCP server integration to create and manage Jira issues aut
 ```bash
 JIRA_API_TOKEN=your-generated-token
 JIRA_BASE_URL=https://your-org.atlassian.net
+JIRA_USER_EMAIL=your-email@company.com
 ```
 
-> **Note:** Jira integration is not yet active — this prepares for future MCP server support.
+See [Jira & Rovo Integration](../09-integrations/jira-rovo.md) for full setup and usage.
 
 ---
 
