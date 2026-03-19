@@ -17,10 +17,10 @@ The multi-agent system is a LangGraph pipeline of four specialized AI agents tha
 │                      LangGraph Orchestrator                         │
 │                      (agents/graph.py)                              │
 │                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐              │
-│  │   Design    │──>│  Develop    │──>│   Testing   │──> Docs       │
-│  │   Agent     │   │   Agent     │   │   Agent     │    Agent      │
-│  └─────────────┘   └─────────────┘   └─────────────┘              │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐  │
+│  │   Design    │──>│  Develop    │──>│   Testing   │──>│    Docs     │  │
+│  │   Agent     │   │   Agent     │   │   Agent     │   │   Agent     │  │
+│  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘  │
 │         │                 │                 │              │        │
 │         └─────────────────┴─────────────────┴──────────────┘        │
 │                           Heartbeats to Dashboard                   │
