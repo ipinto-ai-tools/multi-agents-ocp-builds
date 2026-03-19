@@ -385,6 +385,26 @@ If your build is being terminated before completion:
 }
 
 
+# Mock response for Code Review Agent — passing review
+MOCK_CODE_REVIEW_PASS: dict = {
+    "review_passed": True,
+    "review_findings": [
+        "[SUGGESTION] STYLE: Consider adding more inline comments to timeout enforcement logic",
+    ],
+    "review_summary": "Code review complete: 1 finding(s) | PASS",
+}
+
+# Mock response for Code Review Agent — failing review (for test scenarios)
+MOCK_CODE_REVIEW_FAIL: dict = {
+    "review_passed": False,
+    "review_findings": [
+        "[BLOCKING] SECURITY: Missing input validation for timeout duration in ValidateTimeout()",
+        "[WARNING] TESTING: Table-driven tests missing edge case for zero duration value",
+    ],
+    "review_summary": "Code review complete: 2 finding(s) | 1 blocking | FAIL",
+}
+
+
 MOCK_JIRA_TICKET: dict = {
     "ticket_id": "SHIP-123",
     "ticket_url": "https://issues.redhat.com/browse/SHIP-123",
@@ -434,6 +454,7 @@ def get_mock_response(agent_type: str) -> dict:
         "testing": MOCK_TESTING_STRUCTURED,
         "docs": MOCK_DOCS_STRUCTURED,
         "jira_ticket": MOCK_JIRA_TICKET,
+        "code_review": MOCK_CODE_REVIEW_PASS,
     }
 
     if agent_type not in mock_responses:

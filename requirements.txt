@@ -20,3 +20,6 @@ pytest-asyncio>=0.23.0
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 requests>=2.32.0
+
+# Code review (optional Qodo CLI via npm: npm install -g @qodo/command)
+# PR-Agent (optional, for PR-based review): pip install pr-agent

@@ -73,3 +73,9 @@ class AgentState(TypedDict, total=False):
     jira_labels: list[str]          # ticket labels
     jira_linked_issues: list[str]   # related ticket IDs
     jira_comments_summary: str      # concatenated comments (capped at 10)
+
+    # Code Review phase
+    review_passed: bool         # True if review found no blocking issues
+    review_findings: list[str]  # Structured findings: "[BLOCKING] ...", "[WARNING] ..."
+    review_summary: str         # Human-readable verdict, e.g. "2 findings | 1 blocking | FAIL"
+    review_iteration: int       # Current iteration count (0 = not yet reviewed)

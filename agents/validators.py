@@ -6,6 +6,7 @@ the next phase begins. Prevents silent cascading failures where an agent
 returns empty data and subsequent agents produce garbage outputs.
 """
 from __future__ import annotations
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -144,10 +145,58 @@ def validate_docs_output(state: dict) -> ValidationResult:
     )
 
 
+def validate_review_output(state: dict) -> ValidationResult:
+    """Validate Code Review Agent outputs.
+
+    The review phase itself always 'passes' from a pipeline-blocking perspective —
+    routing logic handles retries and max-iteration fallthrough. This validator
+    surfaces review results as warnings in the phase summary.
+
+    Args:
+        state: Agent state dict after code_review_node runs.
+
+    Returns:
+        ValidationResult always with passed=True; review failure shown as warning.
+    """
+    review_summary = state.get("review_summary", "")
+    review_iteration = state.get("review_iteration", 0)
+    review_passed = state.get("review_passed", True)
+    review_findings = state.get("review_findings", [])
+
+    warnings = []
+    if not isinstance(review_findings, list):
+        review_findings = []
+        warnings.append(f"review_findings has unexpected type: {type(state.get('review_findings')).__name__}")
+    if not review_passed:
+        warnings.append(f"Review failed: {review_summary}")
+
+    max_iterations = int(os.getenv("MAX_REVIEW_ITERATIONS", "3"))
+    if review_iteration >= max_iterations and not review_passed:
+        warnings.append(
+            f"Max review iterations ({max_iterations}) reached. "
+            "Proceeding to testing despite unresolved findings."
+        )
+
+    summary = {
+        "Review verdict": "PASS" if review_passed else "FAIL",
+        "Iteration": review_iteration,
+        "Findings": len(review_findings),
+        "Summary": review_summary or "N/A",
+    }
+
+    return ValidationResult(
+        phase="code_review",
+        passed=True,
+        warnings=warnings,
+        summary=summary,
+    )
+
+
 # Map phase name to validator function
 VALIDATORS = {
     "design": validate_design_output,
     "develop": validate_develop_output,
+    "code_review": validate_review_output,
     "testing": validate_testing_output,
     "docs": validate_docs_output,
 }
