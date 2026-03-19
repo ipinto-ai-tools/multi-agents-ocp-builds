@@ -2,6 +2,8 @@
 
 AI-powered development orchestrator for Shipwright Build using Claude AI and LangGraph. This system automates the design, development, testing, and documentation workflow for OpenShift and Shipwright Build projects. You provide a feature request or bug report; the agent pipeline returns a design document, production Go code, Ginkgo v2 tests, and full documentation.
 
+![Multi-Agent OCP Build Orchestrator: Automated Workflow & Data Flow](docs/user-guide/assets/workflow-diagram.png)
+
 ---
 
 ## Documentation
