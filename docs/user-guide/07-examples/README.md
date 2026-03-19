@@ -13,6 +13,8 @@ The `examples/` directory contains runnable scripts for testing agents, verifyin
 | [`logger_demo.py`](#3-logging-patterns-logger_demopy) | Demonstrate all logging patterns | No |
 | [`test_cleanup_api.py`](#4-dashboard-api-test_cleanup_apipy) | Test and interact with the dashboard REST API | No (requires dashboard running) |
 
+> **Note:** The E2E workflow now includes the Code Review Agent automatically. No new example files are required — the fifth agent runs as part of the existing pipeline.
+
 ---
 
 ## 1. Interactive Agent Demo (`test_agents_demo.sh`)
@@ -67,7 +69,7 @@ Testing E2E workflow...
 | Mode 1 - Dry-run | Uses mock responses from `config/mock_responses.py`. No API credentials needed, no cost. |
 | Mode 2 - Live | Makes real Vertex AI API calls. Requires `ANTHROPIC_VERTEX_PROJECT_ID` and valid `gcloud` credentials. |
 | Test 1 - Individual agent | Prompts for which agent (Design, Testing, or Docs) and tests it in isolation. |
-| Test 2 - E2E workflow | Runs all four agents in sequence using `scripts/test_agents.py --e2e`. |
+| Test 2 - E2E workflow | Runs all five agents in sequence (including Code Review) using `scripts/test_agents.py --e2e`. |
 | Test 3 - Dashboard | Tests dashboard heartbeat and API. Prompts you to start the dashboard first. |
 | Test 4 - All | Runs every agent individually, then E2E, then dashboard tests in sequence. |
 
@@ -81,6 +83,7 @@ All results are saved to a timestamped directory:
   design_output.json           # Design agent structured output
   testing_output.json          # Testing agent structured output
   docs_output.json             # Docs agent structured output
+  review_output.json           # Code Review agent structured output
   e2e_result.json              # Complete E2E workflow result
 ```
 
@@ -360,6 +363,99 @@ All API tests completed successfully!
 ```
 
 > **Note:** The cleanup with a 1-hour threshold will not delete the test heartbeats you just sent because they were created seconds ago. Use a 0-hour threshold or the `clear_completed` endpoint to remove them immediately.
+
+---
+
+## 5. Code Review Agent
+
+The Code Review Agent (`agents/code_review_agent.py`) runs automatically between Development and Testing in every E2E workflow. The examples below show how to observe, configure, and inspect its behavior without modifying any agent code.
+
+### When to Use
+
+Use these examples when you want to:
+
+- Observe the review step during dry-run development without consuming API tokens
+- Disable the review phase temporarily to speed up iteration on non-code changes
+- Tune how aggressively the auto-fix loop triggers before re-running development
+- Enable Qodo CLI as the review backend instead of Claude
+- Inspect review results programmatically after a workflow completes
+
+In normal operation you do not need to interact with the Code Review Agent directly — it runs automatically and routes back to Development when it finds blocking issues.
+
+### a) Dry-run with Review
+
+In dry-run mode the Code Review Agent returns a mock PASS result without making any API call. The log will include the line `[DRY-RUN] Code review skipped`.
+
+```bash
+uv run python scripts/test_agents.py --e2e --dry-run --debug
+```
+
+### b) Disabling Review
+
+Set `QODO_REVIEW_ENABLED=false` to skip the Code Review phase entirely. The pipeline proceeds directly from Development to Testing.
+
+```bash
+QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
+  --title "Feature title" \
+  --description "Description"
+```
+
+### c) Tuning the Auto-fix Loop
+
+`MAX_REVIEW_ITERATIONS` controls how many times the pipeline can cycle back from Code Review to Development before proceeding regardless of verdict (default: `3`). `QODO_BLOCKING_THRESHOLD` controls which finding severity levels count as blocking:
+
+| Threshold | Findings that trigger a re-run |
+|-----------|-------------------------------|
+| `high` | `[BLOCKING]` only (default) |
+| `medium` | `[BLOCKING]` and `[WARNING]` |
+| `low` | Any finding, including `[SUGGESTION]` |
+
+```bash
+MAX_REVIEW_ITERATIONS=5 QODO_BLOCKING_THRESHOLD=medium uv run python scripts/orchestrate.py \
+  --title "Add timeout support" \
+  --description "Users need configurable timeouts"
+```
+
+### d) Optional Qodo CLI
+
+Set `QODO_CLI_PATH` to the absolute path of the Qodo binary to use Qodo as the review backend. If the Qodo CLI fails or is unreachable, the agent automatically falls back to Claude-only review.
+
+```bash
+QODO_CLI_PATH=/usr/local/bin/qodo uv run python scripts/orchestrate.py \
+  --title "Add timeout support" \
+  --description "Description"
+```
+
+### e) Reading Review Output from State
+
+After `orchestrate()` returns, the review results are available directly on the state dict:
+
+```python
+from agents.graph import orchestrate
+
+result = orchestrate(
+    title="Add timeout support",
+    description="Users need configurable timeouts"
+)
+
+print(result.get("review_summary"))    # e.g. "2 findings | 1 blocking | FAIL"
+print(result.get("review_passed"))     # True or False
+for finding in result.get("review_findings", []):
+    print(finding)                     # "[BLOCKING] SECURITY: ..."
+```
+
+State fields populated by the Code Review Agent:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `review_passed` | `bool` | `True` if the verdict was PASS |
+| `review_findings` | `list[str]` | Individual classified findings |
+| `review_summary` | `str` | Human-readable summary line |
+| `review_iteration` | `int` | Number of review cycles completed |
+
+### f) Dashboard Heartbeat for Review
+
+The Code Review Agent emits heartbeats to the dashboard with `agent="code_review"`, so review status and verdict are visible in the real-time dashboard alongside the other agents.
 
 ---
 

@@ -21,6 +21,7 @@ Dry run mode lets you test the system without making any Claude API calls. It us
 |-----------|-----------------|
 | Design Agent | Returns mock design analysis, components, risks, criteria |
 | Development Agent | Uses design mock output as input |
+| Code Review Agent | Returns mock PASS result (`MOCK_CODE_REVIEW_PASS`); no API call, no Qodo CLI |
 | Testing Agent | Returns mock test plans and Ginkgo v2 code |
 | Docs Agent | Returns mock PR summary and release notes |
 | Heartbeat emissions | Logged but not sent to dashboard |
@@ -34,7 +35,7 @@ The full workflow code path still executes - only the Claude API call itself is 
 
 ### Full E2E Workflow
 
-Test all four agents in sequence:
+Test all five agents in sequence (including Code Review):
 
 ```bash
 uv run python scripts/test_agents.py --e2e --dry-run
@@ -77,7 +78,7 @@ uv run python scripts/test_agents.py --e2e --dry-run \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--agent {design\|testing\|docs}` | Test a specific agent | - |
+| `--agent {design\|testing\|docs\|code_review}` | Test a specific agent | - |
 | `--e2e` | Test complete E2E workflow | - |
 | `--dashboard` | Test dashboard functionality | - |
 | `--title TEXT` | Issue title | Default mock title |

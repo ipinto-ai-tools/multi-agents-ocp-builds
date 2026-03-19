@@ -1,6 +1,6 @@
 # Architecture
 
-The multi-agent system is a LangGraph pipeline of four specialized AI agents that process a feature request or bug report end-to-end.
+The multi-agent system is a LangGraph pipeline of five specialized AI agents that process a feature request or bug report end-to-end.
 
 ---
 
@@ -17,13 +17,14 @@ The multi-agent system is a LangGraph pipeline of four specialized AI agents tha
 │                      LangGraph Orchestrator                         │
 │                      (agents/graph.py)                              │
 │                                                                     │
-│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐  │
-│  │   Design    │──>│  Develop    │──>│   Testing   │──>│    Docs     │  │
-│  │   Agent     │   │   Agent     │   │   Agent     │   │   Agent     │  │
-│  └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘  │
-│         │                 │                 │              │        │
-│         └─────────────────┴─────────────────┴──────────────┘        │
-│                           Heartbeats to Dashboard                   │
+│  ┌──────────┐  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌──────┐  │
+│  │  Design  │─>│  Develop │─>│ Code Review │─>│ Testing  │─>│ Docs │  │
+│  │  Agent   │  │  Agent   │  │   Agent     │  │  Agent   │  │Agent │  │
+│  └──────────┘  └──────────┘  └─────────────┘  └──────────┘  └──────┘  │
+│                     ↑              │ (fail: blocking issues found)      │
+│                     └──────────────┘ auto-fix loop (≤ MAX_REVIEW_ITER) │
+│         └───────────────────────────────────────────────────────┘      │
+│                           Heartbeats to Dashboard                       │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -38,10 +39,12 @@ The multi-agent system is a LangGraph pipeline of four specialized AI agents tha
 
 ## LangGraph Pipeline
 
-The orchestrator (`agents/graph.py`) builds a `StateGraph` with four sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which node runs next.
+The orchestrator (`agents/graph.py`) builds a `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which node runs next.
 
 ```
-design_node → develop_node → testing_node → docs_node → END
+design_node → develop_node → code_review_node → testing_node → docs_node → END
+                                  ↑         │ (fail + iter ≤ max)
+                                  └─────────┘ (auto-fix loop)
 ```
 
 ### Phase Transitions
@@ -49,9 +52,13 @@ design_node → develop_node → testing_node → docs_node → END
 The `current_phase` field in `AgentState` controls routing:
 
 ```
-init → design_complete → develop_complete → testing_complete → done
-                                                          ↓
-                                                        error  (any phase)
+init → design_complete → develop_complete → review_complete → testing_complete → done
+                                                  ↑       │
+                                                  └───────┘  (auto-fix loop when
+                                                              review_passed=False and
+                                                              review_iteration ≤ MAX_REVIEW_ITERATIONS)
+                                            ↓ (any phase)
+                                          error
 ```
 
 When an agent raises an unhandled exception, the node sets `current_phase = "error"`, emits an error heartbeat, and the conditional router sends the workflow to `END`.
@@ -77,6 +84,7 @@ The orchestrator:
 |-------|------|-------|--------|
 | Design | `agents/design_agent.py` | Issue title, description, optional repo path | Design document, component list, risks, acceptance criteria, implementation plan |
 | Development | `agents/go_k8s_developer.py` | Design outputs from state | Go code files, test files, PR description |
+| Code Review | `agents/code_review_agent.py` | Generated code files from state | Review verdict, findings list, review summary |
 | Testing | `agents/testing_agent.py` | Design outputs from state | Ginkgo v2 test suites, test plan, coverage analysis |
 | Documentation | `agents/docs_agent.py` | All prior outputs from state | PR summary, release notes, JTBD docs, SHIP document |
 
@@ -100,6 +108,16 @@ Development node adds:
     code_files, test_files, code_changes,
     files_modified, pr_description
     current_phase = "develop_complete"
+    │
+    ▼
+Code Review node adds:
+    review_passed         (bool: True if no blocking issues)
+    review_findings       (list[str]: "[BLOCKING] SECURITY: ...")
+    review_summary        (str: "2 findings | 1 blocking | FAIL")
+    review_iteration      (int: increments each review cycle)
+    current_phase = "review_complete"
+    → if review_passed=False and iteration ≤ max: loops back to Development
+    → if review_passed=True or iteration > max: continues to Testing
     │
     ▼
 Testing node adds:
@@ -147,6 +165,7 @@ Phase  clear error message
 |-------|---------------------|---------------------|
 | Design | Empty `design_analysis`, empty `implementation_plan` | No risks, components, or criteria |
 | Development | Empty `code_files` | Short `pr_description` |
+| Code Review | (never blocks — loop handles retries) | Review failures surfaced as warnings |
 | Testing | Empty `test_plan` | No unit/integration tests |
 | Documentation | Empty `pr_summary` | No `release_notes` |
 
@@ -206,6 +225,7 @@ Each agent has a dedicated system prompt stored as a `Final[str]` constant in `c
 | -------- | ------- | ------- |
 | `DESIGN_AGENT_PROMPT` | `agents/design_agent.py` | Instructs the agent to produce design documents: problem statement, scope, impacted components, risks, acceptance criteria, implementation plan |
 | `DEVELOPMENT_AGENT_PROMPT` | `agents/go_k8s_developer.py` | Instructs the agent to generate idiomatic Go code, table-driven tests, and a PR description ending with "Generated by AI" |
+| `CODE_REVIEW_AGENT_PROMPT` | `agents/code_review_agent.py` | Instructs Claude to review generated Go code using machine-parseable `[BLOCKING]`/`[WARNING]`/`[SUGGESTION]` format, ending with `VERDICT: PASS` or `VERDICT: FAIL` |
 | `TESTING_AGENT_PROMPT` | `agents/testing_agent.py` | Instructs the agent to generate Ginkgo v2 test suites with DDT patterns, Gomega assertions, and Shipwright test helpers |
 | `DOCS_AGENT_PROMPT` | `agents/docs_agent.py` | Instructs the agent to produce PR summaries, release notes, JTBD documentation, SHIP documents, and high-level design documents |
 

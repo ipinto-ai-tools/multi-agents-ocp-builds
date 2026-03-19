@@ -25,12 +25,13 @@ Because of this merge behavior, the Development Agent can read `design_analysis`
 ## State Fields by Phase
 
 | Category | Fields | Set by |
-|----------|--------|--------|
+| -------- | ------ | ------ |
 | **Input** | `issue_title`, `issue_description`, `issue_type` | Orchestrator |
 | **Control** | `session_id`, `current_phase`, `approval_status` | Orchestrator |
 | **Repository** | `repo_path`, `target_branch` | Orchestrator |
 | **Design outputs** | `design_analysis`, `impacted_components`, `risks`, `acceptance_criteria`, `implementation_plan` | Design Agent |
 | **Dev outputs** | `code_files`, `test_files`, `code_changes`, `files_modified`, `pr_description` | Development Agent |
+| **Code Review outputs** | `review_passed`, `review_findings`, `review_summary`, `review_iteration` | Code Review Agent |
 | **Test outputs** | `test_plan`, `test_specifications`, `unit_tests`, `integration_tests`, `e2e_tests`, `coverage_analysis` | Testing Agent |
 | **Test results** | `test_results`, `test_summary`, `coverage_gaps`, `test_failures` | Testing Agent |
 | **Docs outputs** | `pr_summary`, `release_notes`, `docs_changes`, `upgrade_notes`, `known_limitations`, `jtbd_documentation`, `ship_document`, `high_level_design` | Docs Agent |
@@ -42,7 +43,7 @@ Because of this merge behavior, the Development Agent can read `design_analysis`
 
 The `current_phase` field controls the conditional router in the graph. The router reads this field after each node completes and decides which node to invoke next.
 
-```
+```text
 init
   │
   ▼ (design_node runs)
@@ -51,6 +52,10 @@ design_complete
   ▼ (develop_node runs)
 develop_complete
   │
+  ▼ (code_review_node runs)
+review_complete ──── review_passed=False + iteration ≤ max ───→ develop_complete (loop)
+  │
+  ▼ (review_passed=True OR iteration > max)
   ▼ (testing_node runs)
 testing_complete
   │
@@ -64,7 +69,7 @@ Any unhandled exception in a node sets `current_phase = "error"` and routes the 
 
 ## How State Flows Through the Workflow
 
-```
+```text
 orchestrate() creates initial state with:
   - issue_title, issue_description, issue_type
   - session_id (UUID)
@@ -90,6 +95,19 @@ Development node reads design fields, adds:
     security_notes        → list[str]
     dependencies          → list[str]
     current_phase = "develop_complete"
+    │
+    ▼
+Code Review node reads code_files + design fields, adds:
+    review_passed         → bool (True if no blocking issues)
+    review_findings       → list[str] ("[BLOCKING] SECURITY: ...", ...)
+    review_summary        → str ("2 findings | 1 blocking | FAIL")
+    review_iteration      → int (increments each cycle; starts at 0)
+    current_phase = "review_complete"
+
+    If review_passed=False AND review_iteration ≤ MAX_REVIEW_ITERATIONS:
+        → Graph loops back to Development node (inject findings into prompt)
+    Else:
+        → Continues to Testing node
     │
     ▼
 Testing node reads design + dev fields, adds:

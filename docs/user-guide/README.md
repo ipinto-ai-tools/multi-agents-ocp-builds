@@ -24,7 +24,7 @@ This system automates the design, development, testing, and documentation workfl
 | Page | Description |
 |------|-------------|
 | [Architecture](02-concepts/architecture.md) | System overview and LangGraph pipeline |
-| [Agents Overview](02-concepts/agents-overview.md) | The four agents and how they connect |
+| [Agents Overview](02-concepts/agents-overview.md) | The five agents and how they connect |
 | [State Management](02-concepts/state-management.md) | AgentState, phase transitions, data flow |
 
 ### Section 3 - Agents

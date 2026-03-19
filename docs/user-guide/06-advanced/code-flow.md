@@ -11,9 +11,9 @@ The system has two entry points depending on how you invoke it:
 | Entry point | File | When used |
 |-------------|------|-----------|
 | `orchestrate()` | `scripts/orchestrate.py` | CLI invocation by a user or CI job. Runs each phase sequentially, calls validators between phases, and supports manual approval gates. |
-| `build_workflow()` | `agents/graph.py` | LangGraph pipeline invocation. Builds a `StateGraph` where nodes are the four agents and routing is driven by `state["current_phase"]`. Used when you want LangGraph to manage state and edges rather than imperative Python. |
+| `build_workflow()` | `agents/graph.py` | LangGraph pipeline invocation. Builds a `StateGraph` where nodes are the five agents and routing is driven by `state["current_phase"]`. Used when you want LangGraph to manage state and edges rather than imperative Python. |
 
-Both paths call the same four agent functions (`run_design`, `run_development`, `run_testing`, `run_docs`) and emit heartbeats to the dashboard after each phase.
+Both paths call the same five agent functions (`run_design`, `run_development`, `run_code_review`, `run_testing`, `run_docs`) and emit heartbeats to the dashboard after each phase.
 
 ---
 
@@ -58,6 +58,17 @@ orchestrate(title, description, repo_path, issue_type)
   │   │   └─ emit_heartbeat() [dashboard/heartbeat.py]
   │   └─ validate_phase("develop", state) [agents/validators.py]
   │       └─ validate_develop_output()
+  │
+  ├─ Phase 2.5: Code Review
+  │   ├─ run_code_review() [agents/code_review_agent.py]
+  │   │   ├─ get_anthropic_client() [config/auth_config.py]
+  │   │   ├─ _format_code_for_review()
+  │   │   ├─ client.messages.create() → Claude API  (or _run_qodo_review() if QODO_CLI_PATH set)
+  │   │   ├─ _parse_review_output()
+  │   │   └─ emit_heartbeat() [dashboard/heartbeat.py]
+  │   └─ validate_phase("code_review", state) [agents/validators.py]
+  │       └─ validate_review_output()
+  │           └─ (never blocks — surfaces FAIL as warning, loop handled by graph router)
   │
   ├─ Phase 3: Testing
   │   ├─ run_testing() [agents/testing_agent.py]
@@ -118,6 +129,9 @@ build_workflow()
       ├─ develop_node()
       │   ├─ run_development() [agents/go_k8s_developer.py]
       │   └─ emit_heartbeat() [dashboard/heartbeat.py]
+      ├─ code_review_node()
+      │   ├─ run_code_review() [agents/code_review_agent.py]
+      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
       ├─ testing_node()
       │   ├─ run_testing() [agents/testing_agent.py]
       │   └─ emit_heartbeat() [dashboard/heartbeat.py]
@@ -135,7 +149,9 @@ build_workflow()
 | `current_phase` value | Next node |
 |-----------------------|-----------|
 | `design_complete` | `develop_node` |
-| `develop_complete` | `testing_node` |
+| `develop_complete` | `code_review_node` |
+| `review_complete` + `review_passed=True` or `review_iteration ≥ MAX_REVIEW_ITERATIONS` | `testing_node` |
+| `review_complete` + `review_passed=False` + `review_iteration < MAX_REVIEW_ITERATIONS` | `develop_node` (auto-fix loop) |
 | `testing_complete` | `docs_node` |
 | `docs_complete` | `END` |
 | any error value | `END` |
@@ -224,11 +240,11 @@ These modules are consumed by multiple callers across the codebase. When modifyi
 
 | Module | Exported symbol | Used by |
 |--------|----------------|---------|
-| `config/auth_config.py` | `get_anthropic_client()` | All 4 agents (`design_agent`, `go_k8s_developer`, `testing_agent`, `docs_agent`) |
-| `dashboard/heartbeat.py` | `emit_heartbeat()` | All 4 agents + all 4 graph nodes in `agents/graph.py` |
+| `config/auth_config.py` | `get_anthropic_client()` | All 5 agents (`design_agent`, `go_k8s_developer`, `code_review_agent`, `testing_agent`, `docs_agent`) |
+| `dashboard/heartbeat.py` | `emit_heartbeat()` | All 5 agents + all 5 graph nodes in `agents/graph.py` |
 | `agents/validators.py` | `validate_phase()` | `scripts/orchestrate.py` (called after each phase) |
-| `config/agent_prompts.py` | System prompt constants | All 4 agents (injected as the `system` argument to `client.messages.create()`) |
-| `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 4 agents, `dashboard/backend.py`, `agents/graph.py` |
+| `config/agent_prompts.py` | System prompt constants | All 5 agents (injected as the `system` argument to `client.messages.create()`) |
+| `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 5 agents, `dashboard/backend.py`, `agents/graph.py` |
 
 ---
 
