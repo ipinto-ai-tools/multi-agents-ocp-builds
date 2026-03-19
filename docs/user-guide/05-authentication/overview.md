@@ -8,7 +8,7 @@ The system uses Google Vertex AI to authenticate with the Claude API. Authentica
 
 At startup, `config/auth_config.py` reads the `ANTHROPIC_VERTEX_PROJECT_ID` environment variable. If it is set, the system initializes an `AnthropicVertex` client using ADC. If it is not set, the system raises a `ValueError` immediately.
 
-All four agents obtain their Claude client through `config/auth_config.get_anthropic_client()`, which returns the same configured `AnthropicVertex` instance.
+All five agents obtain their Claude client through `config/auth_config.get_anthropic_client()`, which returns the same configured `AnthropicVertex` instance.
 
 ```python
 from config.auth_config import validate_authentication
@@ -49,6 +49,8 @@ LangGraph Orchestrator (agents/graph.py)
 Design Agent ──→ AnthropicVertex client ──→ Claude API (via Vertex AI endpoint)
     │
 Development Agent ──→ same client
+    │
+Code Review Agent ──→ same client
     │
 Testing Agent ──→ same client
     │

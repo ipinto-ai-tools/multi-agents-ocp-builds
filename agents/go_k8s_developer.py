@@ -324,6 +324,11 @@ def _build_development_prompt(
         prompt_parts.append(f"\n## Repository Path\n")
         prompt_parts.append(f"{repo_path}\n")
 
+    # Inject review feedback for auto-fix iterations
+    review_feedback = _build_review_feedback_section(context)
+    if review_feedback:
+        prompt_parts.append(review_feedback)
+
     # Add code generation instructions
     prompt_parts.append(
         "\n## Code Generation Instructions\n\n"
@@ -652,6 +657,40 @@ def _extract_bullet_points(text: str) -> List[str]:
                 items.append(item)
 
     return items
+
+
+def _build_review_feedback_section(context: Dict[str, Any]) -> str:
+    """Build review feedback section for auto-fix iterations.
+
+    Returns empty string on first iteration (no review yet).
+    On subsequent iterations, formats findings as a mandatory fix list.
+    This is the live implementation used by run_development; it is local to
+    this module and not shared with config/agent_prompts.py.
+
+    Args:
+        context: AgentState dict, may contain review_findings and review_iteration.
+
+    Returns:
+        Formatted feedback block or empty string.
+    """
+    findings = context.get("review_findings", [])
+    iteration = context.get("review_iteration", 0)
+
+    if not findings or iteration == 0:
+        return ""
+
+    lines = [
+        f"\n## ⚠️ Code Review Feedback (Iteration {iteration}) — MUST FIX",
+        "The previous code generation had the following issues found during review.",
+        "You MUST address ALL blocking issues in this new generation:\n",
+    ]
+    for finding in findings:
+        lines.append(f"- {finding}")
+
+    lines.append(
+        "\nPay special attention to fixing blocking issues before proceeding.\n"
+    )
+    return "\n".join(lines)
 
 
 def generate_file_summary(dev_results: Dict[str, Any]) -> str:

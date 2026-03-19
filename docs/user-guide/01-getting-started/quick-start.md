@@ -18,7 +18,7 @@ If you want to try the system without credentials, skip to [Dry Run](#dry-run-no
 
 ## Run Your First Workflow
 
-The orchestrator runs all four agents (Design → Development → Testing → Documentation) in sequence and prints the results to the console.
+The orchestrator runs all five agents (Design → Development → Code Review → Testing → Documentation) in sequence and prints the results to the console.
 
 ```bash
 uv run python scripts/orchestrate.py \
@@ -28,19 +28,19 @@ uv run python scripts/orchestrate.py \
 
 ### What Happens
 
-The workflow runs through four sequential phases:
+The workflow runs through five sequential phases:
 
 ```text
-Issue → Design Agent → Development Agent → Testing Agent → Docs Agent → Done
-          |               |                    |               |
-          v               v                    v               v
-        Plan            Code                 Tests           Docs
+Issue → Design Agent → Development Agent → Code Review → Testing Agent → Docs Agent → Done
+          |               |                    |               |               |
+          v               v                    v               v               v
+        Plan            Code               Pass/Fix         Tests           Docs
 ```
 
 State transitions:
 
 ```
-init → design_complete → develop_complete → testing_complete → done
+init → design_complete → develop_complete → review_complete → testing_complete → done
 ```
 
 If an agent raises an unhandled exception, the workflow sets `current_phase = "error"` and stops early. The final state contains the error message.
@@ -51,12 +51,13 @@ If an agent raises an unhandled exception, the workflow sets `current_phase = "e
 
 ### What You Get
 
-When the workflow completes, four outputs are printed to the console:
+When the workflow completes, five outputs are printed to the console:
 
 1. **Design Analysis** - Component analysis, risks, acceptance criteria, and implementation plan
 2. **Production Code** - Go code for Kubernetes/OpenShift with TLS 1.3 and security best practices
-3. **Test Suite** - Ginkgo v2 tests (unit, integration, E2E) with data-driven patterns
-4. **Documentation** - PR summary, release notes, and Jobs-to-be-Done user documentation
+3. **Code Review** - Automated review findings with blocking/warning severity and auto-fix loop (up to 3 iterations)
+4. **Test Suite** - Ginkgo v2 tests (unit, integration, E2E) with data-driven patterns
+5. **Documentation** - PR summary, release notes, and Jobs-to-be-Done user documentation
 
 ---
 

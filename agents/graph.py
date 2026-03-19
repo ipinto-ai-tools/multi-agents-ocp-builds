@@ -10,6 +10,7 @@ Workflow phases:
 4. Documentation: Create PR summaries and release notes
 """
 
+import os
 from typing import Any, Dict, Literal
 import uuid
 
@@ -17,6 +18,7 @@ from langgraph.graph import StateGraph, END
 from graph.state import AgentState
 from agents.design_agent import run_design
 from agents.go_k8s_developer import run_development
+from agents.code_review_agent import run_code_review
 from agents.testing_agent import run_testing
 from agents.docs_agent import run_docs
 from dashboard.heartbeat import emit_heartbeat
@@ -233,87 +235,148 @@ def docs_node(state: AgentState) -> Dict[str, Any]:
         return error_state
 
 
-def should_continue(state: AgentState) -> Literal["develop", "testing", "docs", "end"]:
-    """Determine if workflow should continue to next phase.
+def code_review_node(state: AgentState) -> Dict[str, Any]:
+    """Execute the Code Review phase.
 
-    Workflow: Design → Development → Testing → Docs
+    Reviews generated code and returns structured findings.
+    On review failure (blocking issues found), the graph routes back
+    to the Development Agent with review feedback injected into state.
+    On error, proceeds to Testing to avoid blocking the pipeline.
 
     Args:
-        state: Current agent state
+        state: Current agent state with code_files from Development Agent.
 
     Returns:
-        Next node name or END
+        Updated state with review_passed, review_findings, review_summary,
+        review_iteration, and current_phase set to 'review_complete'.
+    """
+    try:
+        review_output = run_code_review(state)
+
+        updated_state = {
+            "review_passed": review_output["review_passed"],
+            "review_findings": review_output.get("review_findings", []),
+            "review_summary": review_output.get("review_summary", ""),
+            "review_iteration": review_output.get("review_iteration", 1),
+            "current_phase": "review_complete",
+        }
+
+        complete_state = {**state, **updated_state}
+        emit_heartbeat("code_review", complete_state)
+
+        return updated_state
+    except Exception as e:
+        error_state = {
+            "review_passed": True,  # Don't block pipeline on review infrastructure errors
+            "review_findings": [],
+            "review_summary": f"Code review error (proceeding): {str(e)}",
+            "review_iteration": state.get("review_iteration", 0) + 1,
+            "current_phase": "review_complete",
+        }
+
+        complete_state = {**state, **error_state}
+        emit_heartbeat("code_review", complete_state)
+
+        return error_state
+
+
+def should_continue(state: AgentState) -> Literal["develop", "code_review", "testing", "docs", "end"]:
+    """Determine next workflow phase.
+
+    Workflow: Design → Development → Code Review ⟲ Development (auto-fix) → Testing → Docs
+
+    The Code Review phase can loop back to Development when:
+    - review_passed is False (blocking issues found)
+    - review_iteration < MAX_REVIEW_ITERATIONS
+
+    After MAX_REVIEW_ITERATIONS reviews, the workflow proceeds to Testing with a warning
+    in review_summary rather than blocking indefinitely. Note: review_iteration is
+    incremented after each review, so with MAX_REVIEW_ITERATIONS=3 the loop fires
+    after iterations 1 and 2, and exits after iteration 3 (3 review cycles total).
+
+    Args:
+        state: Current agent state.
+
+    Returns:
+        Next node name or 'end'.
     """
     phase = state.get("current_phase", "")
+    from agents.code_review_agent import MAX_REVIEW_ITERATIONS as max_iterations
 
-    # If design completed successfully, proceed to development
     if phase == "design_complete":
         return "develop"
 
-    # If development completed successfully, proceed to testing
     if phase == "develop_complete":
-        return "testing"
+        return "code_review"
 
-    # If testing completed successfully, proceed to docs
+    if phase == "review_complete":
+        review_passed = state.get("review_passed", True)
+        review_iteration = int(state.get("review_iteration", 0) or 0)
+        if not review_passed and review_iteration < max_iterations:
+            return "develop"  # Auto-fix loop
+        return "testing"  # Pass OR max iterations reached
+
     if phase == "testing_complete":
         return "docs"
 
-    # Otherwise, end the workflow
     return "end"
 
 
 def build_workflow() -> StateGraph:
     """Build the LangGraph workflow.
 
+    Pipeline: Design → Development → Code Review ⟲ Development → Testing → Docs
+
+    The Code Review node uses conditional edges:
+    - 'testing': review passed or max iterations reached
+    - 'develop': review failed, loop back for auto-fix
+
     Returns:
         Compiled LangGraph workflow
     """
-    # Create the graph
     workflow = StateGraph(AgentState)
 
     # Add nodes
     workflow.add_node("design", design_node)
     workflow.add_node("develop", develop_node)
+    workflow.add_node("code_review", code_review_node)
     workflow.add_node("testing", testing_node)
     workflow.add_node("docs", docs_node)
 
     # Set entry point
     workflow.set_entry_point("design")
 
-    # Add conditional edges from design
+    # Design → Development
     workflow.add_conditional_edges(
         "design",
         should_continue,
-        {
-            "develop": "develop",
-            "end": END,
-        }
+        {"develop": "develop", "end": END},
     )
 
-    # Add conditional edges from develop
+    # Development → Code Review
     workflow.add_conditional_edges(
         "develop",
         should_continue,
-        {
-            "testing": "testing",
-            "end": END,
-        }
+        {"code_review": "code_review", "end": END},
     )
 
-    # Add conditional edges from testing
+    # Code Review → Testing (pass/max) or → Development (fail, auto-fix loop)
+    workflow.add_conditional_edges(
+        "code_review",
+        should_continue,
+        {"testing": "testing", "develop": "develop", "end": END},
+    )
+
+    # Testing → Docs
     workflow.add_conditional_edges(
         "testing",
         should_continue,
-        {
-            "docs": "docs",
-            "end": END,
-        }
+        {"docs": "docs", "end": END},
     )
 
-    # Add edge from docs to END
+    # Docs → END
     workflow.add_edge("docs", END)
 
-    # Compile the graph
     return workflow.compile()
 
 
@@ -388,6 +451,11 @@ def orchestrate(
         "pr_summary": "",
         "release_notes": "",
         "docs_changes": {},
+        # Code review phase
+        "review_passed": False,
+        "review_findings": [],
+        "review_summary": "",
+        "review_iteration": 0,
     }
 
     # Emit initial heartbeat

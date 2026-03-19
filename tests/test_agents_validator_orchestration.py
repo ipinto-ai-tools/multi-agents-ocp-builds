@@ -509,12 +509,12 @@ class TestWorkflowNodes:
         assert result == "develop"
 
     def test_should_continue_develop_complete(self):
-        """Test should_continue routes to testing after development."""
+        """Test should_continue routes to code_review after development."""
         state = {"current_phase": "develop_complete"}
 
         result = should_continue(state)
 
-        assert result == "testing"
+        assert result == "code_review"
 
     def test_should_continue_testing_complete(self):
         """Test should_continue routes to docs after testing."""

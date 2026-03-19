@@ -48,7 +48,7 @@ Pass `--jira-ticket` with a Jira ticket key in place of `--title` and `--descrip
 uv run python scripts/orchestrate.py --jira-ticket SHIP-123
 ```
 
-The orchestrator fetches the ticket data, builds the agent context, and runs the full four-phase pipeline.
+The orchestrator fetches the ticket data, builds the agent context, and runs the full five-phase pipeline.
 
 ### With manual approval
 

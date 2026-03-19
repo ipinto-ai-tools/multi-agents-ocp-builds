@@ -24,7 +24,7 @@ This system automates the design, development, testing, and documentation workfl
 | Page | Description |
 |------|-------------|
 | [Architecture](02-concepts/architecture.md) | System overview and LangGraph pipeline |
-| [Agents Overview](02-concepts/agents-overview.md) | The four agents and how they connect |
+| [Agents Overview](02-concepts/agents-overview.md) | The five agents and how they connect |
 | [State Management](02-concepts/state-management.md) | AgentState, phase transitions, data flow |
 
 ### Section 3 - Agents
@@ -33,6 +33,7 @@ This system automates the design, development, testing, and documentation workfl
 |------|-------------|
 | [Design Agent](03-agents/design-agent.md) | Inputs, outputs, and direct usage |
 | [Development Agent](03-agents/development-agent.md) | Go/Kubernetes code generation |
+| [Code Review Agent](03-agents/code-review-agent.md) | Automated Go code review with Qodo/Claude auto-fix loop |
 | [Testing Agent](03-agents/testing-agent.md) | Ginkgo v2 patterns and test types |
 | [Docs Agent](03-agents/docs-agent.md) | RAG, SHIP format, and JTBD documentation |
 
@@ -95,6 +96,7 @@ This system automates the design, development, testing, and documentation workfl
 | Debug a failing workflow | [Troubleshooting](06-advanced/troubleshooting.md) |
 | Understand how state flows between agents | [State Management](02-concepts/state-management.md) |
 | Use a Jira ticket as workflow input | [Jira & Rovo Integration](09-integrations/jira-rovo.md) |
+| Review generated code automatically | [Code Review Agent](03-agents/code-review-agent.md) |
 
 ---
 
