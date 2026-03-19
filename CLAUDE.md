@@ -41,7 +41,9 @@ uv run python scripts/test_agents.py --agent design --dry-run
 The orchestrator builds a `StateGraph` with four sequential nodes connected by conditional edges. Each node calls its agent, updates shared state, and emits a heartbeat to the dashboard. The `should_continue` function routes based on `current_phase` in state (e.g., `design_complete` → `develop`, `develop_complete` → `testing`). On error, the workflow terminates early via the `END` edge.
 
 ```
-design_node → develop_node → testing_node → docs_node → END
+design_node → develop_node → code_review_node → testing_node → docs_node → END
+                                  ↑         │ (fail + iter ≤ max)
+                                  └─────────┘ (auto-fix loop)
 ```
 
 ### Shared State (`graph/state.py`)
@@ -50,7 +52,7 @@ design_node → develop_node → testing_node → docs_node → END
 
 ### Agent Pattern
 
-All four agents follow the same pattern:
+All five agents follow the same pattern:
 1. Validate context/inputs
 2. Get Claude client via `config/auth_config.get_anthropic_client()`
 3. Build a prompt using system prompt from `config/agent_prompts.py` + user context
@@ -62,6 +64,7 @@ All four agents follow the same pattern:
 |-------|------------|-----------|------------|
 | Design | `agents/design_agent.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
 | Development | `agents/go_k8s_developer.run_development()` | AgentState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
+| Code Review | `agents/code_review_agent.run_code_review()` | AgentState dict (code_files from development) | review_passed, review_findings, review_summary, review_iteration |
 | Testing | `agents/testing_agent.run_testing()` | context dict (needs design_analysis, impacted_components, acceptance_criteria) | test_plan, unit/integration/e2e_tests, coverage_analysis |
 | Docs | `agents/docs_agent.run_docs()` | context dict + optional input_files, output_format, enable_rag | pr_summary, release_notes, docs_changes |
 
