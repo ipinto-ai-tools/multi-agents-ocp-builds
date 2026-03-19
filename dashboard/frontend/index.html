@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            flex: 1;
+        }
+
+        .header-content h1 {
+            font-size: 2.5em;
+            margin: 0 0 10px 0;
+            color: white;
+        }
+
+        .header-content p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1em;
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: 20px;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-actions {
+                margin-left: 0;
+                margin-top: 15px;
+                width: 100%;
+            }
+
+            .header-actions .btn {
+                flex: 1;
+            }
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            max-width: 1400px;
+            margin: 0 auto 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .controls button {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .controls button:hover {
+            background: #30363d;
+        }
+
+        .controls button.active {
+            background: #238636;
+            border-color: #238636;
+        }
+
+        .status {
+            margin-left: auto;
+            padding: 8px 16px;
+            background: #21262d;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .status.connected {
+            color: #3fb950;
+        }
+
+        .status.disconnected {
+            color: #f85149;
+        }
+
+        .sessions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .session-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .session-card:hover {
+            transform: translateY(-2px);
+            border-color: #58a6ff;
+        }
+
+        .session-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-dot.active {
+            background: #3fb950;
+            box-shadow: 0 0 10px #3fb950;
+        }
+
+        .status-dot.complete {
+            background: #58a6ff;
+        }
+
+        .status-dot.error {
+            background: #f85149;
+        }
+
+        .session-id {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #8b949e;
+        }
+
+        .issue-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #c9d1d9;
+        }
+
+        .issue-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+
+        .issue-type.feature { background: #1f6feb33; color: #58a6ff; }
+        .issue-type.bug { background: #da363333; color: #f85149; }
+        .issue-type.refactor { background: #a371f733; color: #bc8cff; }
+        .issue-type.docs { background: #57ab5a33; color: #7ee787; }
+
+        .agents-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .agent-badge {
+            flex: 1;
+            padding: 8px;
+            background: #21262d;
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .agent-badge.complete {
+            background: #238636;
+        }
+
+        .agent-badge.in-progress {
+            background: #1f6feb;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .metric {
+            background: #21262d;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: #8b949e;
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .context-bar {
+            height: 8px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .context-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3fb950, #d29922, #f85149);
+            transition: width 0.3s;
+        }
+
+        .components-list {
+            margin-bottom: 15px;
+        }
+
+        .components-title {
+            font-size: 0.9em;
+            color: #8b949e;
+            margin-bottom: 5px;
+        }
+
+        .component-tag {
+            display: inline-block;
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 2px;
+            font-size: 0.85em;
+            color: #58a6ff;
+        }
+
+        .risks-section {
+            margin-bottom: 15px;
+        }
+
+        .risk-level {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .risk-level.none { background: #238636; color: #fff; }
+        .risk-level.low { background: #d29922; color: #000; }
+        .risk-level.medium { background: #db6d28; color: #fff; }
+        .risk-level.high { background: #da3633; color: #fff; }
+
+        .timestamp {
+            font-size: 0.85em;
+            color: #8b949e;
+            text-align: right;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b949e;
+        }
+
+        .empty-state h2 {
+            margin-bottom: 10px;
+        }
+
+        .jira-badge {
+            display: inline-block;
+            background: #0052CC;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+            margin-left: 8px;
+        }
+        .jira-badge:hover {
+            background: #0065FF;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1>Multi-Agent Dashboard</h1>
+            <p>Real-time monitoring for Design, Development, Testing, and Docs agents</p>
+        </div>
+        <div class="header-actions">
+            <button id="clearSessionsBtn" class="btn btn-danger">
+                Clear Completed Sessions
+            </button>
+            <button id="refreshBtn" class="btn btn-primary">
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="autoRefreshBtn" class="active">Auto-Refresh (5s)</button>
+        <div class="status connected" id="statusIndicator">● Connected</div>
+    </div>
+
+    <div class="sessions-grid" id="sessionsGrid">
+        <div class="empty-state">
+            <h2>No Active Sessions</h2>
+            <p>Sessions will appear here when agents start working</p>
+        </div>
+    </div>
+
+    <script>
+        // Dashboard state
+        let autoRefresh = true;
+        let refreshInterval = null;
+        const REFRESH_RATE = 5000; // 5 seconds
+
+        // API base URL
+        const API_BASE = window.location.origin;
+
+        // DOM elements
+        const sessionsGrid = document.getElementById('sessionsGrid');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+        const clearSessionsBtn = document.getElementById('clearSessionsBtn');
+
+        // Fetch sessions from API
+        async function fetchSessions() {
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions`);
+                if (!response.ok) throw new Error('Failed to fetch sessions');
+
+                const sessions = await response.json();
+                updateStatus(true);
+                renderSessions(sessions);
+            } catch (error) {
+                console.error('Error fetching sessions:', error);
+                updateStatus(false);
+            }
+        }
+
+        // Update connection status
+        function updateStatus(connected) {
+            statusIndicator.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            statusIndicator.textContent = connected ? '● Connected' : '● Disconnected';
+        }
+
+        // Render sessions in grid
+        function renderSessions(sessions) {
+            if (!sessions || sessions.length === 0) {
+                sessionsGrid.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No Active Sessions</h2>
+                        <p>Sessions will appear here when agents start working</p>
+                    </div>
+                `;
+                return;
+            }
+
+            sessionsGrid.innerHTML = sessions.map(session => renderSessionCard(session)).join('');
+        }
+
+        // Render a single session card
+        function renderSessionCard(session) {
+            const hb = session.latest_heartbeat || {};
+            const status = hb.status || 'unknown';
+            const contextPercent = hb.context_percent || 0;
+            const components = hb.impacted_components || [];
+            const riskLevel = hb.risk_level || 'none';
+            const riskCount = hb.risk_count || 0;
+
+            // Determine status dot color
+            let statusClass = 'active';
+            if (status === 'complete') statusClass = 'complete';
+            else if (status === 'error') statusClass = 'error';
+
+            // Jira ticket badge
+            const jiraHtml = session.jira_ticket_id ? `
+                <a href="${session.jira_ticket_url || '#'}" target="_blank" class="jira-badge">
+                    ${session.jira_ticket_id}
+                </a>` : '';
+
+            // Design, Development, Testing, and Docs agent status
+            const designStatus =
+                hb.agent === 'design' || hb.phase === 'design_complete' ||
+                hb.phase === 'develop_complete' || hb.phase === 'testing_complete' ||
+                status === 'complete' ? 'complete' :
+                hb.phase === 'design' ? 'in-progress' : 'pending';
+
+            const developStatus =
+                hb.agent === 'development' || hb.agent === 'go-k8s-developer' ||
+                hb.phase === 'develop_complete' || hb.phase === 'testing_complete' ||
+                status === 'complete' ? 'complete' :
+                hb.phase === 'develop' ? 'in-progress' : 'pending';
+
+            const testingStatus =
+                status === 'complete' || hb.phase === 'testing_complete' ? 'complete' :
+                (hb.agent === 'testing' || hb.phase === 'develop_complete') ? 'in-progress' :
+                'pending';
+
+            const docsStatus =
+                status === 'complete' ? 'complete' :
+                (hb.agent === 'docs' || hb.phase === 'testing_complete') ? 'in-progress' :
+                'pending';
+
+            return `
+                <div class="session-card" data-session-id="${session.id}">
+                    <div class="session-header">
+                        <div class="status-dot ${statusClass}"></div>
+                        <span class="session-id">${session.id.substring(0, 8)}</span>
+                    </div>
+
+                    <div class="issue-title">${session.issue_title || 'Unknown Task'}${jiraHtml}</div>
+                    <span class="issue-type ${session.issue_type || 'feature'}">${session.issue_type || 'feature'}</span>
+
+                    <div class="agents-status">
+                        <div class="agent-badge ${designStatus}">
+                            Design Agent ${designStatus === 'complete' ? '✓' : designStatus === 'in-progress' ? '⏳' : '⏸'}
+                        </div>
+                        <div class="agent-badge ${developStatus}">
+                            Development Agent ${developStatus === 'complete' ? '✓' : developStatus === 'in-progress' ? '⏳' : '⏸'}
+                        </div>
+                        <div class="agent-badge ${testingStatus}">
+                            Testing Agent ${testingStatus === 'complete' ? '✓' : testingStatus === 'in-progress' ? '⏳' : '⏸'}
+                        </div>
+                        <div class="agent-badge ${docsStatus}">
+                            Docs Agent ${docsStatus === 'complete' ? '✓' : docsStatus === 'in-progress' ? '⏳' : '⏸'}
+                        </div>
+                    </div>
+
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">Context Usage</div>
+                            <div class="metric-value">${contextPercent.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Model</div>
+                            <div class="metric-value">${hb.model ? hb.model.split('-').slice(0, 2).join('-') : 'N/A'}</div>
+                        </div>
+                    </div>
+
+                    <div class="context-bar">
+                        <div class="context-fill" style="width: ${Math.min(contextPercent, 100)}%"></div>
+                    </div>
+
+                    ${components.length > 0 ? `
+                        <div class="components-list">
+                            <div class="components-title">Impacted Components:</div>
+                            ${components.slice(0, 5).map(c => `<span class="component-tag">${c}</span>`).join('')}
+                            ${components.length > 5 ? `<span class="component-tag">+${components.length - 5} more</span>` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${riskCount > 0 ? `
+                        <div class="risks-section">
+                            <span class="risk-level ${riskLevel}">${riskCount} Risk${riskCount !== 1 ? 's' : ''} - ${riskLevel.toUpperCase()}</span>
+                        </div>
+                    ` : ''}
+
+                    <div class="timestamp">
+                        ${hb.timestamp_relative || 'Unknown'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Start auto-refresh
+        function startAutoRefresh() {
+            if (refreshInterval) return;
+            refreshInterval = setInterval(fetchSessions, REFRESH_RATE);
+            autoRefresh = true;
+            autoRefreshBtn.classList.add('active');
+        }
+
+        // Stop auto-refresh
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                refreshInterval = null;
+            }
+            autoRefresh = false;
+            autoRefreshBtn.classList.remove('active');
+        }
+
+        // Clear completed sessions button
+        clearSessionsBtn.addEventListener('click', async () => {
+            // Confirm action
+            if (!confirm('Are you sure you want to clear all completed sessions? This action cannot be undone.')) {
+                return;
+            }
+
+            // Disable button during request
+            clearSessionsBtn.disabled = true;
+            clearSessionsBtn.textContent = 'Clearing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions/completed`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                // Show success message
+                alert(`Successfully cleared ${result.sessions_cleared} completed session(s)`);
+
+                // Reload sessions
+                fetchSessions();
+            } catch (error) {
+                console.error('Error clearing sessions:', error);
+                alert('Failed to clear completed sessions. Please try again.');
+            } finally {
+                // Re-enable button
+                clearSessionsBtn.disabled = false;
+                clearSessionsBtn.textContent = 'Clear Completed Sessions';
+            }
+        });
+
+        // Refresh button
+        refreshBtn.addEventListener('click', () => {
+            fetchSessions();
+        });
+
+        // Event listeners
+        autoRefreshBtn.addEventListener('click', () => {
+            if (autoRefresh) {
+                stopAutoRefresh();
+            } else {
+                startAutoRefresh();
+            }
+        });
+
+        // Initialize
+        fetchSessions();
+        startAutoRefresh();
+    </script>
+</body>
+</html>

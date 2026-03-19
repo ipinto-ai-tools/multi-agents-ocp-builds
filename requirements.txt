@@ -1,2 +1,25 @@
-langgraph
-python-dotenv
+# Core AI/LLM dependencies
+anthropic[vertex]>=0.40.0  # Include Vertex AI support for Google Cloud
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# Environment and configuration
+python-dotenv>=1.0.0
+
+# Git operations
+GitPython>=3.1.0
+
+# YAML parsing for Kubernetes manifests
+pyyaml>=6.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# Dashboard backend
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+requests>=2.32.0
+
+# Code review (optional Qodo CLI via npm: npm install -g @qodo/command)
+# PR-Agent (optional, for PR-based review): pip install pr-agent
