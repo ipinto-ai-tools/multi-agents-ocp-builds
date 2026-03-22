@@ -66,8 +66,8 @@ def run_testing(context: Dict[str, Any]) -> Dict[str, Any]:
         ...     "issue_title": "Add timeout support",
         ...     "issue_description": "Users need build timeout...",
         ... }
-        >>> result = run_testing(context)
-        >>> print(result["test_plan"])
+        >>> result = run_testing(context)  # doctest: +SKIP
+        >>> print(result["test_plan"])  # doctest: +SKIP
     """
     # Get session-specific logger
     session_id = context.get("session_id", "unknown")

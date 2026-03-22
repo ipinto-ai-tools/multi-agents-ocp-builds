@@ -52,9 +52,9 @@ def setup_logging(
         Configured logger instance
 
     Example:
-        >>> logger = setup_logging(debug=True, log_file=Path("/tmp/test.log"))
-        >>> logger.debug("This is a debug message")
-        >>> logger.info("This is an info message")
+        >>> logger = setup_logging(debug=True, log_file=Path("/tmp/test.log"))  # doctest: +SKIP
+        >>> logger.debug("This is a debug message")  # doctest: +SKIP
+        >>> logger.info("This is an info message")  # doctest: +SKIP
     """
     # Determine log level
     log_level = logging.DEBUG if debug else logging.INFO

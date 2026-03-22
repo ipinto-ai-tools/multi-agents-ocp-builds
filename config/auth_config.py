@@ -114,7 +114,8 @@ def validate_authentication() -> dict:
 
     Example:
         >>> auth_info = validate_authentication()
-        >>> print(f"Authentication type: {auth_info['auth_type']}")
+        >>> print(f"Authentication type: {auth_info['auth_type']}")  # doctest: +ELLIPSIS
+        Authentication type: ...
     """
     use_vertex = os.getenv("CLAUDE_CODE_USE_VERTEX") == "1"
     vertex_project_id = os.getenv("ANTHROPIC_VERTEX_PROJECT_ID")
