@@ -20,6 +20,8 @@ The three required environment variables are:
 | `JIRA_USER_EMAIL` | The email address tied to your API token |
 | `JIRA_API_TOKEN` | Your Atlassian API token |
 
+A `GITHUB_TOKEN` is optional but recommended if your Jira tickets link to GitHub pull requests — see [GitHub PR Integration](#github-pr-integration) below.
+
 ---
 
 ## Configuration
@@ -72,15 +74,17 @@ uv run python scripts/orchestrate.py --jira-ticket SHIP-123 --dry-run
 
 The integration reads the following fields from the Jira REST API v3 and passes them as structured context to the agent pipeline:
 
-| Field | Jira Source | Used by |
-|-------|-------------|---------|
-| Title | Summary | All agents |
-| Description | Description (ADF converted to plain text) | Design agent |
-| Acceptance Criteria | Custom AC field or AC section in description | Design, Testing agents |
-| Priority | Priority field | Design agent |
-| Labels | Labels | All agents |
-| Linked Issues | Issue links | Design agent |
-| Recent Comments | Last 5 comments (summarized) | Design agent |
+| Field | Source | Used by |
+|-------|--------|---------|
+| Title | Jira — Summary | All agents |
+| Description | Jira — Description (ADF converted to plain text) | Design agent |
+| Acceptance Criteria | Jira — Custom AC field or AC section in description | Design, Testing agents |
+| Priority | Jira — Priority field | Design agent |
+| Labels | Jira — Labels | All agents |
+| Linked Issues | Jira — Issue links | Design agent |
+| Recent Comments | Jira — Last 5 comments (summarized) | Design agent |
+| GitHub PR URLs | Remote links API (`/remotelink` endpoint) | Docs agent |
+| GitHub PR Data | GitHub REST API v3 (via `GITHUB_TOKEN`) | Docs agent |
 
 The acceptance criteria are extracted from the Jira custom field if present, or parsed from an "Acceptance Criteria" section in the description body if not. This allows the Testing agent to generate test cases directly from the ticket requirements without any manual copy-paste.
 
@@ -133,6 +137,58 @@ This is equivalent to passing a fixed `--title` and `--description` while still 
 | `JIRA_BASE_URL is not set` | Missing environment variable | Add all three variables to `.env` |
 
 If you receive an authentication error after confirming credentials, regenerate the API token at [https://id.atlassian.com/manage-profile/security](https://id.atlassian.com/manage-profile/security) and update `.env`.
+
+---
+
+## GitHub PR Integration
+
+When a Jira ticket has remote links pointing to GitHub pull requests, the docs agent automatically fetches full PR metadata and includes it in the documentation context. This gives the docs agent access to the actual code changes, review decisions, and merge status — without any manual input.
+
+### How It Works
+
+The pipeline follows four steps to enrich the docs agent with GitHub PR data:
+
+1. **Remote links fetch** — After fetching the Jira ticket, the integration calls `GET /rest/api/3/issue/{id}/remotelink` via the `_fetch_remotelinks()` method. This returns all external URLs attached to the ticket.
+2. **PR URL extraction** — From those remote links, any URL containing both `github.com` and `/pull/` is identified as a GitHub pull request URL.
+3. **GitHub API fetch** — Each PR URL is resolved against the GitHub REST API v3 via `tools/github_client.py`, which retrieves full PR metadata.
+4. **Docs agent context** — The collected PR data is assembled into an "Upstream GitHub Pull Requests" context section and passed to the docs agent alongside the Jira fields.
+
+### What PR Metadata Is Fetched
+
+`tools/github_client.py` retrieves the following for each linked pull request:
+
+| Field | Description |
+|-------|-------------|
+| Title | PR title |
+| Body | PR description, capped at 2000 characters to manage token usage |
+| Author | GitHub username of the PR author |
+| Reviewers | List of requested reviewers and review participants |
+| State | `merged`, `open`, or `closed` |
+| Labels | Labels applied to the PR |
+| Base branch | The branch the PR targets |
+| Head branch | The branch the PR was opened from |
+| Files changed | List of changed files with `+additions` / `-deletions` counts |
+| Created at | Timestamp when the PR was opened |
+| Merged at | Timestamp when the PR was merged (if applicable) |
+
+The PR body cap (2000 characters) prevents large PR descriptions from consuming a disproportionate share of the context window. The remaining fields are always included in full.
+
+### Configuration
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_TOKEN` | Optional (but recommended) | Personal access token — without it, PR URLs are shown but metadata is not fetched |
+| `GITHUB_REQUEST_TIMEOUT` | Optional | Timeout in seconds for GitHub API calls (default: `10`) |
+
+Without a `GITHUB_TOKEN`, the remote link URLs are still extracted from Jira and logged, but no GitHub API call is made and no PR metadata is added to the docs agent context.
+
+**To create a token:** GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+
+Required scope: `Contents` (read-only) on the target repositories.
+
+### Dry-Run Behavior
+
+When `--dry-run` is used, no real GitHub API calls are made. Instead, mock PR data is returned from `config/mock_responses.py` (`MOCK_GITHUB_PR`). The mock response follows the same structure as a live response, so the docs agent processes it identically. This lets you test the full pipeline — including the "Upstream GitHub Pull Requests" context section — without a `GITHUB_TOKEN` or network access.
 
 ---
 
