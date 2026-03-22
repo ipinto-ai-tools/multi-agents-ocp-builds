@@ -946,6 +946,7 @@ def _mock_response(status_code: int, body: dict) -> MagicMock:
     mock.status_code = status_code
     mock.json.return_value = body
     mock.raise_for_status = MagicMock()  # no-op by default (success)
+    mock.headers = {"Content-Type": "application/json"}
     return mock
 
 
