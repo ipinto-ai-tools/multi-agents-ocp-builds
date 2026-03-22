@@ -119,9 +119,6 @@ class JiraClient:
         try:
             response = requests.get(url, headers=self.headers, timeout=JIRA_REQUEST_TIMEOUT)
             response.raise_for_status()
-            if "application/json" not in response.headers.get("Content-Type", ""):
-                logger.warning("Remotelinks endpoint returned non-JSON for %s", ticket_id)
-                return []
             links = response.json()
             github_pr_urls = []
             for link in links:

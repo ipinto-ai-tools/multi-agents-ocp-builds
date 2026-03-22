@@ -410,11 +410,7 @@ class TestFetchTicket:
                 }
             }
         ]
-        remotelinks_mock = MagicMock()
-        remotelinks_mock.status_code = 200
-        remotelinks_mock.headers = {"Content-Type": "application/json"}
-        remotelinks_mock.json.return_value = remotelinks_response
-        remotelinks_mock.raise_for_status = MagicMock()
+        remotelinks_mock = _mock_response(200, remotelinks_response)
 
         with patch("requests.get") as mock_get:
             mock_get.side_effect = [
