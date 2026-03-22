@@ -55,6 +55,12 @@ class JiraClient:
         response = requests.get(url, headers=self.headers, params=params, timeout=JIRA_REQUEST_TIMEOUT)
         response.raise_for_status()
 
+        if "application/json" not in response.headers.get("Content-Type", ""):
+            raise ValueError(
+                f"Jira returned non-JSON response (Content-Type: {response.headers.get('Content-Type', 'unknown')}). "
+                "Check that JIRA_BASE_URL is correct (e.g. https://your-org.atlassian.net with no path suffix)."
+            )
+
         data = response.json()
         fields = data.get("fields", {})
 
