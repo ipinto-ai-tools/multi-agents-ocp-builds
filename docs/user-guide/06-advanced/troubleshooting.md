@@ -66,7 +66,7 @@ gcloud projects add-iam-policy-binding YOUR_GCP_PROJECT_ID \
 # Install all dependencies
 uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Verify a specific package
 uv run --with anthropic python -c "import anthropic; print('OK')"

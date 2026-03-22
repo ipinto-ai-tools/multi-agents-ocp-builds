@@ -52,7 +52,7 @@ cd muilti-agents-ocp-builds
 ```bash
 uv venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 **Option B - uv sync (if pyproject.toml is configured):**
@@ -107,22 +107,6 @@ OK design agent
 OK development agent
 OK testing agent
 OK docs agent
-```
-
----
-
-## Optional: Shipwright Repository
-
-Providing the Shipwright Build source repository enables deeper analysis. Agents can identify specific files to modify, match existing conventions, and produce more accurate component impact analysis.
-
-```bash
-git clone https://github.com/shipwright-io/build.git /path/to/shipwright-build
-```
-
-Then set `SHIPWRIGHT_REPO_PATH` in your `.env` file:
-
-```bash
-SHIPWRIGHT_REPO_PATH=/path/to/shipwright-build
 ```
 
 ---
