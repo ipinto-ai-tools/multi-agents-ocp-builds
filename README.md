@@ -32,7 +32,7 @@ See [Getting Started](docs/user-guide/01-getting-started/installation.md) for fu
 ```bash
 git clone https://github.com/yourusername/muilti-agents-ocp-builds.git
 cd muilti-agents-ocp-builds
-uv venv && source .venv/bin/activate && pip install -r requirements.txt
+uv venv && uv pip install -r requirements.txt
 cp .env.example .env
 # Set ANTHROPIC_VERTEX_PROJECT_ID in .env
 gcloud auth application-default login
@@ -87,10 +87,12 @@ uv run python scripts/test_agents.py --e2e --dry-run --debug
 
 ## Architecture
 
-The system runs four Claude AI agents in a sequential LangGraph pipeline:
+The system runs five Claude AI agents in a sequential LangGraph pipeline:
 
 ```
-Issue → Design Agent → Development Agent → Testing Agent → Docs Agent → Done
+Issue → Design Agent → Development Agent → Code Review Agent → Testing Agent → Docs Agent → Done
+                              ↑                    │ (fail: blocking issues found)
+                              └────────────────────┘ auto-fix loop (≤ MAX_REVIEW_ITER)
 ```
 
 Each agent reads from the shared `AgentState` and writes its outputs back before the next agent begins. Each phase includes automatic output validation — the workflow stops immediately if required outputs are missing, rather than silently passing bad data forward. See [Architecture](docs/user-guide/02-concepts/architecture.md) for a full breakdown.

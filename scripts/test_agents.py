@@ -11,7 +11,7 @@ Features:
 - Dry-run mode with mock responses (no API calls)
 - Debug mode with verbose logging
 - Local artifact storage
-- Prepared for future MCP server integration (GitHub, Jira)
+- Jira ticket integration via --jira-ticket flag
 
 Usage:
     # Test design agent with dry-run
@@ -25,10 +25,17 @@ Usage:
 
     # Test with custom output directory
     python scripts/test_agents.py --agent testing --output-dir /tmp/test-output
+
+    # Test docs agent with Jira ticket
+    python scripts/test_agents.py --agent docs --jira-ticket SHIP-123
+
+    # Test docs agent with Jira ticket (dry-run, no credentials)
+    python scripts/test_agents.py --agent docs --jira-ticket SHIP-123 --dry-run
 """
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +57,57 @@ from utils.logging_config import (
     log_error,
     log_artifact_saved,
 )
+
+
+def _fetch_jira_state(ticket_id: str, dry_run: bool) -> Dict[str, Any]:
+    """Fetch Jira ticket and return mapped AgentState fields.
+
+    Sets DRY_RUN env var when dry_run=True, then restores the original
+    value (or removes it) in a finally block.
+
+    Returns dict with: issue_title, issue_description, issue_type,
+    jira_ticket_id, jira_ticket_url, jira_priority, jira_labels,
+    jira_linked_issues, jira_comments_summary.
+
+    Raises:
+        ConnectionError: when Jira is unreachable.
+        Exception: for any other fetch or mapping failure.
+    """
+    _prev_dry_run = os.environ.get("DRY_RUN")
+    _dry_run_set = False
+    if dry_run and _prev_dry_run != "true":
+        os.environ["DRY_RUN"] = "true"
+        _dry_run_set = True
+    try:
+        from mcp.jira_stub import fetch_ticket
+        from tools.jira_client import map_ticket_to_state
+        ticket_data = fetch_ticket(ticket_id)
+        jira_state = map_ticket_to_state(ticket_data)
+
+        # Enrich with GitHub PR data if URLs were found
+        github_pr_urls = jira_state.get("github_pr_urls", [])
+        if github_pr_urls:
+            try:
+                from tools.github_client import get_github_client, is_github_configured
+                if is_github_configured():
+                    gh_client = get_github_client()
+                    jira_state["github_pr_data"] = gh_client.fetch_prs_from_urls(github_pr_urls)
+                else:
+                    jira_state["github_pr_data"] = []
+            except Exception as e:
+                logger = get_agent_logger("jira")
+                logger.warning(f"GitHub PR fetch failed (non-blocking): {e}")
+                jira_state["github_pr_data"] = []
+        else:
+            jira_state["github_pr_data"] = []
+
+        return jira_state
+    finally:
+        if _dry_run_set:
+            if _prev_dry_run is None:
+                os.environ.pop("DRY_RUN", None)
+            else:
+                os.environ["DRY_RUN"] = _prev_dry_run
 
 
 class AgentTester:
@@ -82,12 +140,18 @@ class AgentTester:
         self.logger.info(f"Mode: {'DRY-RUN' if dry_run else 'LIVE'}")
         self.logger.info(f"Output directory: {self.output_dir}")
 
-    def test_design_agent(self, title: str, description: str) -> Dict[str, Any]:
+    def test_design_agent(
+        self,
+        title: str,
+        description: str,
+        jira_state: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Test Design Agent.
 
         Args:
             title: Issue title
             description: Issue description
+            jira_state: Optional Jira ticket state fields
 
         Returns:
             Design agent output dictionary
@@ -109,6 +173,7 @@ class AgentTester:
                 output = run_design(title=title, description=description)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
 
+            output["_jira_state"] = jira_state or {}
             log_agent_complete(logger, "design", output)
             self._save_artifact("design_output.json", output)
 
@@ -118,11 +183,16 @@ class AgentTester:
             log_error(logger, "design", e)
             raise
 
-    def test_testing_agent(self, design_output: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def test_testing_agent(
+        self,
+        design_output: Optional[Dict[str, Any]] = None,
+        jira_state: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Test Testing Agent.
 
         Args:
             design_output: Output from design agent (if None, uses mock data)
+            jira_state: Optional Jira ticket state fields
 
         Returns:
             Testing agent output dictionary
@@ -145,15 +215,18 @@ class AgentTester:
                         "Run design agent first or use --e2e mode."
                     )
 
+        # Prefer jira_state passed directly; fall back to what design agent stored
+        effective_jira = jira_state or design_output.get("_jira_state") or {}
+
         context = {
             "design_analysis": design_output.get("design_analysis", ""),
             "impacted_components": design_output.get("impacted_components", []),
             "acceptance_criteria": design_output.get("acceptance_criteria", []),
             "risks": design_output.get("risks", []),
             "implementation_plan": design_output.get("implementation_plan", ""),
-            "issue_title": "Test Issue",
-            "issue_description": "Test Description",
-            "issue_type": "feature",
+            "issue_title": effective_jira.get("issue_title", "Test Issue"),
+            "issue_description": effective_jira.get("issue_description", "Test Description"),
+            "issue_type": effective_jira.get("issue_type", "feature"),
         }
 
         log_agent_start(logger, "testing", context)
@@ -183,12 +256,14 @@ class AgentTester:
         self,
         design_output: Optional[Dict[str, Any]] = None,
         testing_output: Optional[Dict[str, Any]] = None,
+        jira_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Test Docs Agent.
 
         Args:
             design_output: Output from design agent (if None, uses mock/artifact)
             testing_output: Output from testing agent (if None, uses mock/artifact)
+            jira_state: Optional Jira ticket state fields
 
         Returns:
             Docs agent output dictionary
@@ -219,6 +294,12 @@ class AgentTester:
                 else:
                     testing_output = {}
 
+        # Prefer jira_state passed directly; fall back to what design agent stored
+        effective_jira = jira_state or design_output.get("_jira_state") or {}
+
+        if not self.dry_run and not (jira_state or design_output):
+            logger.warning("No Jira state and no design artifact found. Docs agent will use placeholder issue data.")
+
         context = {
             "design_analysis": design_output.get("design_analysis", ""),
             "implementation_plan": design_output.get("implementation_plan", ""),
@@ -235,9 +316,16 @@ class AgentTester:
             "integration_tests": testing_output.get("integration_tests", {}),
             "e2e_tests": testing_output.get("e2e_tests", {}),
             "coverage_analysis": testing_output.get("coverage_analysis", ""),
-            "issue_title": "Test Issue",
-            "issue_description": "Test Description",
-            "issue_type": "feature",
+            "issue_title": effective_jira.get("issue_title", "Test Issue"),
+            "issue_description": effective_jira.get("issue_description", "Test Description"),
+            "issue_type": effective_jira.get("issue_type", "feature"),
+            # Jira enrichment fields (empty when not using Jira)
+            "jira_ticket_id": effective_jira.get("jira_ticket_id", ""),
+            "jira_ticket_url": effective_jira.get("jira_ticket_url", ""),
+            "jira_priority": effective_jira.get("jira_priority", ""),
+            "jira_labels": effective_jira.get("jira_labels", []),
+            "jira_linked_issues": effective_jira.get("jira_linked_issues", []),
+            "jira_comments_summary": effective_jira.get("jira_comments_summary", ""),
         }
 
         log_agent_start(logger, "docs", context)
@@ -263,12 +351,18 @@ class AgentTester:
             log_error(logger, "docs", e)
             raise
 
-    def test_e2e_workflow(self, title: str, description: str) -> Dict[str, Any]:
+    def test_e2e_workflow(
+        self,
+        title: str,
+        description: str,
+        jira_state: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Test complete E2E workflow.
 
         Args:
             title: Issue title
             description: Issue description
+            jira_state: Optional Jira ticket state fields
 
         Returns:
             Dictionary with all agent outputs
@@ -279,15 +373,15 @@ class AgentTester:
 
         # Phase 1: Design
         self.logger.info("\nPhase 1: Design Agent")
-        design_output = self.test_design_agent(title, description)
+        design_output = self.test_design_agent(title, description, jira_state=jira_state)
 
         # Phase 2: Testing
         self.logger.info("\nPhase 2: Testing Agent")
-        testing_output = self.test_testing_agent(design_output)
+        testing_output = self.test_testing_agent(design_output, jira_state=jira_state)
 
         # Phase 3: Docs
         self.logger.info("\nPhase 3: Docs Agent")
-        docs_output = self.test_docs_agent(design_output, testing_output)
+        docs_output = self.test_docs_agent(design_output, testing_output, jira_state=jira_state)
 
         # Compile final result
         final_result = {
@@ -469,6 +563,12 @@ Examples:
 
   # Test specific agent with custom output
   %(prog)s --agent testing --output-dir /tmp/my-tests --debug
+
+  # Test docs agent with Jira ticket
+  %(prog)s --agent docs --jira-ticket SHIP-123
+
+  # Test docs agent with Jira ticket (dry-run, no credentials)
+  %(prog)s --agent docs --jira-ticket SHIP-123 --dry-run
         """,
     )
 
@@ -485,6 +585,12 @@ Examples:
     # Issue details (required for agent/e2e modes)
     parser.add_argument("--title", help="Issue title (required for --agent and --e2e)")
     parser.add_argument("--description", help="Issue description (required for --agent and --e2e)")
+    parser.add_argument(
+        "--jira-ticket",
+        default=None,
+        metavar="TICKET_ID",
+        help="Jira ticket ID (e.g. SHIP-123). Fetches title and description automatically. Use with --dry-run for mock data.",
+    )
 
     # Test options
     parser.add_argument(
@@ -502,10 +608,33 @@ Examples:
 
     args = parser.parse_args()
 
+    if args.jira_ticket and args.title:
+        print(f"WARNING: Both --jira-ticket and --title provided. Jira ticket data will override --title and --description.")
+
+    # Fetch Jira ticket if provided
+    jira_state = None
+    if args.jira_ticket:
+        try:
+            print(f"Fetching Jira ticket: {args.jira_ticket}")
+            jira_state = _fetch_jira_state(args.jira_ticket, args.dry_run)
+            args.title = jira_state.get("issue_title") or args.jira_ticket
+            args.description = jira_state.get("issue_description", "")
+            print(f"  Title:    {args.title}")
+            print(f"  Priority: {jira_state.get('jira_priority', 'N/A')}")
+            labels = ', '.join(jira_state.get('jira_labels', [])) or 'none'
+            print(f"  Labels:   {labels}")
+        except ConnectionError as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Failed to fetch Jira ticket: {e}")
+            sys.exit(1)
+
     # Validate title/description for agent and e2e modes
     if (args.agent or args.e2e) and not args.dry_run:
         if not args.title or not args.description:
-            parser.error("--title and --description are required for agent/e2e testing (unless --dry-run)")
+            if not args.jira_ticket:  # allow Jira ticket instead of title/description
+                parser.error("--title and --description are required for agent/e2e testing (unless --dry-run or --jira-ticket)")
 
     # Use defaults for dry-run mode
     if args.dry_run and not args.title:
@@ -520,11 +649,11 @@ Examples:
         # Execute requested test
         if args.agent:
             if args.agent == "design":
-                result = tester.test_design_agent(args.title, args.description)
+                result = tester.test_design_agent(args.title, args.description, jira_state=jira_state)
             elif args.agent == "testing":
-                result = tester.test_testing_agent()
+                result = tester.test_testing_agent(jira_state=jira_state)
             elif args.agent == "docs":
-                result = tester.test_docs_agent()
+                result = tester.test_docs_agent(jira_state=jira_state)
 
             print(f"\n{'=' * 80}")
             print(f"{args.agent.upper()} Agent Test Complete")
@@ -532,7 +661,7 @@ Examples:
             print(f"Results saved to: {args.output_dir}")
 
         elif args.e2e:
-            result = tester.test_e2e_workflow(args.title, args.description)
+            result = tester.test_e2e_workflow(args.title, args.description, jira_state=jira_state)
 
             print(f"\n{'=' * 80}")
             print("E2E Workflow Test Complete")

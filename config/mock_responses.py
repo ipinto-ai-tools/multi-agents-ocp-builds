@@ -434,6 +434,42 @@ MOCK_JIRA_TICKET: dict = {
     "linked_issues": ["SHIP-100", "SHIP-101"],
     "components": ["buildrun-controller"],
     "fix_versions": ["v0.14.0"],
+    "github_pr_urls": ["https://github.com/shipwright-io/build/pull/1234"],
+}
+
+
+MOCK_GITHUB_PR: dict = {
+    "pr_number": 1234,
+    "pr_url": "https://github.com/shipwright-io/build/pull/1234",
+    "title": "Add timeout configuration for BuildRun",
+    "body": (
+        "## Summary\n\n"
+        "Adds a `timeout` field to the BuildRun spec, allowing users to set per-BuildRun "
+        "timeout durations. Builds that exceed the timeout are automatically cancelled with "
+        "a clear `BuildRunTimeout` status condition.\n\n"
+        "## Changes\n\n"
+        "- `pkg/apis/build/v1alpha1/buildrun_types.go`: add `Timeout *metav1.Duration` to `BuildRunSpec`\n"
+        "- `pkg/reconciler/buildrun/buildrun.go`: enforce timeout in reconcile loop\n"
+        "- `pkg/reconciler/buildrun/resources/buildrun_test.go`: table-driven tests for timeout\n\n"
+        "## Testing\n\n"
+        "- Unit tests: `go test ./pkg/reconciler/buildrun/...`\n"
+        "- E2E tests: `TEST_E2E_FLAGS=-run TestBuildRunTimeout make test-e2e`\n\n"
+        "Closes #SHIP-123"
+    ),
+    "state": "merged",
+    "merged": True,
+    "merged_at": "2024-03-15T10:30:00Z",
+    "author": "janedeveloper",
+    "reviewers": ["reviewer1", "reviewer2"],
+    "labels": ["approved", "lgtm"],
+    "base_branch": "main",
+    "head_branch": "feature/buildrun-timeout",
+    "repo_full_name": "shipwright-io/build",
+    "files_changed": 3,
+    "additions": 87,
+    "deletions": 12,
+    "created_at": "2024-03-10T09:00:00Z",
+    "updated_at": "2024-03-15T10:30:00Z",
 }
 
 
@@ -455,6 +491,7 @@ def get_mock_response(agent_type: str) -> dict:
         "docs": MOCK_DOCS_STRUCTURED,
         "jira_ticket": MOCK_JIRA_TICKET,
         "code_review": MOCK_CODE_REVIEW_PASS,
+        "github_pr": MOCK_GITHUB_PR,
     }
 
     if agent_type not in mock_responses:

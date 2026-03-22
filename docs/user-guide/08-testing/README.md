@@ -1,16 +1,16 @@
 # Testing
 
-The test suite validates all agents and the orchestration workflow using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 57 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
+The test suite validates all agents and the orchestration workflow using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 389 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
 
 ---
 
 ## Overview
 
 | Metric | Value |
-|--------|-------|
-| Total tests | 57 |
-| Core test modules | 3 |
-| Mock-mode execution time | ~0.85 seconds |
+| ------ | ----- |
+| Total tests | 389 |
+| Core test modules | 14 |
+| Mock-mode execution time | Completes in seconds |
 | Real API execution time | Varies (network latency) |
 | Test framework | pytest |
 
@@ -18,9 +18,9 @@ The test suite validates all agents and the orchestration workflow using a dual-
 
 The suite detects your environment at collection time and adjusts automatically.
 
-**Mock mode** runs when `ANTHROPIC_VERTEX_PROJECT_ID` is not set or the `google-auth` package is not installed. All tests that require a live API are skipped; the remaining 53 tests run entirely offline using fixtures and `unittest.mock` patches. This is the default for local development and CI pipelines without credentials.
+**Mock mode** runs when `ANTHROPIC_VERTEX_PROJECT_ID` is not set or the `google-auth` package is not installed. All tests that require a live API are skipped; the remaining 383 tests run entirely offline using fixtures and `unittest.mock` patches. This is the default for local development and CI pipelines without credentials.
 
-**Real API mode** activates when `ANTHROPIC_VERTEX_PROJECT_ID` is set and `google.auth` is importable. All 57 tests run, including the 4 marked `real_api` that make actual calls to Claude via Vertex AI. Use this mode to validate end-to-end integration or catch breaking API changes.
+**Real API mode** activates when `ANTHROPIC_VERTEX_PROJECT_ID` is set and `google.auth` is importable. All 389 tests run, including the 6 tests that are auto-skipped in mock mode and make actual calls to Claude via Vertex AI. Use this mode to validate end-to-end integration or catch breaking API changes.
 
 ---
 
@@ -43,20 +43,23 @@ uv run pytest tests/ -v
 ### Mock Mode (Default)
 
 - No API credentials required
-- Completes in approximately 0.85 seconds
+- Completes in seconds
 - Uses fixtures defined in `tests/conftest.py`
-- All `@pytest.mark.real_api` tests are automatically skipped
+- 6 tests that require Vertex AI are automatically skipped via `skipif`
 - Validates code structure, logic, response parsing, and error handling
 
-The auto-skip logic lives in `conftest.py`:
+The auto-skip logic is implemented in each test file using `tests/auth_helper.py`:
 
 ```python
-# conftest.py - pytest_collection_modifyitems
-if "real_api" in item.keywords and not HAS_ANTHROPIC_AUTH:
-    item.add_marker(skip_real_api)
+# tests/auth_helper.py sets HAS_ANTHROPIC_AUTH at import time
+from tests.auth_helper import HAS_ANTHROPIC_AUTH
+
+@pytest.mark.skipif(not HAS_ANTHROPIC_AUTH, reason="Requires ANTHROPIC_VERTEX_PROJECT_ID")
+def test_design_agent_with_real_api(...):
+    ...
 ```
 
-`HAS_ANTHROPIC_AUTH` is set at import time by `tests/auth_helper.py`, which checks for both the environment variable and the `google.auth` package. This means the skip decision is made once at collection, not per test.
+`HAS_ANTHROPIC_AUTH` is set at import time by `tests/auth_helper.py`, which checks for both the environment variable and the `google.auth` package. This means the skip decision is made once at collection, not per test. Note that `-m real_api` finds only 1 test; the primary skip mechanism is `skipif(not HAS_ANTHROPIC_AUTH)`.
 
 ### Real API Mode
 
@@ -66,17 +69,29 @@ if "real_api" in item.keywords and not HAS_ANTHROPIC_AUTH:
 - Validates the full integration path from agent code to API response
 - Catches issues such as changed response formats or quota limits
 
+The 6 tests that are skipped in mock mode are:
+
+- `test_agents_validator_design.py::test_design_agent_with_real_api`
+- `test_agents_validator_develop.py::test_development_agent_with_real_api`
+- `test_agents_validator_docs.py::test_docs_agent_with_real_api`
+- `test_agents_validator_orchestration.py::test_full_orchestration_with_real_api`
+- `test_agents_validator_orchestration.py::test_shipwright_timeout_feature`
+- `test_agents_validator_testing.py::test_testing_agent_with_real_api`
+
 ---
 
 ## Running Tests
 
 | Command | Purpose |
-|---------|---------|
+| ------- | ------- |
 | `uv run pytest tests/ -v` | All tests (auto-detects mode) |
 | `uv run pytest tests/ -v -s` | All tests with captured output printed |
 | `uv run pytest tests/test_agents_validator_design.py -v` | Design agent only |
 | `uv run pytest tests/test_agents_validator_docs.py -v` | Docs agent only |
 | `uv run pytest tests/test_agents_validator_orchestration.py -v` | Orchestration only |
+| `uv run pytest tests/test_agents_code_review.py -v` | Code Review Agent only |
+| `uv run pytest tests/test_agents_validator_jira.py -v` | Jira integration only |
+| `uv run pytest tests/test_agents_validator_develop.py -v` | Development agent only |
 | `uv run pytest tests/ --cov=agents --cov=graph --cov-report=html` | All tests with HTML coverage report |
 | `uv run pytest -m "not real_api"` | Explicitly skip real API tests |
 | `uv run pytest -m real_api` | Run only real API tests |
@@ -96,14 +111,21 @@ uv run pytest tests/test_agents_validator_design.py::TestDesignAgent::test_desig
 ## Test Files
 
 | File | Tests | What It Covers |
-|------|-------|----------------|
-| `test_agents_validator_design.py` | 15 | Design agent analysis, component context, parsing, error handling |
-| `test_agents_validator_docs.py` | 21 | Docs generation, context building, section splitting, error scenarios |
-| `test_agents_validator_orchestration.py` | 21 | Full workflow, state management, node execution, graph structure |
-| `test_agents_validator_develop.py` | - | Development agent validation |
-| `test_agents_validator_testing.py` | - | Testing agent validation |
-| `test_agents_validator_docs_enhanced.py` | - | Enhanced docs agent scenarios |
-| `test_auth_config.py` | - | Authentication configuration |
+| ---- | ----- | -------------- |
+| `test_agents_code_review.py` | 90 | Code Review Agent: output parsing, severity classification, auto-fix loop routing, dry-run, validators, mock responses |
+| `test_agents_validator_jira.py` | 67 | Jira ticket fetching, context injection, field parsing, error handling, dry-run mode |
+| `test_agents_validator_develop.py` | 34 | Development agent code generation, prompt building, output parsing, review feedback injection |
+| `test_agents_validator_orchestration.py` | 29 | Full 5-agent workflow, state management, node execution, graph routing, auto-fix loop |
+| `test_agents_validator_dashboard.py` | 25 | Dashboard heartbeat, enricher pipeline, session storage, REST endpoints |
+| `test_agents_validator_docs_enhanced.py` | 24 | Enhanced docs generation scenarios, RAG integration, SHIP format, JTBD docs |
+| `test_agents_validator_docs.py` | 23 | Docs agent core: mock and real API, context building, section parsing, error scenarios |
+| `test_agents_validator_rag.py` | 21 | RAG search, repository analysis, documentation retrieval |
+| `test_agents_validator_testing.py` | 19 | Testing agent: Ginkgo v2 generation, DDT patterns, coverage analysis |
+| `test_file_logger.py` | 19 | File logger, session logging, log level control, rotating handlers |
+| `test_agents_validator_design.py` | 15 | Design agent: analysis, component context, parsing, error handling |
+| `test_auth_config.py` | 13 | Authentication configuration, Vertex AI setup, ADC validation |
+| `test_logging_integration.py` | 6 | Cross-module logging integration |
+| `test_dashboard_cleanup.py` | 4 | Dashboard session cleanup and lifecycle |
 
 ### test_agents_validator_design.py (15 tests)
 
@@ -113,7 +135,7 @@ Three test classes cover the full design agent surface:
 - `TestHelperFunctions` - validates helper utilities such as component context building
 - `TestEdgeCases` - error handling and boundary conditions
 
-### test_agents_validator_docs.py (21 tests)
+### test_agents_validator_docs.py (23 tests)
 
 Four test classes plus a standalone function:
 
@@ -122,9 +144,9 @@ Four test classes plus a standalone function:
 - `TestEdgeCases` - missing data, malformed responses, API failures
 - `TestIntegration` - full context flow from input to output
 
-### test_agents_validator_orchestration.py (21 tests)
+### test_agents_validator_orchestration.py (29 tests)
 
-Six test classes validate the LangGraph pipeline end to end:
+Six test classes validate the LangGraph pipeline end to end, including the auto-fix loop routing introduced by the Code Review Agent:
 
 - `TestOrchestration` - full workflow with mock and real API
 - `TestWorkflowNodes` - individual design and docs node execution
@@ -132,6 +154,21 @@ Six test classes validate the LangGraph pipeline end to end:
 - `TestStateManagement` - state persistence across phases
 - `TestIntegration` - end-to-end scenarios with realistic inputs
 - `TestRealWorldScenarios` - real Shipwright issue simulations (e.g., BuildRun timeout feature)
+
+### test_agents_code_review.py (90 tests)
+
+Ten test classes cover the full Code Review Agent surface:
+
+- `TestParseReviewOutput` - parsing `[BLOCKING]`/`[WARNING]`/`[SUGGESTION]` lines and `VERDICT`
+- `TestFormatCodeForReview` - code formatting, file capping, and truncation marker
+- `TestFeatureFlag` - `QODO_REVIEW_ENABLED=false` bypass
+- `TestNoCodeFiles` - empty `code_files` skips review gracefully
+- `TestDryRun` - dry-run returns `MOCK_CODE_REVIEW_PASS` without API call
+- `TestClaudeReview` - Claude API mocked; validates result structure
+- `TestErrorResilience` - agent returns `review_passed=True` on any error so pipeline is never blocked
+- `TestValidators` - `validate_review_output` always passes, surfaces FAIL as warning
+- `TestGraphRouting` - `should_continue` routes correctly for pass, fail, and max-iterations
+- `TestMockResponses` - `MOCK_CODE_REVIEW_PASS`/`MOCK_CODE_REVIEW_FAIL` structure
 
 ---
 
@@ -142,14 +179,14 @@ All shared test data is defined in `tests/conftest.py` and automatically availab
 ### Auth Fixtures
 
 | Fixture | Mechanism | Used For |
-|---------|-----------|---------|
+| ------- | --------- | -------- |
 | `mock_vertex_auth` | `monkeypatch.setenv` | Set `ANTHROPIC_VERTEX_PROJECT_ID=test-project-id` and `CLOUD_ML_REGION=us-east5` |
 | `no_anthropic_auth` | `monkeypatch.delenv` | Clear all auth env vars to simulate unauthenticated state |
 
 ### Data Fixtures
 
 | Fixture | Return Type | Used For |
-|---------|-------------|---------|
+| ------- | ----------- | -------- |
 | `sample_issue_data` | `Dict[str, str]` | A realistic GitHub issue (BuildRun timeout feature request) |
 | `sample_design_output` | `Dict[str, Any]` | Design agent result with analysis, components, risks, and plan |
 | `sample_code_changes` | `Dict[str, str]` | Three modified Go files with descriptions |
@@ -161,7 +198,7 @@ All shared test data is defined in `tests/conftest.py` and automatically availab
 
 The data fixtures build on each other. `sample_docs_context` aggregates the four base fixtures, and `sample_workflow_state` reflects the complete pipeline state:
 
-```
+```text
 sample_issue_data    ──┐
 sample_design_output ──┤
 sample_code_changes  ──┼──> sample_docs_context ──> sample_workflow_state
@@ -223,7 +260,7 @@ class TestMyAgent:
             result = run_my_agent(sample_issue_data["title"])
             assert result["key"] == "expected"
 
-    @pytest.mark.real_api
+    @pytest.mark.skipif(not HAS_ANTHROPIC_AUTH, reason="Requires ANTHROPIC_VERTEX_PROJECT_ID")
     def test_my_agent_with_real_api(self, sample_issue_data):
         """Validate agent against the live Claude API. Auto-skipped without Vertex AI."""
         result = run_my_agent(sample_issue_data["title"])
@@ -235,10 +272,10 @@ class TestMyAgent:
 1. Use descriptive names: `test_design_agent_without_api_key` not `test_1`
 2. Test one behavior per test method
 3. Reuse fixtures from `conftest.py` instead of repeating setup
-4. Always mock external dependencies in non-`real_api` tests
+4. Always mock external dependencies in non-real-API tests
 5. Test error cases explicitly - validate the error message, not just that an exception was raised
 6. Add docstrings explaining what each test validates
-7. Mark anything touching the real API with `@pytest.mark.real_api`
+7. Use `@pytest.mark.skipif(not HAS_ANTHROPIC_AUTH, ...)` from `tests/auth_helper.py` for tests that require real API access
 
 ---
 
@@ -260,7 +297,7 @@ uv run pytest tests/ --cov=agents --cov=graph --cov-report=term-missing
 
 ## Continuous Integration
 
-The test suite is designed to run in CI without credentials. Mock tests execute in under one second and have no external dependencies.
+The test suite is designed to run in CI without credentials. Mock tests execute in seconds and have no external dependencies.
 
 ```yaml
 # Example GitHub Actions step
@@ -270,22 +307,22 @@ The test suite is designed to run in CI without credentials. Mock tests execute 
     ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
 ```
 
-When `ANTHROPIC_VERTEX_PROJECT_ID` is not set as a secret, all `real_api` tests are skipped automatically and the job still passes. To run real API tests nightly, add a separate scheduled workflow that injects the secret.
+When `ANTHROPIC_VERTEX_PROJECT_ID` is not set as a secret, all tests guarded by `skipif(not HAS_ANTHROPIC_AUTH)` are skipped automatically and the job still passes. To run real API tests nightly, add a separate scheduled workflow that injects the secret.
 
 ---
 
 ## Troubleshooting
 
 | Problem | Solution |
-|---------|---------|
-| `ModuleNotFoundError: google` | Install Vertex AI dependencies: `pip install anthropic[vertex]` |
+| ------- | -------- |
+| `ModuleNotFoundError: google` | Install Vertex AI dependencies: `uv pip install "anthropic[vertex]"` |
 | Tests hang with no output | Run with `-s` to disable output capture and see where execution stalls; check for an accidental real API call |
 | Real API tests not running | Verify `ANTHROPIC_VERTEX_PROJECT_ID` is set and run `gcloud auth application-default login` |
 | Import errors on test files | Run pytest from the project root; verify `PYTHONPATH` includes the project directory |
 | Mock patches not applying | Confirm the patch target path matches the import in the module under test (patch where it is used, not where it is defined) |
 | `conftest.py` fixtures not found | Confirm `tests/conftest.py` exists and pytest is invoked from the project root |
 | Vertex AI quota errors | Check GCP console for rate limits; consider running real API tests on a schedule rather than every commit |
-| `53 passed, 4 skipped` result | Expected behavior in mock mode - the 4 skipped tests require Vertex AI credentials |
+| `383 passed, 6 skipped` result | Expected behavior in mock mode — the 6 skipped tests require `ANTHROPIC_VERTEX_PROJECT_ID` (they use `skipif(not HAS_ANTHROPIC_AUTH)` from `tests/auth_helper.py`) |
 
 ---
 

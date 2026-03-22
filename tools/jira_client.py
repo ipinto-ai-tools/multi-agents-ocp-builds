@@ -63,6 +63,7 @@ class JiraClient:
 
         # Fetch linked issues
         linked_issues = self._extract_linked_issues(fields)
+        github_pr_urls = self._fetch_remotelinks(ticket_id)
 
         return {
             "ticket_id": ticket_id,
@@ -80,6 +81,7 @@ class JiraClient:
             "linked_issues": linked_issues,
             "components": [c.get("name") for c in fields.get("components", [])],
             "fix_versions": [v.get("name") for v in fields.get("fixVersions", [])],
+            "github_pr_urls": github_pr_urls,
         }
 
     def _fetch_comments(self, ticket_id: str) -> list[str]:
@@ -110,6 +112,26 @@ class JiraClient:
         for subtask in fields.get("subtasks", []):
             linked.append(subtask.get("key", ""))
         return [k for k in linked if k]
+
+    def _fetch_remotelinks(self, ticket_id: str) -> list[str]:
+        """Fetch remote links for a ticket and return GitHub PR URLs."""
+        url = f"{self.base_url}/rest/api/3/issue/{ticket_id}/remotelink"
+        try:
+            response = requests.get(url, headers=self.headers, timeout=JIRA_REQUEST_TIMEOUT)
+            response.raise_for_status()
+            links = response.json()
+            github_pr_urls = []
+            for link in links:
+                obj = link.get("object", {})
+                link_url = obj.get("url", "")
+                if "github.com" in link_url and "/pull/" in link_url:
+                    github_pr_urls.append(link_url)
+            logger.info("Found %d GitHub PR link(s) in remotelinks for %s", len(github_pr_urls), ticket_id)
+            return github_pr_urls
+        except Exception as e:
+            logger.warning("Could not fetch remotelinks for %s: %s", ticket_id, type(e).__name__)
+            logger.debug("Full error: %s", e)
+            return []
 
     def _extract_acceptance_criteria(self, fields: dict) -> list[str]:
         """Extract acceptance criteria from custom field or description."""
@@ -277,4 +299,5 @@ def map_ticket_to_state(ticket_data: dict) -> dict[str, Any]:
         "jira_labels": ticket_data.get("labels", []),
         "jira_linked_issues": ticket_data.get("linked_issues", []),
         "jira_comments_summary": "\n".join(comments[:10]),
+        "github_pr_urls": ticket_data.get("github_pr_urls", []),
     }
