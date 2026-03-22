@@ -209,6 +209,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 - `tools/repo_search.py` - Code search and Go package analysis
 - `tools/rag_search.py` - Documentation search with RAG for the docs agent
 - `tools/git_ops.py` - Git operations and repository utilities
+- `tools/github_client.py` - GitHub REST API client for fetching PR metadata linked to Jira tickets via remote links
 
 ### Configuration
 
@@ -267,7 +268,7 @@ muilti-agents-ocp-builds/
 ├── mcp/             # MCP server stubs (future integrations)
 ├── scripts/         # orchestrate.py, run_dashboard.py, test_agents.py
 ├── tests/           # pytest test suite
-├── tools/           # repo_search, rag_search, git_ops
+├── tools/           # repo_search, rag_search, git_ops, github_client
 └── utils/           # logging_config.py
 ```
 

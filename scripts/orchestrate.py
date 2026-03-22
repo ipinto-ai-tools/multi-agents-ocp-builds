@@ -135,6 +135,23 @@ def orchestrate(
             linked = ', '.join(state.get('jira_linked_issues', [])) or 'none'
             print(f"  Linked:   {linked}")
             print(f"  URL:      {state.get('jira_ticket_url', '')}")
+
+            # -- GitHub PR enrichment (optional) --
+            github_pr_urls = state.get("github_pr_urls", [])
+            if github_pr_urls:
+                try:
+                    from tools.github_client import get_github_client, is_github_configured
+                    if is_github_configured():
+                        gh_client = get_github_client()
+                        github_pr_data = gh_client.fetch_prs_from_urls(github_pr_urls)
+                        state["github_pr_data"] = github_pr_data
+                        print(f"  GitHub PRs: {len(github_pr_data)} PR(s) fetched")
+                        for pr in github_pr_data:
+                            print(f"    #{pr['pr_number']} [{pr['state']}] {pr['title']}")
+                    else:
+                        print(f"  GitHub PRs: {len(github_pr_urls)} linked (GITHUB_TOKEN not set, skipping fetch)")
+                except Exception as e:
+                    print(f"  GitHub PR fetch failed (non-blocking): {e}")
         except ConnectionError as e:
             print(f"\n  ERROR: {e}")
             return state
@@ -247,6 +264,9 @@ def orchestrate(
             "test_failures": state.get("test_failures", []),
             # repo context
             "repo_path": repo_path or ".",
+            # github outputs
+            "github_pr_urls": state.get("github_pr_urls", []),
+            "github_pr_data": state.get("github_pr_data", []),
         }
         docs_output = run_docs(context)
         state.update(docs_output)

@@ -74,6 +74,10 @@ class AgentState(TypedDict, total=False):
     jira_linked_issues: list[str]   # related ticket IDs
     jira_comments_summary: str      # concatenated comments (capped at 10)
 
+    # GitHub integration
+    github_pr_urls: list[str]   # GitHub PR URLs extracted from Jira remotelinks
+    github_pr_data: list[dict]  # Full PR metadata from GitHub API
+
     # Code Review phase
     review_passed: bool         # True if review found no blocking issues
     review_findings: list[str]  # Structured findings: "[BLOCKING] ...", "[WARNING] ..."
