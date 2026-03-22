@@ -39,7 +39,7 @@ class ModelInfoEnricher(Enricher):
         """
         import os
         # Get model from environment or use default
-        heartbeat["model"] = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        heartbeat["model"] = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
         return heartbeat
 
 

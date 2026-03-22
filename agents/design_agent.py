@@ -96,7 +96,7 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
 
     # Call Claude API
     try:
-        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
         logger.info(f"Calling Claude API with model: {model}")
 
         response = client.messages.create(

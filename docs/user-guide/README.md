@@ -104,7 +104,7 @@ This system automates the design, development, testing, and documentation workfl
 
 | Item | Value |
 |------|-------|
-| Default model | `claude-sonnet-4-20250514` |
+| Default model | `claude-sonnet-4-6` |
 | Python requirement | 3.11 or higher |
 | Auth method | Google Vertex AI (Application Default Credentials) |
 | Dashboard port | 8080 (local only) |

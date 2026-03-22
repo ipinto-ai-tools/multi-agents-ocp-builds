@@ -140,7 +140,7 @@ class TestDesignAgent:
                 call_args = mock_client.messages.create.call_args
 
                 # Validate request structure
-                expected_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+                expected_model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
                 assert call_args.kwargs["model"] == expected_model
                 assert call_args.kwargs["max_tokens"] == 8000
                 assert len(call_args.kwargs["messages"]) == 1
