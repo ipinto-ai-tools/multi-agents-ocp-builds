@@ -449,6 +449,44 @@ def _build_context_message(
         for file_path, content in input_file_context["file_contents"].items():
             message_parts.append(f"### {file_path}\n```\n{content}\n```\n")
 
+    # Upstream GitHub PRs (from Jira remote links)
+    github_pr_data = context.get("github_pr_data", [])
+    if github_pr_data:
+        message_parts.append("\n## Upstream GitHub Pull Requests\n")
+        message_parts.append(
+            "These are the upstream community PRs linked to this Jira ticket. "
+            "Use the PR titles, descriptions, and metadata to enrich the documentation.\n"
+        )
+        for pr in github_pr_data:
+            state_label = pr.get("state", "unknown").upper()
+            message_parts.append(
+                f"### PR #{pr.get('pr_number')} — {pr.get('title', 'N/A')} [{state_label}]\n"
+                f"**URL**: {pr.get('pr_url', 'N/A')}\n"
+                f"**Repository**: {pr.get('repo_full_name', 'N/A')}\n"
+                f"**Author**: {pr.get('author', 'N/A')}\n"
+                f"**Base branch**: {pr.get('base_branch', 'N/A')}\n"
+                f"**Files changed**: {pr.get('files_changed', 0)} "
+                f"(+{pr.get('additions', 0)} / -{pr.get('deletions', 0)})\n"
+            )
+            if pr.get("reviewers"):
+                message_parts.append(f"**Reviewers**: {', '.join(pr['reviewers'])}\n")
+            if pr.get("labels"):
+                message_parts.append(f"**Labels**: {', '.join(pr['labels'])}\n")
+            if pr.get("merged_at"):
+                message_parts.append(f"**Merged**: {pr['merged_at']}\n")
+            body = pr.get("body", "").strip()
+            if body:
+                # Cap PR body at 2000 chars to avoid token bloat
+                truncated = body[:2000] + ("\n...[truncated]" if len(body) > 2000 else "")
+                message_parts.append(f"\n**PR Description**:\n{truncated}\n")
+            message_parts.append("\n")
+    elif context.get("github_pr_urls"):
+        # URLs were found but GitHub token not set — mention them for reference
+        message_parts.append("\n## Upstream GitHub Pull Requests (URLs only — token not set)\n")
+        for url in context["github_pr_urls"]:
+            message_parts.append(f"- {url}\n")
+        message_parts.append("\n")
+
     # Request documentation generation based on format
     message_parts.append("\n---\n\n")
     message_parts.append(_get_generation_request(output_format))

@@ -82,7 +82,26 @@ def _fetch_jira_state(ticket_id: str, dry_run: bool) -> Dict[str, Any]:
         from mcp.jira_stub import fetch_ticket
         from tools.jira_client import map_ticket_to_state
         ticket_data = fetch_ticket(ticket_id)
-        return map_ticket_to_state(ticket_data)
+        jira_state = map_ticket_to_state(ticket_data)
+
+        # Enrich with GitHub PR data if URLs were found
+        github_pr_urls = jira_state.get("github_pr_urls", [])
+        if github_pr_urls:
+            try:
+                from tools.github_client import get_github_client, is_github_configured
+                if is_github_configured():
+                    gh_client = get_github_client()
+                    jira_state["github_pr_data"] = gh_client.fetch_prs_from_urls(github_pr_urls)
+                else:
+                    jira_state["github_pr_data"] = []
+            except Exception as e:
+                logger = get_agent_logger("jira")
+                logger.warning(f"GitHub PR fetch failed (non-blocking): {e}")
+                jira_state["github_pr_data"] = []
+        else:
+            jira_state["github_pr_data"] = []
+
+        return jira_state
     finally:
         if _dry_run_set:
             if _prev_dry_run is None:

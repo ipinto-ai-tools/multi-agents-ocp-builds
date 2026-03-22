@@ -280,6 +280,7 @@ class TestFetchTicket:
             mock_get.side_effect = [
                 _mock_response(200, api_response),
                 _mock_response(200, comments_response),
+                _mock_response(200, []),   # remotelinks — no GitHub PRs linked
             ]
             result = client.fetch_ticket("SHIP-200")
 
@@ -289,6 +290,8 @@ class TestFetchTicket:
         assert result["priority"] == "High"
         assert result["labels"] == ["buildrun", "timeout"]
         assert result["ticket_url"] == "https://test.atlassian.net/browse/SHIP-200"
+        assert "github_pr_urls" in result
+        assert result["github_pr_urls"] == []
 
     def test_fetch_ticket_raises_on_http_error(self, client):
         """fetch_ticket should propagate HTTPError on non-2xx responses."""
@@ -311,6 +314,7 @@ class TestFetchTicket:
             mock_get.side_effect = [
                 _mock_response(200, api_response),
                 _mock_response(200, comments_response),
+                _mock_response(200, []),   # remotelinks — no GitHub PRs linked
             ]
             result = client.fetch_ticket("SHIP-300")
 
@@ -330,6 +334,7 @@ class TestFetchTicket:
             mock_get.side_effect = [
                 _mock_response(200, api_response),
                 error_response,
+                _mock_response(200, []),   # remotelinks — no GitHub PRs linked
             ]
             result = client.fetch_ticket("SHIP-400")
 
@@ -347,6 +352,7 @@ class TestFetchTicket:
             mock_get.side_effect = [
                 _mock_response(200, api_response),
                 _mock_response(200, {"comments": []}),
+                _mock_response(200, []),   # remotelinks — no GitHub PRs linked
             ]
             result = client.fetch_ticket("SHIP-500")
 
@@ -362,6 +368,7 @@ class TestFetchTicket:
             mock_get.side_effect = [
                 _mock_response(200, api_response),
                 _mock_response(200, {"comments": []}),
+                _mock_response(200, []),   # remotelinks — no GitHub PRs linked
             ]
             result = client.fetch_ticket("SHIP-600")
 
@@ -369,6 +376,54 @@ class TestFetchTicket:
         # At least one criterion should contain meaningful text
         joined = " ".join(result["acceptance_criteria"])
         assert "timeout" in joined.lower()
+
+    def test_fetch_ticket_extracts_github_pr_urls(self, client):
+        """fetch_ticket returns GitHub PR URLs from remotelinks."""
+        api_response = {
+            "fields": {
+                "summary": "Test ticket",
+                "description": None,
+                "issuetype": {"name": "Story"},
+                "status": {"name": "Open"},
+                "priority": {"name": "Major"},
+                "labels": [],
+                "assignee": None,
+                "reporter": None,
+                "components": [],
+                "fixVersions": [],
+                "issuelinks": [],
+                "subtasks": [],
+            }
+        }
+        comments_response = {"comments": []}
+        remotelinks_response = [
+            {
+                "object": {
+                    "url": "https://github.com/shipwright-io/build/pull/1234",
+                    "title": "Add timeout support"
+                }
+            },
+            {
+                "object": {
+                    "url": "https://github.com/shipwright-io/build/issues/999",  # issue, not PR — should be excluded
+                    "title": "Related issue"
+                }
+            }
+        ]
+        remotelinks_mock = MagicMock()
+        remotelinks_mock.status_code = 200
+        remotelinks_mock.headers = {"Content-Type": "application/json"}
+        remotelinks_mock.json.return_value = remotelinks_response
+        remotelinks_mock.raise_for_status = MagicMock()
+
+        with patch("requests.get") as mock_get:
+            mock_get.side_effect = [
+                _mock_response(200, api_response),
+                _mock_response(200, comments_response),
+                remotelinks_mock,
+            ]
+            result = client.fetch_ticket("SHIP-123")
+        assert result["github_pr_urls"] == ["https://github.com/shipwright-io/build/pull/1234"]
 
 
 # ── map_to_agent_state tests ──────────────────────────────────────────────────
