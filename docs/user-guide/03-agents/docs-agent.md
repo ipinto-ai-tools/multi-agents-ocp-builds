@@ -93,7 +93,7 @@ To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/a
 
 | Setting | Value |
 |---------|-------|
-| Model | `claude-sonnet-4-20250514` |
+| Model | `claude-sonnet-4-6` |
 | Max tokens | 8,192 |
 | Temperature | 0.3 (lower for consistent documentation style) |
 

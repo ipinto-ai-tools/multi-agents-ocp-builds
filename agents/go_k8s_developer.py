@@ -122,7 +122,7 @@ def run_development(
 
     # Call Claude API
     try:
-        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+        model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
         logger.info(f"Calling Claude API with model: {model}, max_tokens: 16000")
         session_logger.info(f"API Request: model={model}, max_tokens=16000, temperature=0.2")
 

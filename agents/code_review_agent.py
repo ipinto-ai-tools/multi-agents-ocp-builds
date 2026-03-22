@@ -150,7 +150,7 @@ def _run_claude_review(state: dict[str, Any]) -> dict[str, Any]:
         f"End your response with either 'VERDICT: PASS' or 'VERDICT: FAIL'."
     )
 
-    model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    model = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
     response = client.messages.create(
         model=model,
         max_tokens=4000,

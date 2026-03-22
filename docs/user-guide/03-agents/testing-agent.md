@@ -58,7 +58,7 @@ To customize Testing Agent behavior, edit `TESTING_AGENT_PROMPT` in `config/agen
 
 | Setting | Value |
 |---------|-------|
-| Model | `claude-sonnet-4-20250514` |
+| Model | `claude-sonnet-4-6` |
 | Max tokens | 16,000 (larger for test code generation) |
 
 ---

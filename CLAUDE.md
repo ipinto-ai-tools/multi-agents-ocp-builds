@@ -56,7 +56,7 @@ All five agents follow the same pattern:
 1. Validate context/inputs
 2. Get Claude client via `config/auth_config.get_anthropic_client()`
 3. Build a prompt using system prompt from `config/agent_prompts.py` + user context
-4. Call `client.messages.create()` with the configured model (`CLAUDE_MODEL` env var, default `claude-sonnet-4-20250514`)
+4. Call `client.messages.create()` with the configured model (`CLAUDE_MODEL` env var, default `claude-sonnet-4-6`)
 5. Parse the Markdown-structured response into typed dict outputs
 6. Emit heartbeat to dashboard
 
@@ -99,7 +99,7 @@ Tests are in `tests/` and use pytest. The `conftest.py` provides shared fixtures
 |----------|---------|
 | `ANTHROPIC_VERTEX_PROJECT_ID` | GCP project ID for Vertex AI auth |
 | `CLOUD_ML_REGION` | GCP region (default: `us-east5`) |
-| `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-20250514`) |
+| `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-6`) |
 | `CLAUDE_MAX_TOKENS` | Max tokens override |
 | `SHIPWRIGHT_REPO_PATH` / `OPENSHIFT_BUILDS_REPO_PATH` | Repo paths for code analysis |
 | `DASHBOARD_URL` | Dashboard URL (default: `http://localhost:8080`) |

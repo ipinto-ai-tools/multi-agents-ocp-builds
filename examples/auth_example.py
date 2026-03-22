@@ -40,7 +40,7 @@ def main():
         # Uncomment to test (will use API credits):
         # print("\n3. Testing client with a simple API call...")
         # response = client.messages.create(
-        #     model="claude-sonnet-4-20250514",
+        #     model="claude-sonnet-4-6",
         #     max_tokens=100,
         #     messages=[{"role": "user", "content": "Say hello!"}]
         # )

@@ -65,7 +65,7 @@ The `design_analysis` field is a structured Markdown document containing:
 
 | Setting | Value |
 |---------|-------|
-| Model | `claude-sonnet-4-20250514` |
+| Model | `claude-sonnet-4-6` |
 | Max tokens | 8,000 |
 | Temperature | 1.0 (default) |
 

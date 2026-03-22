@@ -36,7 +36,7 @@ See [Vertex AI Setup](../05-authentication/vertex-ai.md) for authentication inst
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAUDE_MODEL` | `claude-sonnet-4-20250514` | Claude model version |
+| `CLAUDE_MODEL` | `claude-sonnet-4-6` | Claude model version |
 | `CLAUDE_MAX_TOKENS` | `8000` | Default max tokens per response |
 
 > **Note:** The Development and Testing agents override `CLAUDE_MAX_TOKENS` with 16000 to accommodate larger code generation outputs.
@@ -131,7 +131,7 @@ CLOUD_ML_REGION=us-east5
 SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
 
 # Model settings
-CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_MODEL=claude-sonnet-4-6
 CLAUDE_MAX_TOKENS=8000
 
 # Dashboard

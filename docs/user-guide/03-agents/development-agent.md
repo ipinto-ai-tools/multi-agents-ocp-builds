@@ -59,7 +59,7 @@ The agent reads from a context dictionary, which is populated from `AgentState` 
 
 | Setting | Value |
 |---------|-------|
-| Model | `claude-sonnet-4-20250514` |
+| Model | `claude-sonnet-4-6` |
 | Max tokens | 16,000 (larger for code generation) |
 | Temperature | 0.2 (lower for deterministic code output) |
 
