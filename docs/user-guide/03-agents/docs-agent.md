@@ -40,6 +40,8 @@ To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/a
 | `issue_description` | str | No | Original issue description |
 | `issue_type` | str | No | `bug`, `feature`, `refactor`, or `docs` |
 | `repo_path` | str | No | Required for RAG - path to repository |
+| `github_pr_urls` | list[str] | No | GitHub PR URLs extracted from Jira remote links |
+| `github_pr_data` | list[dict] | No | Full PR metadata fetched from GitHub API (title, author, reviewers, state, files changed, etc.) |
 
 ### Function Parameters
 
@@ -235,6 +237,67 @@ result = run_docs(context=context, enable_rag=False)
 | Missing required context keys | Raises `RuntimeError: Missing required context keys` |
 
 **Required context keys:** `design_analysis`, `code_changes`, `test_results`
+
+---
+
+## Upstream GitHub PR Integration
+
+When a Jira ticket has GitHub PRs linked via remote links, the docs agent automatically includes them in an "Upstream GitHub Pull Requests" context section that is injected into the prompt before generation.
+
+### What triggers it
+
+The orchestration pipeline fetches Jira remote links and resolves any linked GitHub PRs before calling the docs agent. The resolved data arrives in the context as `github_pr_urls` (a list of URLs) and `github_pr_data` (a list of dicts with full PR metadata). The docs agent detects whichever is present and builds the context section accordingly.
+
+### PR fields included in the prompt
+
+When `github_pr_data` is available (requires `GITHUB_TOKEN` to be set at fetch time), each PR entry includes:
+
+| Field | Description |
+|-------|-------------|
+| PR number and URL | Link back to the upstream pull request |
+| Title | PR title as written by the author |
+| State | `MERGED`, `OPEN`, or `CLOSED` |
+| Author | GitHub username of the PR author |
+| Base branch | Target branch the PR merges into |
+| Files changed | Count of changed files with `+additions / -deletions` |
+| Reviewers | Usernames of requested and completed reviewers |
+| Labels | All labels attached to the PR |
+| Merged at | ISO timestamp of when the PR was merged (if applicable) |
+| Body | PR description, capped at 2,000 characters to control prompt size |
+
+### Graceful fallback behavior
+
+| Situation | Behavior |
+|-----------|----------|
+| `github_pr_data` present | Full metadata injected into prompt |
+| `github_pr_urls` present but no `github_pr_data` | List of PR URLs injected without metadata (no `GITHUB_TOKEN` was available at fetch time) |
+| Neither key present | "Upstream GitHub Pull Requests" section is omitted from the prompt entirely |
+
+### Example output
+
+When GitHub PR data is available, the docs agent uses it to ground the generated documentation in real upstream activity. For example, a PR summary might include:
+
+```markdown
+## PR Summary
+
+This change adds `RuntimeClass` support to Shipwright BuildStrategies, enabling
+pod-level runtime isolation for builds that require specific node capabilities.
+
+**Upstream reference:** Implemented in [shipwright-io/community #42](https://github.com/shipwright-io/community/pull/42)
+— _"Add RuntimeClass support to BuildStrategy pod template"_ (MERGED, authored by @adambkaplan,
+reviewed by @qu1queee and @SaschaSchwarze0).
+
+The upstream PR modified 6 files (+312 / -18 lines) targeting the `main` branch and was
+merged on 2024-11-14. Labels: `enhancement`, `api-change`.
+
+**What changed:**
+- Added `runtimeClassName` field to `BuildStrategySpec.BuildSteps`
+- CRD schema updated to include the new optional field
+- Controller updated to propagate `runtimeClassName` to generated pods
+
+**Testing:** Unit tests cover field propagation. E2E tests verify builds complete
+successfully when a valid `RuntimeClass` is referenced.
+```
 
 ---
 

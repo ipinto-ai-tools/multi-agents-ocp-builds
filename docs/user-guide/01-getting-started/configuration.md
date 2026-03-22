@@ -93,6 +93,23 @@ MAX_REPO_FILES=50
 API_TIMEOUT=120
 ```
 
+### GitHub Integration
+
+Required for fetching upstream PR metadata linked to Jira tickets.
+
+| Variable                  | Required | Default | Description                                                                                                   |
+|---------------------------|----------|---------|---------------------------------------------------------------------------------------------------------------|
+| `GITHUB_TOKEN`            | Optional | (none)  | Personal access token for reading GitHub PR data. Without it, PR URLs are shown but metadata is not fetched. |
+| `GITHUB_REQUEST_TIMEOUT`  | Optional | `10`    | Timeout in seconds for GitHub API requests                                                                    |
+
+```bash
+# GitHub Integration (optional — enriches docs agent with upstream PR context)
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+GITHUB_REQUEST_TIMEOUT=10
+```
+
+To create a token: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens. Required scope: `Contents` (read-only) on the target repositories.
+
 ### Agent Behavior
 
 | Variable | Default | Description |
