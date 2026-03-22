@@ -32,7 +32,7 @@ See [Getting Started](docs/user-guide/01-getting-started/installation.md) for fu
 ```bash
 git clone https://github.com/yourusername/muilti-agents-ocp-builds.git
 cd muilti-agents-ocp-builds
-uv venv && source .venv/bin/activate && pip install -r requirements.txt
+uv venv && uv pip install -r requirements.txt
 cp .env.example .env
 # Set ANTHROPIC_VERTEX_PROJECT_ID in .env
 gcloud auth application-default login

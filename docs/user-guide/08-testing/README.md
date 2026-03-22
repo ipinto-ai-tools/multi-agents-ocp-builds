@@ -315,7 +315,7 @@ When `ANTHROPIC_VERTEX_PROJECT_ID` is not set as a secret, all tests guarded by 
 
 | Problem | Solution |
 | ------- | -------- |
-| `ModuleNotFoundError: google` | Install Vertex AI dependencies: `pip install anthropic[vertex]` |
+| `ModuleNotFoundError: google` | Install Vertex AI dependencies: `uv pip install "anthropic[vertex]"` |
 | Tests hang with no output | Run with `-s` to disable output capture and see where execution stalls; check for an accidental real API call |
 | Real API tests not running | Verify `ANTHROPIC_VERTEX_PROJECT_ID` is set and run `gcloud auth application-default login` |
 | Import errors on test files | Run pytest from the project root; verify `PYTHONPATH` includes the project directory |

@@ -10,7 +10,7 @@ Multi-agent AI system that automates design analysis and documentation generatio
 
 ```bash
 # Install dependencies
-uv venv && source .venv/bin/activate && pip install -r requirements.txt
+uv venv && uv pip install -r requirements.txt
 
 # Run the orchestration workflow
 uv run python scripts/orchestrate.py --title "Feature title" --description "Description"
