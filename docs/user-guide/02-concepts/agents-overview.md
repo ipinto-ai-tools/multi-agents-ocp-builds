@@ -22,7 +22,7 @@ The Design Agent analyzes a GitHub issue and produces a comprehensive design doc
 - Acceptance criteria
 - Implementation plan
 
-**Claude API settings:** model `claude-sonnet-4-20250514`, 8,000 max tokens, temperature 1.0
+**Claude API settings:** model `claude-sonnet-4-6`, 8,000 max tokens, temperature 1.0
 
 ---
 
@@ -40,7 +40,7 @@ The Development Agent generates production-quality Go code for Kubernetes and Op
 - Security notes
 - New dependency list
 
-**Claude API settings:** model `claude-sonnet-4-20250514`, 16,000 max tokens, temperature 0.2 (lower for deterministic code output)
+**Claude API settings:** model `claude-sonnet-4-6`, 16,000 max tokens, temperature 0.2 (lower for deterministic code output)
 
 ---
 
@@ -75,7 +75,7 @@ The Code Review Agent reviews generated Go code for quality, security, and corre
 - `review_summary` — human-readable verdict
 - `review_iteration` — current loop iteration count
 
-**Claude API settings:** model `claude-sonnet-4-20250514`, 4,000 max tokens, temperature 0.1 (very low for consistent, deterministic review output)
+**Claude API settings:** model `claude-sonnet-4-6`, 4,000 max tokens, temperature 0.1 (very low for consistent, deterministic review output)
 
 **Feature flag:** Set `QODO_REVIEW_ENABLED=false` to skip the review phase entirely (backward compatible).
 
@@ -104,7 +104,7 @@ The Testing Agent generates comprehensive Ginkgo v2 test suites. It detects Ship
 - Ginkgo v2 E2E test code
 - Coverage analysis mapped to acceptance criteria
 
-**Claude API settings:** model `claude-sonnet-4-20250514`, 16,000 max tokens
+**Claude API settings:** model `claude-sonnet-4-6`, 16,000 max tokens
 
 ---
 
@@ -121,7 +121,7 @@ The Documentation Agent generates all documentation artifacts from the combined 
 - `"jtbd"` - Adds Jobs-to-be-Done user documentation
 - `"all"` - All formats plus a high-level design document
 
-**Claude API settings:** model `claude-sonnet-4-20250514`, 8,192 max tokens, temperature 0.3 (lower for consistent documentation style)
+**Claude API settings:** model `claude-sonnet-4-6`, 8,192 max tokens, temperature 0.3 (lower for consistent documentation style)
 
 ---
 

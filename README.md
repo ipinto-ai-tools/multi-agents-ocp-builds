@@ -116,7 +116,7 @@ Each agent reads from the shared `AgentState` and writes its outputs back before
 |----------|---------|
 | `ANTHROPIC_VERTEX_PROJECT_ID` | GCP project ID for Vertex AI auth (required) |
 | `CLOUD_ML_REGION` | GCP region (default: `us-east5`) |
-| `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-20250514`) |
+| `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-6`) |
 | `DASHBOARD_ENABLED` | Enable heartbeats to dashboard (default: `true`) |
 | `SHIPWRIGHT_REPO_PATH` | Path to Shipwright Build repo for deeper analysis |
 | `MANUAL_APPROVAL` | Pause for user approval between phases (default: `false`) |

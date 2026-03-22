@@ -39,8 +39,8 @@ def get_logger(
         Configured logger instance
 
     Example:
-        >>> logger = get_logger('design_agent')
-        >>> logger.info("Starting design analysis")
+         logger = get_logger('design_agent')
+         logger.info("Starting design analysis")
     """
     logger = logging.getLogger(name)
 
@@ -109,8 +109,8 @@ def get_session_logger(session_id: str, agent_name: str) -> logging.Logger:
         Logger configured to write to session-specific file
 
     Example:
-        >>> logger = get_session_logger('abc123', 'design_agent')
-        >>> logger.info("Session-specific log entry")
+         logger = get_session_logger('abc123', 'design_agent')
+         logger.info("Session-specific log entry")
     """
     logger_name = f"session.{session_id}.{agent_name}"
     log_file = f"sessions/session_{session_id}_{agent_name}.log"
@@ -132,7 +132,7 @@ def set_log_level(logger_name: str, level: int):
         level: New log level (logging.DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
     Example:
-        >>> set_log_level('design_agent', logging.DEBUG)
+         set_log_level('design_agent', logging.DEBUG)
     """
     logger = logging.getLogger(logger_name)
     logger.setLevel(level)
