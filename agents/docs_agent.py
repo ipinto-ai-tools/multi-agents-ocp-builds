@@ -531,7 +531,7 @@ def _get_generation_request(output_format: str) -> str:
     )
 
     if output_format == "standard":
-        return base_request + "\nFormat your response with clear section headers."
+        return base_request + jtbd_request + "\nFormat your response with clear section headers."
 
     elif output_format == "jtbd":
         return base_request + jtbd_request + "\nFormat your response with clear section headers."
@@ -582,7 +582,7 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
     output["high_level_design"] = sections.get("high-level design", sections.get("high level design", "")).strip()
 
     # Format-specific sections
-    if output_format in ("jtbd", "all"):
+    if output_format in ("standard", "jtbd", "all"):
         output["jtbd_documentation"] = sections.get("jtbd documentation", "").strip()
 
     if output_format in ("ship", "all"):

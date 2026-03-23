@@ -257,6 +257,7 @@ class AgentTester:
         design_output: Optional[Dict[str, Any]] = None,
         testing_output: Optional[Dict[str, Any]] = None,
         jira_state: Optional[Dict[str, Any]] = None,
+        output_format: str = "standard",
     ) -> Dict[str, Any]:
         """Test Docs Agent.
 
@@ -339,7 +340,7 @@ class AgentTester:
                 logger.info("Calling real Docs Agent")
                 from agents.docs_agent import run_docs
 
-                output = run_docs(context)
+                output = run_docs(context, output_format=output_format)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
 
             log_agent_complete(logger, "docs", output)
@@ -591,6 +592,12 @@ Examples:
         metavar="TICKET_ID",
         help="Jira ticket ID (e.g. SHIP-123). Fetches title and description automatically. Use with --dry-run for mock data.",
     )
+    parser.add_argument(
+        "--output-format",
+        choices=["standard", "jtbd", "ship", "all"],
+        default="standard",
+        help="Docs agent output format (default: standard)",
+    )
 
     # Test options
     parser.add_argument(
@@ -653,7 +660,7 @@ Examples:
             elif args.agent == "testing":
                 result = tester.test_testing_agent(jira_state=jira_state)
             elif args.agent == "docs":
-                result = tester.test_docs_agent(jira_state=jira_state)
+                result = tester.test_docs_agent(jira_state=jira_state, output_format=args.output_format)
 
             print(f"\n{'=' * 80}")
             print(f"{args.agent.upper()} Agent Test Complete")
