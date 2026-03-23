@@ -285,6 +285,71 @@ shipwright-build/
 
 ---
 
+## Output Artifacts
+
+When the testing agent runs via `scripts/test_agents.py`, three artifacts are written to the output directory (default `/tmp/claude/agent-tests/`):
+
+| Artifact | Description |
+|----------|-------------|
+| `testing_output.json` | Full structured output from the agent as a JSON file |
+| `test_plan.md` | Human-readable test plan with strategy, scenario counts, and coverage analysis |
+| `go_tests/<full_path>` | Individual Go test files under a `go_tests/` subdirectory, preserving the full relative path (e.g. `go_tests/pkg/reconciler/buildrun/resources/step_test.go`) |
+
+### test_plan.md structure
+
+```markdown
+# Test Plan: <issue title>
+
+## Test Strategy
+<agent's test_plan text>
+
+## Test Coverage by Level
+
+### Unit Tests (N scenarios)
+- **BUILD-XXX-001**: <description>
+  - File: `<path>`
+  - Expected: <expected_outcome>
+
+### Integration Tests (N scenarios)
+...
+
+### E2E Tests (N scenarios)
+...
+
+## Generated Test Files
+- `go_tests/pkg/webhook/validation/buildrun_timeout_test.go`
+- `go_tests/test/integration/buildrun_timeout_test.go`
+- `go_tests/test/e2e/buildrun_timeout_test.go`
+
+## Coverage Analysis
+<agent's coverage_analysis text>
+
+## Detected Patterns
+- Strategies: ['kaniko']
+- Source types: ['git']
+- Output types: ['image']
+```
+
+### go_tests/ directory
+
+Go test files are written with their full relative path preserved so they can be copied directly into a Shipwright repository checkout:
+
+```
+output_dir/
+└── go_tests/
+    ├── pkg/
+    │   └── webhook/
+    │       └── validation/
+    │           └── buildrun_timeout_test.go
+    └── test/
+        ├── integration/
+        │   └── buildrun_timeout_test.go
+        └── e2e/
+            └── buildrun_timeout_test.go
+```
+
+---
+
 ## Best Practices for Better Output
 
 **Provide specific acceptance criteria:**
