@@ -6,6 +6,7 @@ for Shipwright Build features based on design analysis and acceptance criteria.
 
 import os
 import pytest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from tests.auth_helper import HAS_ANTHROPIC_AUTH
@@ -584,6 +585,101 @@ class TestEdgeCases:
             with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
                 with pytest.raises(TestingAgentError, match="Failed to initialize"):
                     run_testing(SAMPLE_CONTEXT)
+
+
+class TestAgentTesterArtifacts:
+    """Tests for artifact writing methods added to AgentTester."""
+
+    def _make_tester(self, tmp_path: Path):
+        """Return an AgentTester in dry-run mode using tmp_path as output_dir."""
+        from scripts.test_agents import AgentTester
+
+        return AgentTester(dry_run=True, debug=False, output_dir=tmp_path)
+
+    def test_go_test_files_written(self, tmp_path: Path):
+        """After test_testing_agent() runs in mock mode, go_tests/ contains .go files."""
+        tester = self._make_tester(tmp_path)
+        tester.test_testing_agent()
+
+        go_tests_dir = tmp_path / "go_tests"
+        assert go_tests_dir.exists(), "go_tests/ directory was not created"
+
+        go_files = list(go_tests_dir.rglob("*.go"))
+        assert len(go_files) > 0, "No .go files were written under go_tests/"
+
+    def test_plan_md_written(self, tmp_path: Path):
+        """After test_testing_agent() runs in mock mode, test_plan.md exists with expected sections."""
+        tester = self._make_tester(tmp_path)
+        tester.test_testing_agent()
+
+        md_path = tmp_path / "test_plan.md"
+        assert md_path.exists(), "test_plan.md was not created"
+
+        content = md_path.read_text(encoding="utf-8")
+        assert "# Test Plan:" in content
+        assert "## Test Strategy" in content
+        assert "## Test Coverage by Level" in content
+        assert "## Generated Test Files" in content
+        assert "## Coverage Analysis" in content
+        assert "## Detected Patterns" in content
+
+    def test_go_test_files_skips_empty_code(self, tmp_path: Path):
+        """_write_go_test_files() skips entries with empty code strings."""
+        from scripts.test_agents import AgentTester
+
+        tester = AgentTester(dry_run=True, debug=False, output_dir=tmp_path)
+        output = {
+            "unit_tests": {"pkg/foo/foo_test.go": "", "pkg/bar/bar_test.go": "package bar_test"},
+            "integration_tests": {},
+            "e2e_tests": {},
+        }
+        tester._write_go_test_files(output)
+
+        go_tests_dir = tmp_path / "go_tests"
+        assert not (go_tests_dir / "pkg/foo/foo_test.go").exists(), \
+            "Empty code file should not be written"
+        assert (go_tests_dir / "pkg/bar/bar_test.go").exists(), \
+            "Non-empty code file should be written"
+
+    def test_write_test_plan_md_content(self, tmp_path: Path):
+        """_write_test_plan_md() writes correct content for a known output dict."""
+        from scripts.test_agents import AgentTester
+
+        tester = AgentTester(dry_run=True, debug=False, output_dir=tmp_path)
+        output = {
+            "issue_title": "My Feature",
+            "test_plan": "Test everything carefully.",
+            "test_specifications": {
+                "scenarios": [
+                    {
+                        "id": "BUILD-001",
+                        "description": "Validate field",
+                        "type": "unit",
+                        "file": "pkg/api/api_test.go",
+                        "expected_outcome": "No error",
+                    }
+                ]
+            },
+            "unit_tests": {"pkg/api/api_test.go": "package api_test"},
+            "integration_tests": {},
+            "e2e_tests": {},
+            "coverage_analysis": "100% covered.",
+            "patterns_detected": {
+                "strategies": ["kaniko"],
+                "source_types": ["git"],
+                "output_types": ["image"],
+            },
+        }
+        tester._write_test_plan_md(output)
+
+        content = (tmp_path / "test_plan.md").read_text(encoding="utf-8")
+        assert "# Test Plan: My Feature" in content
+        assert "Test everything carefully." in content
+        assert "### Unit Tests (1 scenarios)" in content
+        assert "**BUILD-001**" in content
+        assert "go_tests/pkg/api/api_test.go" in content
+        assert "100% covered." in content
+        assert "kaniko" in content
 
 
 if __name__ == "__main__":

@@ -240,11 +240,13 @@ class AgentTester:
                 logger.info("Calling real Testing Agent")
                 from agents.testing_agent import run_testing
 
-                output = run_testing(context)
+                output = run_testing(context, output_dir=self.output_dir)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
 
             log_agent_complete(logger, "testing", output)
             self._save_artifact("testing_output.json", output)
+            self._write_test_plan_md(output)
+            self._write_go_test_files(output)
 
             return output
 
@@ -528,6 +530,16 @@ class AgentTester:
         self._save_artifact("dashboard_test_results.json", results)
 
         return results
+
+    def _write_test_plan_md(self, output: Dict[str, Any]) -> None:
+        """Write test_plan.md. Delegates to testing_agent module function."""
+        from agents.testing_agent import _write_test_plan_md as _agent_write_test_plan_md
+        _agent_write_test_plan_md(output, self.output_dir)
+
+    def _write_go_test_files(self, output: Dict[str, Any]) -> None:
+        """Write Go test files. Delegates to testing_agent module function."""
+        from agents.testing_agent import _write_go_test_files as _agent_write_go_test_files
+        _agent_write_go_test_files(output, self.output_dir)
 
     def _save_artifact(self, filename: str, data: Any):
         """Save artifact to output directory.

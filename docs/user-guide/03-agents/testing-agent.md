@@ -220,6 +220,7 @@ var _ = Describe("BuildRun Timeout Controller Integration", func() {
 ## Direct Invocation
 
 ```python
+from pathlib import Path
 from agents.testing_agent import run_testing
 
 context = {
@@ -234,7 +235,11 @@ context = {
     "issue_description": "Users need to specify max build execution time..."
 }
 
+# Artifacts written to /tmp/claude/testing-artifacts/ (default)
 result = run_testing(context)
+
+# Artifacts written to a custom directory
+result = run_testing(context, output_dir=Path("/tmp/my-feature/testing"))
 
 print("Test Plan:", result["test_plan"])
 print("Patterns detected:", result["patterns_detected"])
@@ -244,6 +249,8 @@ print("E2E test files:", list(result["e2e_tests"].keys()))
 print("\nCoverage analysis:")
 print(result["coverage_analysis"])
 ```
+
+> **Note:** `run_testing()` always writes `test_plan.md` and `go_tests/` artifacts to `output_dir`. When called via `scripts/orchestrate.py`, artifacts land in `/tmp/claude/testing-artifacts/` by default. Pass `output_dir` explicitly to control the destination.
 
 ---
 
@@ -281,6 +288,75 @@ shipwright-build/
 │   └── buildrun_timeout_test.go      # Integration tests
 └── test/e2e/
     └── timeout_builds_test.go        # E2E tests
+```
+
+---
+
+## Output Artifacts
+
+The testing agent always writes three artifacts when `run_testing()` is called. The output directory is:
+
+- **`/tmp/claude/agent-tests/`** — when called via `scripts/test_agents.py` (the default `--output-dir`)
+- **`/tmp/claude/testing-artifacts/`** — when called directly or via `scripts/orchestrate.py` (built-in default)
+- **Custom path** — when `output_dir` is passed explicitly to `run_testing()`
+
+| Artifact | Description |
+|----------|-------------|
+| `testing_output.json` | Full structured output from the agent as a JSON file |
+| `test_plan.md` | Human-readable test plan with strategy, scenario counts, and coverage analysis |
+| `go_tests/<full_path>` | Individual Go test files under a `go_tests/` subdirectory, preserving the full relative path (e.g. `go_tests/pkg/reconciler/buildrun/resources/step_test.go`) |
+
+### test_plan.md structure
+
+```markdown
+# Test Plan: <issue title>
+
+## Test Strategy
+<agent's test_plan text>
+
+## Test Coverage by Level
+
+### Unit Tests (N scenarios)
+- **BUILD-XXX-001**: <description>
+  - File: `<path>`
+  - Expected: <expected_outcome>
+
+### Integration Tests (N scenarios)
+...
+
+### E2E Tests (N scenarios)
+...
+
+## Generated Test Files
+- `go_tests/pkg/webhook/validation/buildrun_timeout_test.go`
+- `go_tests/test/integration/buildrun_timeout_test.go`
+- `go_tests/test/e2e/buildrun_timeout_test.go`
+
+## Coverage Analysis
+<agent's coverage_analysis text>
+
+## Detected Patterns
+- Strategies: ['kaniko']
+- Source types: ['git']
+- Output types: ['image']
+```
+
+### go_tests/ directory
+
+Go test files are written with their full relative path preserved so they can be copied directly into a Shipwright repository checkout:
+
+```
+output_dir/
+└── go_tests/
+    ├── pkg/
+    │   └── webhook/
+    │       └── validation/
+    │           └── buildrun_timeout_test.go
+    └── test/
+        ├── integration/
+        │   └── buildrun_timeout_test.go
+        └── e2e/
+            └── buildrun_timeout_test.go
 ```
 
 ---
