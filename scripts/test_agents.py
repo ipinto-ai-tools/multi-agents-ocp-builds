@@ -240,7 +240,7 @@ class AgentTester:
                 logger.info("Calling real Testing Agent")
                 from agents.testing_agent import run_testing
 
-                output = run_testing(context)
+                output = run_testing(context, output_dir=self.output_dir)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
 
             log_agent_complete(logger, "testing", output)
@@ -532,131 +532,14 @@ class AgentTester:
         return results
 
     def _write_test_plan_md(self, output: Dict[str, Any]) -> None:
-        """Write a human-readable test plan to test_plan.md in the output directory.
-
-        Args:
-            output: Testing agent output dictionary
-        """
-        try:
-            issue_title = output.get("issue_title") or "Feature"
-
-            # Collect scenarios by type from test_specifications
-            specs = output.get("test_specifications", {})
-            unit_scenarios: list = []
-            integration_scenarios: list = []
-            e2e_scenarios: list = []
-
-            # test_specifications may be a dict with spec IDs as keys
-            # or a dict with a top-level "scenarios" list (parsed YAML).
-            if isinstance(specs, dict):
-                raw_scenarios = specs.get("scenarios")
-                if isinstance(raw_scenarios, list):
-                    # Parsed YAML format: {"scenarios": [...]}
-                    for s in raw_scenarios:
-                        t = s.get("type", "")
-                        if t == "unit":
-                            unit_scenarios.append(s)
-                        elif t == "integration":
-                            integration_scenarios.append(s)
-                        elif t == "e2e":
-                            e2e_scenarios.append(s)
-                else:
-                    # Flat dict format: {id: {type, ...}, ...}
-                    for spec_id, spec in specs.items():
-                        if not isinstance(spec, dict):
-                            continue
-                        t = spec.get("type", "")
-                        entry = {"id": spec_id, **spec}
-                        if t == "unit":
-                            unit_scenarios.append(entry)
-                        elif t == "integration":
-                            integration_scenarios.append(entry)
-                        elif t == "e2e":
-                            e2e_scenarios.append(entry)
-
-            def _format_scenarios(scenarios: list) -> str:
-                if not scenarios:
-                    return "_No scenarios detected._\n"
-                lines = []
-                for s in scenarios:
-                    sid = s.get("id", "")
-                    desc = s.get("description", "")
-                    file_ = s.get("file", "")
-                    outcome = s.get("expected_outcome", "")
-                    lines.append(f"- **{sid}**: {desc}")
-                    if file_:
-                        lines.append(f"  - File: `{file_}`")
-                    if outcome:
-                        lines.append(f"  - Expected: {outcome}")
-                return "\n".join(lines) + "\n"
-
-            # Collect generated file paths
-            all_test_files: list = []
-            for section in ("unit_tests", "integration_tests", "e2e_tests"):
-                for path in output.get(section, {}).keys():
-                    all_test_files.append(f"- `go_tests/{path}`")
-
-            # Patterns
-            patterns = output.get("patterns_detected", {})
-            strategies = patterns.get("strategies", [])
-            source_types = patterns.get("source_types", [])
-            output_types = patterns.get("output_types", [])
-
-            lines = [
-                f"# Test Plan: {issue_title}",
-                "",
-                "## Test Strategy",
-                output.get("test_plan", ""),
-                "",
-                "## Test Coverage by Level",
-                "",
-                f"### Unit Tests ({len(unit_scenarios)} scenarios)",
-                _format_scenarios(unit_scenarios),
-                f"### Integration Tests ({len(integration_scenarios)} scenarios)",
-                _format_scenarios(integration_scenarios),
-                f"### E2E Tests ({len(e2e_scenarios)} scenarios)",
-                _format_scenarios(e2e_scenarios),
-                "## Generated Test Files",
-                "\n".join(all_test_files) if all_test_files else "_No test files generated._",
-                "",
-                "## Coverage Analysis",
-                output.get("coverage_analysis", ""),
-                "",
-                "## Detected Patterns",
-                f"- Strategies: {strategies}",
-                f"- Source types: {source_types}",
-                f"- Output types: {output_types}",
-            ]
-
-            md_path = self.output_dir / "test_plan.md"
-            md_path.write_text("\n".join(lines), encoding="utf-8")
-            self.logger.info(f"Wrote test plan: {md_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to write test_plan.md: {e}")
+        """Write test_plan.md. Delegates to testing_agent module function."""
+        from agents.testing_agent import _write_test_plan_md as _agent_write_test_plan_md
+        _agent_write_test_plan_md(output, self.output_dir)
 
     def _write_go_test_files(self, output: Dict[str, Any]) -> None:
-        """Write individual Go test files to go_tests/ under the output directory.
-
-        Args:
-            output: Testing agent output dictionary containing unit_tests,
-                    integration_tests, and e2e_tests dicts mapping full_path -> code.
-        """
-        go_tests_dir = self.output_dir / "go_tests"
-        sections = {
-            "unit_tests": output.get("unit_tests", {}),
-            "integration_tests": output.get("integration_tests", {}),
-            "e2e_tests": output.get("e2e_tests", {}),
-        }
-        for section_name, files in sections.items():
-            if not isinstance(files, dict):
-                continue
-            for full_path, code in files.items():
-                if not code:
-                    continue
-                dest = go_tests_dir / full_path
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_text(code, encoding="utf-8")
-                self.logger.info(f"Wrote Go test file: {dest}")
+        """Write Go test files. Delegates to testing_agent module function."""
+        from agents.testing_agent import _write_go_test_files as _agent_write_go_test_files
+        _agent_write_go_test_files(output, self.output_dir)
 
     def _save_artifact(self, filename: str, data: Any):
         """Save artifact to output directory.
