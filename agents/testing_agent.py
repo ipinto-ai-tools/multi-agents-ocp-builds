@@ -448,7 +448,9 @@ def _extract_test_code(section_text: str) -> Dict[str, str]:
         section_text: Section text containing test code
 
     Returns:
-        Dictionary mapping file names to code content
+        Dictionary mapping full relative file paths to code content.
+        Keys are full paths like ``pkg/reconciler/buildrun/resources/step_test.go``
+        rather than bare basenames.
     """
     tests = {}
 
@@ -459,16 +461,29 @@ def _extract_test_code(section_text: str) -> Dict[str, str]:
     in_code_block = False
 
     for line in lines:
-        # Check for file path indicators
-        if "file:" in line.lower() or "_test.go" in line:
-            # Extract file path
+        # Check for file path indicators outside of code blocks.
+        # Patterns handled:
+        #   ### File: `pkg/some/path_test.go`
+        #   ### File: pkg/some/path_test.go
+        #   File: `path_test.go`
+        #   File: path_test.go
+        #   plain lines that contain _test.go
+        if not in_code_block and ("file:" in line.lower() or "_test.go" in line):
             if "_test.go" in line:
-                # Try to extract the file path
-                parts = line.split("_test.go")
-                if parts:
-                    potential_path = parts[0].strip().strip("`").strip("*").strip()
-                    if potential_path:
-                        current_file = potential_path + "_test.go"
+                # Strip markdown/heading prefix and whitespace
+                stripped = line.strip()
+                # Remove heading markers (###, ##, #)
+                while stripped.startswith("#"):
+                    stripped = stripped.lstrip("#").strip()
+                # Remove "File:" or "file:" prefix
+                if "file:" in stripped.lower():
+                    colon_idx = stripped.lower().index("file:")
+                    stripped = stripped[colon_idx + len("file:"):].strip()
+                # Remove surrounding backticks, asterisks, and extra whitespace
+                stripped = stripped.strip("`").strip("*").strip()
+                # Accept the path only when it actually ends with _test.go
+                if stripped.endswith("_test.go") and stripped:
+                    current_file = stripped
 
         # Handle code blocks
         if line.strip().startswith("```"):
