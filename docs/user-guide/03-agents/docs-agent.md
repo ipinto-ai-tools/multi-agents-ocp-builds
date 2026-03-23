@@ -57,9 +57,9 @@ To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/a
 
 | Format | Description |
 |--------|-------------|
-| `"standard"` | PR summary, release notes, upgrade notes, known limitations |
+| `"standard"` | PR summary, release notes, upgrade notes, known limitations, and JTBD documentation |
 | `"ship"` | Adds a SHIP (Solution, Highlight, Impact, Plan) document |
-| `"jtbd"` | Adds Jobs-to-be-Done user documentation |
+| `"jtbd"` | Same as `"standard"` — included for backwards compatibility |
 | `"all"` | All formats plus a high-level design document |
 
 ---
@@ -77,8 +77,8 @@ To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/a
     "high_level_design": str,        # High-level design summary
 
     # Format-specific outputs
-    "jtbd_documentation": str,       # Jobs-to-be-Done (if requested)
-    "ship_document": str,            # SHIP format (if requested)
+    "jtbd_documentation": str,       # Jobs-to-be-Done (always included for standard and jtbd; also for all)
+    "ship_document": str,            # SHIP format (if ship or all requested)
 
     # Metadata
     "input_files_analyzed": list,    # Files that were read and included
