@@ -220,6 +220,7 @@ var _ = Describe("BuildRun Timeout Controller Integration", func() {
 ## Direct Invocation
 
 ```python
+from pathlib import Path
 from agents.testing_agent import run_testing
 
 context = {
@@ -234,7 +235,11 @@ context = {
     "issue_description": "Users need to specify max build execution time..."
 }
 
+# Artifacts written to /tmp/claude/testing-artifacts/ (default)
 result = run_testing(context)
+
+# Artifacts written to a custom directory
+result = run_testing(context, output_dir=Path("/tmp/my-feature/testing"))
 
 print("Test Plan:", result["test_plan"])
 print("Patterns detected:", result["patterns_detected"])
@@ -244,6 +249,8 @@ print("E2E test files:", list(result["e2e_tests"].keys()))
 print("\nCoverage analysis:")
 print(result["coverage_analysis"])
 ```
+
+> **Note:** `run_testing()` always writes `test_plan.md` and `go_tests/` artifacts to `output_dir`. When called via `scripts/orchestrate.py`, artifacts land in `/tmp/claude/testing-artifacts/` by default. Pass `output_dir` explicitly to control the destination.
 
 ---
 
@@ -287,7 +294,11 @@ shipwright-build/
 
 ## Output Artifacts
 
-When the testing agent runs via `scripts/test_agents.py`, three artifacts are written to the output directory (default `/tmp/claude/agent-tests/`):
+The testing agent always writes three artifacts when `run_testing()` is called. The output directory is:
+
+- **`/tmp/claude/agent-tests/`** — when called via `scripts/test_agents.py` (the default `--output-dir`)
+- **`/tmp/claude/testing-artifacts/`** — when called directly or via `scripts/orchestrate.py` (built-in default)
+- **Custom path** — when `output_dir` is passed explicitly to `run_testing()`
 
 | Artifact | Description |
 |----------|-------------|
