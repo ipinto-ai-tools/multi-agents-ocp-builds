@@ -377,6 +377,31 @@ class TestFetchTicket:
         joined = " ".join(result["acceptance_criteria"])
         assert "timeout" in joined.lower()
 
+    def test_fetch_ticket_raises_value_error_on_non_json_content_type(self, client):
+        """fetch_ticket should raise ValueError with a clear message when Jira returns HTML."""
+        html_response = MagicMock()
+        html_response.status_code = 200
+        html_response.raise_for_status = MagicMock()
+        html_response.headers = {"Content-Type": "text/html; charset=utf-8"}
+        html_response.text = "<html><body>Login required</body></html>"
+
+        with patch("requests.get", return_value=html_response):
+            with pytest.raises(ValueError, match="non-JSON response"):
+                client.fetch_ticket("SHIP-HTML")
+
+    def test_fetch_ticket_raises_value_error_on_json_decode_error(self, client):
+        """fetch_ticket should raise ValueError with a clear message on malformed JSON."""
+        bad_json_response = MagicMock()
+        bad_json_response.status_code = 200
+        bad_json_response.raise_for_status = MagicMock()
+        bad_json_response.headers = {"Content-Type": "application/json"}
+        bad_json_response.text = "<not-json>"
+        bad_json_response.json.side_effect = json.JSONDecodeError("Expecting value", "<not-json>", 0)
+
+        with patch("requests.get", return_value=bad_json_response):
+            with pytest.raises(ValueError, match="invalid JSON"):
+                client.fetch_ticket("SHIP-BADJSON")
+
     def test_fetch_ticket_extracts_github_pr_urls(self, client):
         """fetch_ticket returns GitHub PR URLs from remotelinks."""
         api_response = {

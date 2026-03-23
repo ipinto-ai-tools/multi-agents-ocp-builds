@@ -6,6 +6,7 @@ No Forge or Rovo required — standard REST API access.
 Auth: Base64(email:api_token) via JIRA_USER_EMAIL + JIRA_API_TOKEN env vars.
 """
 
+import json
 import os
 import base64
 import logging
@@ -55,7 +56,31 @@ class JiraClient:
         response = requests.get(url, headers=self.headers, params=params, timeout=JIRA_REQUEST_TIMEOUT)
         response.raise_for_status()
 
-        data = response.json()
+        content_type = response.headers.get("Content-Type", "")
+        if "application/json" not in content_type:
+            snippet = response.text[:300]
+            logger.warning(
+                "Jira returned non-JSON response (status=%s, content-type=%s): %s",
+                response.status_code, content_type, snippet
+            )
+            raise ValueError(
+                f"Jira API returned non-JSON response (status={response.status_code}). "
+                "Check JIRA_BASE_URL, JIRA_USER_EMAIL, and JIRA_API_TOKEN env vars."
+            )
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            snippet = response.text[:300]
+            logger.warning(
+                "Jira returned invalid JSON (status=%s, content-type=%s): %s",
+                response.status_code, content_type, snippet
+            )
+            raise ValueError(
+                f"Jira API returned invalid JSON (status={response.status_code}). "
+                "Check JIRA_BASE_URL, JIRA_USER_EMAIL, and JIRA_API_TOKEN env vars."
+            ) from exc
+
         fields = data.get("fields", {})
 
         # Fetch comments separately for cleaner parsing
