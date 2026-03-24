@@ -470,6 +470,47 @@ var _ = Describe("Test", func() {
         for filename, code in tests.items():
             assert "package" in code or "Describe" in code
 
+    def test_split_into_sections_does_not_split_on_triple_hash(self):
+        """### subsection headers must NOT create new top-level sections."""
+        from agents.testing_agent import _split_into_sections
+        text = (
+            "## Unit Tests\n"
+            "\n"
+            "### Signature Tests\n"
+            "```go\npackage foo\n```\n"
+            "\n"
+            "### Filter Tests\n"
+            "```go\npackage bar\n```\n"
+        )
+        sections = _split_into_sections(text)
+        assert "unit tests" in sections
+        # Content must include the subsection headers and code
+        assert "### Signature Tests" in sections["unit tests"]
+        assert "### Filter Tests" in sections["unit tests"]
+        # Subsection keys must NOT appear as top-level sections
+        assert "signature tests" not in sections
+        assert "filter tests" not in sections
+
+    def test_extract_test_code_go_comment_filename(self):
+        """File path as Go comment on first line inside code block must be extracted."""
+        from agents.testing_agent import _extract_test_code
+        section = (
+            "### Signature Tests\n"
+            "```go\n"
+            "// pkg/webhook/github/signature_test.go\n"
+            "package github_test\n"
+            "\n"
+            "func TestFoo(t *testing.T) {}\n"
+            "```\n"
+        )
+        result = _extract_test_code(section)
+        assert "pkg/webhook/github/signature_test.go" in result
+        code = result["pkg/webhook/github/signature_test.go"]
+        # The comment line should NOT be in the code content
+        assert "// pkg/webhook/github/signature_test.go" not in code
+        assert "package github_test" in code
+        assert "func TestFoo(t *testing.T) {}" in code
+
     def test_generate_test_summary(self):
         """Test test summary generation."""
         test_results = {
@@ -680,6 +721,34 @@ class TestAgentTesterArtifacts:
         assert "go_tests/pkg/api/api_test.go" in content
         assert "100% covered." in content
         assert "kaniko" in content
+
+
+class TestParserRobustness:
+    """Test robustness of the parser against realistic Claude output formats."""
+
+    def test_parse_test_output_with_subsections(self):
+        """_parse_test_output must find unit tests even when ## Unit Tests has ### subsections."""
+        from agents.testing_agent import _parse_test_output
+        raw = (
+            "## Test Plan\n"
+            "Comprehensive test strategy.\n"
+            "\n"
+            "## Unit Tests\n"
+            "\n"
+            "### Webhook Handler Tests\n"
+            "```go\n"
+            "// pkg/webhook/handler_test.go\n"
+            "package webhook_test\n"
+            "\n"
+            "func TestHandler(t *testing.T) {}\n"
+            "```\n"
+            "\n"
+            "## Test Summary\n"
+            "1 unit test file generated.\n"
+        )
+        result = _parse_test_output(raw)
+        assert len(result["unit_tests"]) == 1
+        assert "pkg/webhook/handler_test.go" in result["unit_tests"]
 
 
 if __name__ == "__main__":
