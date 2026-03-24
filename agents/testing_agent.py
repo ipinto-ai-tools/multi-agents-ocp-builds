@@ -396,7 +396,7 @@ def _split_into_sections(text: str) -> Dict[str, str]:
 
     for line in text.split("\n"):
         # Check for section headers (## Header)
-        if line.strip().startswith("##"):
+        if line.strip().startswith("## ") and not line.strip().startswith("###"):
             # Save previous section
             if current_section:
                 sections[current_section] = "\n".join(current_content)
@@ -505,11 +505,22 @@ def _extract_test_code(section_text: str) -> Dict[str, str]:
                     )
                 current_code = []
                 in_code_block = False
+                current_file = None
             else:
                 # Start of code block
                 in_code_block = True
                 current_code = []
         elif in_code_block:
+            # Detect file path from a Go comment on the very first line inside a block.
+            # Format used by Claude: // pkg/webhook/github/signature_test.go
+            if not current_code and current_file is None:
+                stripped = line.strip()
+                if stripped.startswith("//"):
+                    candidate = stripped[2:].strip()
+                    if candidate.endswith("_test.go") and " " not in candidate:
+                        current_file = candidate
+                        # Skip adding the comment line to code content
+                        continue
             current_code.append(line)
 
     # Save any remaining code
