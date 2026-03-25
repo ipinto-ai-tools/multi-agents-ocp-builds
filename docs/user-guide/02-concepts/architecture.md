@@ -223,6 +223,32 @@ Sanitization runs at the agent layer — after PII redaction but before prompt a
 
 See [Prompt Injection Guard](../07-security/prompt-injection-guard.md) for the full reference.
 
+### Output Sanitizer
+
+The Output Sanitizer (Layer 3) protects all egress channels from containing PII. Where Layers 1 and 2 guard data entering the pipeline, Layer 3 guards data leaving it.
+
+**Protected channels:**
+
+- **Python logging** — `SanitizingFilter` is attached to every handler (file and console). It pre-formats log records to resolve `%s`/`%d` placeholders before sanitizing, preventing a bypass where a clean format string is combined with a PII-containing argument.
+- **Generated artifacts** — `test_plan.md` and Go test files written by the Testing Agent are sanitized before being written to disk.
+- **Dashboard heartbeat payloads** — the full heartbeat dict is recursively sanitized before the HTTP POST to the dashboard.
+
+The sanitizer reuses `_redact_text` from `pii_redactor.py`, so the same patterns and replacement tokens apply at both layers. Sanitization is idempotent — running it on already-redacted text is safe.
+
+**Disabling:** Set `OUTPUT_SANITIZER_ENABLED=false` to bypass sanitization during local development. This setting must not be used in production.
+
+See [Output Sanitizer](../07-security/output-sanitizer.md) for the full reference.
+
+### Claude Hooks — PostToolUse Defender
+
+The PostToolUse Prompt Injection Defender (Layer 4) operates at the Claude Code host level, outside the Python application. After every tool call (`Read`, `WebFetch`, `Bash`, `Grep`, `Task`, `mcp__*`), the hook scans the tool output for injection patterns using the same categories as the Prompt Injection Guard plus a custom Jira-specific category.
+
+The hook is warn-only: it always exits with code 0 so tool execution is never blocked. When a pattern is detected, Claude receives a warning alongside the tool output, giving it the context to evaluate the content critically.
+
+**Pattern categories (59+ total):** instruction override, role-playing/DAN, encoding obfuscation, context manipulation, and Jira-specific injection patterns.
+
+See [Claude Hooks](../07-security/claude-hooks.md) for the full reference, including how to add custom patterns.
+
 ---
 
 ## Supporting Components

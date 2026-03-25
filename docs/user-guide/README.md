@@ -67,6 +67,8 @@ This system automates the design, development, testing, and documentation workfl
 |-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
 | [PII Redaction](07-security/pii-redaction.md)                               | How Jira and GitHub data is redacted before entering the agent pipeline      |
 | [Prompt Injection Guard](07-security/prompt-injection-guard.md)             | How external text is sanitized to prevent prompt injection attacks           |
+| [Log & Output Sanitizer](07-security/output-sanitizer.md)                   | Layer 3: egress protection — scrubs sensitive data from logs and outputs     |
+| [claude-hooks PostToolUse Integration](07-security/claude-hooks.md)         | Layer 4: host-level defense via Claude Code hooks                            |
 
 ### Section 7 - Examples
 
