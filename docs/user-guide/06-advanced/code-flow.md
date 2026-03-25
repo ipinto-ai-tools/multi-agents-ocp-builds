@@ -24,6 +24,21 @@ Both paths call the same five agent functions (`run_design`, `run_development`, 
 ```
 orchestrate(title, description, repo_path, issue_type)
   │
+  ├─ Pre-flight: Skills registry calls
+  │   ├─ default_registry.get("fetch_jira_ticket").run({"ticket_id": jira_ticket})
+  │   │   → resolves via SkillRegistry [skills/registry.py]
+  │   │   → FetchJiraTicketSkill._execute() [skills/jira.py]
+  │   │       ├─ fetch_ticket() [mcp/jira_stub.py]
+  │   │       └─ map_ticket_to_state() [tools/jira_client.py]
+  │   │   → returns merged AgentState Jira fields
+  │   └─ default_registry.get("fetch_github_prs").run({"pr_urls": urls})
+  │       → FetchGitHubPRsSkill._execute() [skills/github.py]
+  │           └─ GitHubClient.fetch_prs_from_urls() [tools/github_client.py]
+  │       → returns {"pr_data": [...]}
+  │
+  │   Note: both skills check DRY_RUN via Skill.run() [skills/base.py] before
+  │   dispatching. In dry-run mode _mock_response() is called instead of _execute().
+  │
   ├─ Phase 1: Design
   │   ├─ run_design() [agents/design_agent.py]
   │   │   ├─ get_anthropic_client() [config/auth_config.py]
@@ -245,6 +260,7 @@ These modules are consumed by multiple callers across the codebase. When modifyi
 | `agents/validators.py` | `validate_phase()` | `scripts/orchestrate.py` (called after each phase) |
 | `config/agent_prompts.py` | System prompt constants | All 5 agents (injected as the `system` argument to `client.messages.create()`) |
 | `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 5 agents, `dashboard/backend.py`, `agents/graph.py` |
+| `skills/__init__.py` | `default_registry` | `scripts/orchestrate.py`, `scripts/test_agents.py` (entry points only — agents do not import from `skills/`) |
 
 ---
 

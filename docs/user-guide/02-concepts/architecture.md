@@ -202,6 +202,25 @@ The dashboard (`dashboard/backend.py`) is an optional FastAPI server with SQLite
 
 See [Dashboard Overview](../04-dashboard/overview.md).
 
+### Skills Layer
+
+The `skills/` package is a thin, uniform wrapper over the external integrations in `tools/`. Skills are called exclusively from entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) — agents in the pipeline do not call skills directly.
+
+**Key design properties:**
+
+- Skills do not replace `tools/` — all business logic remains in `tools/` unchanged.
+- `DRY_RUN` handling is centralized: `Skill.run()` checks the `DRY_RUN` environment variable and automatically routes to `_mock_response()` instead of `_execute()`, so every skill gets offline mode for free.
+- Each skill declares `input_schema` and `output_schema` as JSON Schema dicts, making them MCP-ready without additional glue code.
+- `__init_subclass__` enforces required class attributes (`name`, `description`, `input_schema`, `output_schema`) at class definition time, catching misconfigured skills before runtime.
+
+**Registered skills (`skills/default_registry` via `skills/__init__.py`):**
+
+| Skill name | Wraps | Input | Output |
+| --- | --- | --- | --- |
+| `fetch_jira_ticket` | `mcp.jira_stub.fetch_ticket()` + `tools.jira_client.map_ticket_to_state()` | `{"ticket_id": str}` | AgentState Jira fields |
+| `update_jira` | `tools.jira_client.JiraClient.update_ticket()` | `{"ticket_id": str, "comment": str}` | `{"success": bool}` |
+| `fetch_github_prs` | `tools.github_client.GitHubClient.fetch_prs_from_urls()` | `{"pr_urls": list[str]}` | `{"pr_data": list[dict]}` |
+
 ### Repository Analysis Tools
 
 Optional tools in `tools/` that agents can use when a repository path is provided:
@@ -267,6 +286,12 @@ muilti-agents-ocp-builds/
 ├── graph/           # AgentState schema (state.py)
 ├── mcp/             # MCP server stubs (future integrations)
 ├── scripts/         # orchestrate.py, run_dashboard.py, test_agents.py
+├── skills/          # Thin entry-point wrappers over tools/ (MCP-ready, DRY_RUN-aware)
+│   ├── __init__.py  # default_registry pre-populated with all three skills
+│   ├── base.py      # Skill ABC: run() dispatches to _mock_response() or _execute()
+│   ├── registry.py  # SkillRegistry with register/get/list_skills
+│   ├── jira.py      # FetchJiraTicketSkill, UpdateJiraSkill
+│   └── github.py    # FetchGitHubPRsSkill
 ├── tests/           # pytest test suite
 ├── tools/           # repo_search, rag_search, git_ops, github_client
 └── utils/           # logging_config.py
