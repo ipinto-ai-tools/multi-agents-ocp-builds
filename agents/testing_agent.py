@@ -15,6 +15,7 @@ import yaml
 
 from config.agent_prompts import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from tools.output_sanitizer import sanitize
 from tools.prompt_guard import sanitize_external_input
 from utils.file_logger import get_logger, get_session_logger
 from config.testing_config import (
@@ -700,7 +701,9 @@ def _write_test_plan_md(output: Dict[str, Any], output_dir: Path) -> None:
         ]
 
         md_path = output_dir / "test_plan.md"
-        md_path.write_text("\n".join(lines), encoding="utf-8")
+        content = "\n".join(lines)
+        safe_content = sanitize(content, source=f"testing_agent:test_plan_md:{output_dir.name}")
+        md_path.write_text(safe_content, encoding="utf-8")
         logger.info(f"Wrote test plan: {md_path}")
     except Exception as e:
         logger.error(f"Failed to write test_plan.md: {e}")
@@ -722,5 +725,6 @@ def _write_go_test_files(output: Dict[str, Any], output_dir: Path) -> None:
                 continue
             dest = go_tests_dir / full_path
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(code, encoding="utf-8")
+            safe_code = sanitize(code, source=f"testing_agent:go_test:{dest.name}")
+            dest.write_text(safe_code, encoding="utf-8")
             logger.info(f"Wrote Go test file: {dest}")

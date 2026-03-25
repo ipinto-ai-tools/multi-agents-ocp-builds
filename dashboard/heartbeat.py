@@ -10,6 +10,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 import requests
 
+from tools.output_sanitizer import sanitize_dict
+
 
 class HeartbeatConfig:
     """Configuration for heartbeat emission."""
@@ -104,9 +106,10 @@ class HeartbeatEmitter:
             return False
 
         try:
+            payload = sanitize_dict(heartbeat.to_dict(), source="heartbeat")
             response = requests.post(
                 f"{self.config.dashboard_url}/api/heartbeat",
-                json=heartbeat.to_dict(),
+                json=payload,
                 timeout=self.config.timeout_seconds
             )
             return response.status_code == 200
