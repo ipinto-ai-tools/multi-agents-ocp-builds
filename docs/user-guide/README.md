@@ -63,9 +63,10 @@ This system automates the design, development, testing, and documentation workfl
 
 ### Section 7 - Security
 
-| Page | Description |
-|------|-------------|
-| [PII Redaction](07-security/pii-redaction.md) | How Jira and GitHub data is redacted before entering the agent pipeline |
+| Page                                                                        | Description                                                                  |
+|-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| [PII Redaction](07-security/pii-redaction.md)                               | How Jira and GitHub data is redacted before entering the agent pipeline      |
+| [Prompt Injection Guard](07-security/prompt-injection-guard.md)             | How external text is sanitized to prevent prompt injection attacks           |
 
 ### Section 7 - Examples
 
