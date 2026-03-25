@@ -117,11 +117,9 @@ def orchestrate(
             os.environ["DRY_RUN"] = "true"
             _dry_run_set_by_us = True
         try:
-            from mcp.jira_stub import fetch_ticket
-            from tools.jira_client import map_ticket_to_state
-            ticket_data = fetch_ticket(jira_ticket)
+            from skills import default_registry
+            jira_state = default_registry.get("fetch_jira_ticket").run({"ticket_id": jira_ticket})
 
-            jira_state = map_ticket_to_state(ticket_data)
             state.update(jira_state)
             title = state["issue_title"]
             description = state["issue_description"]
@@ -140,16 +138,12 @@ def orchestrate(
             github_pr_urls = state.get("github_pr_urls", [])
             if github_pr_urls:
                 try:
-                    from tools.github_client import get_github_client, is_github_configured
-                    if is_github_configured():
-                        gh_client = get_github_client()
-                        github_pr_data = gh_client.fetch_prs_from_urls(github_pr_urls)
-                        state["github_pr_data"] = github_pr_data
-                        print(f"  GitHub PRs: {len(github_pr_data)} PR(s) fetched")
-                        for pr in github_pr_data:
-                            print(f"    #{pr['pr_number']} [{pr['state']}] {pr['title']}")
-                    else:
-                        print(f"  GitHub PRs: {len(github_pr_urls)} linked (GITHUB_TOKEN not set, skipping fetch)")
+                    github_pr_data_result = default_registry.get("fetch_github_prs").run({"pr_urls": github_pr_urls})
+                    github_pr_data = github_pr_data_result["pr_data"]
+                    state["github_pr_data"] = github_pr_data
+                    print(f"  GitHub PRs: {len(github_pr_data)} PR(s) fetched")
+                    for pr in github_pr_data:
+                        print(f"    #{pr['pr_number']} [{pr['state']}] {pr['title']}")
                 except Exception as e:
                     print(f"  GitHub PR fetch failed (non-blocking): {e}")
         except ConnectionError as e:
