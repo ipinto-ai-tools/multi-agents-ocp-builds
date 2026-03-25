@@ -30,11 +30,16 @@ orchestrate(title, description, repo_path, issue_type)
   │   │   → FetchJiraTicketSkill._execute() [skills/jira.py]
   │   │       ├─ fetch_ticket() [mcp/jira_stub.py]
   │   │       └─ map_ticket_to_state() [tools/jira_client.py]
-  │   │   → returns merged AgentState Jira fields
+  │   │           └─ redact_pii(ticket_dict, source="jira:<id>") [tools/pii_redactor.py]
+  │   │               ← PII redacted here before data enters state
+  │   │   → returns merged AgentState Jira fields (already redacted)
   │   └─ default_registry.get("fetch_github_prs").run({"pr_urls": urls})
   │       → FetchGitHubPRsSkill._execute() [skills/github.py]
   │           └─ GitHubClient.fetch_prs_from_urls() [tools/github_client.py]
-  │       → returns {"pr_data": [...]}
+  │               └─ GitHubClient.fetch_pr() per URL
+  │                   └─ redact_pii(pr_dict, source="github:owner/repo#N") [tools/pii_redactor.py]
+  │                       ← PII redacted here before data enters state
+  │       → returns {"pr_data": [...]} (already redacted)
   │
   │   Note: both skills check DRY_RUN via Skill.run() [skills/base.py] before
   │   dispatching. In dry-run mode _mock_response() is called instead of _execute().
@@ -261,6 +266,7 @@ These modules are consumed by multiple callers across the codebase. When modifyi
 | `config/agent_prompts.py` | System prompt constants | All 5 agents (injected as the `system` argument to `client.messages.create()`) |
 | `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 5 agents, `dashboard/backend.py`, `agents/graph.py` |
 | `skills/__init__.py` | `default_registry` | `scripts/orchestrate.py`, `scripts/test_agents.py` (entry points only — agents do not import from `skills/`) |
+| `tools/pii_redactor.py` | `redact_pii()`, `is_redaction_enabled()` | `tools/jira_client.py`, `tools/github_client.py` (called at the end of each fetch function) |
 
 ---
 
