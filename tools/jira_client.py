@@ -15,6 +15,7 @@ from typing import Any
 import requests
 
 from config.jira_config import ACCEPTANCE_CRITERIA_FIELD_ID, ISSUE_TYPE_MAP
+from tools.pii_redactor import redact_pii
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ class JiraClient:
         linked_issues = self._extract_linked_issues(fields)
         github_pr_urls = self._fetch_remotelinks(ticket_id)
 
-        return {
+        ticket_dict = {
             "ticket_id": ticket_id,
             "ticket_url": f"{self.base_url}/browse/{ticket_id}",
             "summary": fields.get("summary", ""),
@@ -108,6 +109,7 @@ class JiraClient:
             "fix_versions": [v.get("name") for v in fields.get("fixVersions", [])],
             "github_pr_urls": github_pr_urls,
         }
+        return redact_pii(ticket_dict, source=f"jira:{ticket_id}")
 
     def _fetch_comments(self, ticket_id: str) -> list[str]:
         """Fetch all comments for a ticket, return as plain text list."""
@@ -117,7 +119,7 @@ class JiraClient:
             response.raise_for_status()
             comments_data = response.json().get("comments", [])
             return [
-                f"{c.get('author', {}).get('displayName', 'Unknown')}: {self._extract_text(c.get('body'))}"
+                f"[CUSTOMER_REDACTED]: {self._extract_text(c.get('body'))}"
                 for c in comments_data
             ]
         except Exception as e:

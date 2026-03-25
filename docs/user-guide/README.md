@@ -61,6 +61,12 @@ This system automates the design, development, testing, and documentation workfl
 | [Output Validation](06-advanced/output-validation.md) | Per-phase validation and manual approval |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
 
+### Section 7 - Security
+
+| Page | Description |
+|------|-------------|
+| [PII Redaction](07-security/pii-redaction.md) | How Jira and GitHub data is redacted before entering the agent pipeline |
+
 ### Section 7 - Examples
 
 | Page | Description |

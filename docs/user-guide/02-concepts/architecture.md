@@ -194,6 +194,23 @@ configuration, and manual approval mode.
 
 ---
 
+## PII Redaction Layer
+
+All data fetched from external sources (Jira tickets, GitHub PRs) is redacted before it enters the agent pipeline. Redaction happens inside the fetch functions themselves — `JiraClient.fetch_ticket()` and `GitHubClient.fetch_pr()` — so PII never appears in workflow state, agent prompts, or dashboard heartbeats.
+
+**What is redacted:**
+
+- Personal name fields (`reporter`, `assignee`, `author`, `reviewers`) are replaced with `[CUSTOMER_REDACTED]`
+- Free-text fields (`summary`, `description`, `title`, `body`, `comments`, `acceptance_criteria`) are scanned for IPv4/IPv6 addresses, email addresses, phone numbers, and internal hostnames
+
+**Public domain allowlist:** URLs and email addresses belonging to known public domains (such as `github.com`, `redhat.com`, `kubernetes.io`) are preserved. The full list is defined in `config/redaction_config.py`.
+
+**Disabling:** Set `PII_REDACTION_ENABLED=false` to bypass redaction during local development. This setting must not be used in production.
+
+See [PII Redaction](../07-security/pii-redaction.md) for the full reference.
+
+---
+
 ## Supporting Components
 
 ### Dashboard
@@ -229,6 +246,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 - `tools/rag_search.py` - Documentation search with RAG for the docs agent
 - `tools/git_ops.py` - Git operations and repository utilities
 - `tools/github_client.py` - GitHub REST API client for fetching PR metadata linked to Jira tickets via remote links
+- `tools/pii_redactor.py` - PII redaction applied at fetch time to all Jira and GitHub data
 
 ### Configuration
 
@@ -236,6 +254,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 - `config/agent_prompts.py` - System prompts for each agent
 - `config/testing_config.py` - Ginkgo v2 test patterns and templates
 - `config/mock_responses.py` - Mock API responses for dry run mode
+- `config/redaction_config.py` - Public domain allowlist for PII redaction
 
 ### Agent Prompts (`config/agent_prompts.py`)
 
@@ -293,7 +312,7 @@ muilti-agents-ocp-builds/
 │   ├── jira.py      # FetchJiraTicketSkill, UpdateJiraSkill
 │   └── github.py    # FetchGitHubPRsSkill
 ├── tests/           # pytest test suite
-├── tools/           # repo_search, rag_search, git_ops, github_client
+├── tools/           # repo_search, rag_search, git_ops, github_client, pii_redactor
 └── utils/           # logging_config.py
 ```
 

@@ -110,6 +110,14 @@ GITHUB_REQUEST_TIMEOUT=10
 
 To create a token: GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens. Required scope: `Contents` (read-only) on the target repositories.
 
+### Privacy and Security
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PII_REDACTION_ENABLED` | `true` | Redact PII from Jira and GitHub data before it enters the agent pipeline. Set to `false` only for local development — never in production. |
+
+See [PII Redaction](../07-security/pii-redaction.md) for details on what is redacted and how the public domain allowlist works.
+
 ### Agent Behavior
 
 | Variable | Default | Description |
