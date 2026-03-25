@@ -1,6 +1,6 @@
 # Testing
 
-The test suite validates all agents, the orchestration workflow, the skills layer, the PII redaction layer, and the Prompt Injection Guard using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 546 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
+The test suite validates all agents, the orchestration workflow, the skills layer, the PII redaction layer, the Prompt Injection Guard, the Output Sanitizer, and the claude-hooks prompt injection defender using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 659 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
 
 ---
 
@@ -8,8 +8,8 @@ The test suite validates all agents, the orchestration workflow, the skills laye
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 546 |
-| Core test modules | 17 |
+| Total tests | 659 |
+| Core test modules | 19 |
 | Mock-mode execution time | Completes in seconds |
 | Real API execution time | Varies (network latency) |
 | Test framework | pytest |
