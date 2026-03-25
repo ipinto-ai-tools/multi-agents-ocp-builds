@@ -319,9 +319,9 @@ class TestFetchTicket:
             result = client.fetch_ticket("SHIP-300")
 
         assert len(result["comments"]) == 2
-        assert "Alice Dev" in result["comments"][0]
+        assert "[CUSTOMER_REDACTED]" in result["comments"][0]
         assert "Started implementation." in result["comments"][0]
-        assert "Bob PM" in result["comments"][1]
+        assert "[CUSTOMER_REDACTED]" in result["comments"][1]
 
     def test_fetch_ticket_comments_failure_is_graceful(self, client):
         """If the comments endpoint fails, fetch_ticket should still succeed."""
