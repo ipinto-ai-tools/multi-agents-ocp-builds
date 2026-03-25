@@ -15,6 +15,7 @@ import yaml
 
 from config.agent_prompts import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from tools.prompt_guard import sanitize_external_input
 from utils.file_logger import get_logger, get_session_logger
 from config.testing_config import (
     detect_patterns_in_description,
@@ -215,24 +216,40 @@ def _build_testing_prompt(
         "## Feature/Bug Information\n",
     ]
 
-    if context.get("issue_title"):
-        prompt_parts.append(f"**Title:** {context['issue_title']}\n")
+    issue_title = sanitize_external_input(context.get("issue_title", ""), source="testing:issue_title")
+    issue_description = sanitize_external_input(context.get("issue_description", ""), source="testing:issue_description")
+    design_analysis = sanitize_external_input(context.get("design_analysis", ""), source="testing:design_analysis")
+    acceptance_criteria = [
+        sanitize_external_input(c, source=f"testing:acceptance_criteria:{i}")
+        for i, c in enumerate(context.get("acceptance_criteria", []))
+    ]
+    risks = [
+        sanitize_external_input(r, source=f"testing:risks:{i}")
+        for i, r in enumerate(context.get("risks", []))
+    ]
+    impacted_components = [
+        sanitize_external_input(c, source=f"testing:impacted_components:{i}")
+        for i, c in enumerate(context.get("impacted_components", []))
+    ]
+
+    if issue_title:
+        prompt_parts.append(f"**Title:** {issue_title}\n")
 
     if context.get("issue_type"):
         prompt_parts.append(f"**Type:** {context['issue_type']}\n")
 
-    if context.get("issue_description"):
-        prompt_parts.append(f"\n**Description:**\n{context['issue_description']}\n")
+    if issue_description:
+        prompt_parts.append(f"\n**Description:**\n{issue_description}\n")
 
     prompt_parts.append("\n## Design Analysis\n")
-    prompt_parts.append(f"{context['design_analysis']}\n")
+    prompt_parts.append(f"{design_analysis}\n")
 
     prompt_parts.append("\n## Impacted Components\n")
-    for component in context["impacted_components"]:
+    for component in impacted_components:
         prompt_parts.append(f"- {component}\n")
 
     prompt_parts.append("\n## Acceptance Criteria\n")
-    for idx, criterion in enumerate(context["acceptance_criteria"], 1):
+    for idx, criterion in enumerate(acceptance_criteria, 1):
         prompt_parts.append(f"{idx}. {criterion}\n")
 
     if context.get("implementation_plan"):
@@ -243,9 +260,9 @@ def _build_testing_prompt(
         else:
             prompt_parts.append(f"{context['implementation_plan']}\n")
 
-    if context.get("risks"):
+    if risks:
         prompt_parts.append("\n## Risks to Test\n")
-        for risk in context["risks"]:
+        for risk in risks:
             prompt_parts.append(f"- {risk}\n")
 
     # Add detected patterns

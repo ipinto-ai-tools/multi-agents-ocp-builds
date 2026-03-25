@@ -22,6 +22,7 @@ from config.shipwright_components import (
     OPENSHIFT_INTEGRATIONS,
 )
 from tools.repo_search import RepoSearch
+from tools.prompt_guard import sanitize_external_input
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -248,6 +249,9 @@ def _build_analysis_prompt(
     Returns:
         Formatted prompt string
     """
+    title = sanitize_external_input(title, source="design:title")
+    description = sanitize_external_input(description, source="design:description")
+
     prompt_parts = [
         "# Design Analysis Request\n",
         f"## Issue Title\n{title}\n",
