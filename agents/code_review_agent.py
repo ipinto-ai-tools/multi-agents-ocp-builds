@@ -22,6 +22,7 @@ from typing import Any
 from config.agent_prompts import CODE_REVIEW_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
+from tools.prompt_guard import sanitize_external_input
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +122,15 @@ def _run_claude_review(state: dict[str, Any]) -> dict[str, Any]:
 
     code_content = _format_code_for_review(state.get("code_files", []))
     design_analysis = state.get("design_analysis", "")[:2000]
+    design_analysis = sanitize_external_input(design_analysis, source="code_review:design_analysis")
     acceptance_criteria = state.get("acceptance_criteria", [])
     iteration = state.get("review_iteration", 0)
 
-    ac_block = "\n".join(f"- {c}" for c in acceptance_criteria) if acceptance_criteria else "Not specified"
+    safe_criteria = [
+        sanitize_external_input(c, source=f"code_review:acceptance_criteria:{i}")
+        for i, c in enumerate(acceptance_criteria)
+    ]
+    ac_block = "\n".join(f"- {c}" for c in safe_criteria) if safe_criteria else "Not specified"
     iteration_note = (
         "Previous findings have been addressed. Focus on remaining or new issues."
         if iteration > 0

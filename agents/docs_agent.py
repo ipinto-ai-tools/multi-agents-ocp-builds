@@ -20,6 +20,7 @@ from anthropic import APIError
 
 from config.agent_prompts import DOCS_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from tools.prompt_guard import sanitize_external_input
 from tools.rag_search import RAGSearch, RAGSearchError
 from utils.file_logger import get_logger, get_session_logger
 
@@ -362,11 +363,13 @@ def _build_context_message(
     """
     message_parts = []
 
-    # Issue information
+    # Issue information (sanitize external-origin fields before injection)
     if "issue_title" in context:
-        message_parts.append(f"## Issue Title\n{context['issue_title']}\n")
+        issue_title = sanitize_external_input(context["issue_title"], source="docs:issue_title")
+        message_parts.append(f"## Issue Title\n{issue_title}\n")
     if "issue_description" in context:
-        message_parts.append(f"## Issue Description\n{context['issue_description']}\n")
+        issue_description = sanitize_external_input(context["issue_description"], source="docs:issue_description")
+        message_parts.append(f"## Issue Description\n{issue_description}\n")
     if "issue_type" in context:
         message_parts.append(f"## Issue Type\n{context['issue_type']}\n")
 
@@ -458,27 +461,40 @@ def _build_context_message(
             "Use the PR titles, descriptions, and metadata to enrich the documentation.\n"
         )
         for pr in github_pr_data:
+            pr_url = pr.get("pr_url", "unknown")
             state_label = pr.get("state", "unknown").upper()
+            pr_title = sanitize_external_input(pr.get("title", "N/A"), source=f"docs:github_pr:title:{pr_url}")
+            pr_author = sanitize_external_input(pr.get("author", "N/A"), source=f"docs:github_pr:author:{pr_url}")
+            pr_base_branch = sanitize_external_input(pr.get("base_branch", "N/A"), source=f"docs:github_pr:base_branch:{pr_url}")
+            reviewers = [
+                sanitize_external_input(r, source=f"docs:github_pr:reviewer:{pr_url}")
+                for r in pr.get("reviewers", [])
+            ]
+            labels = [
+                sanitize_external_input(l, source=f"docs:github_pr:label:{pr_url}")
+                for l in pr.get("labels", [])
+            ]
             message_parts.append(
-                f"### PR #{pr.get('pr_number')} — {pr.get('title', 'N/A')} [{state_label}]\n"
-                f"**URL**: {pr.get('pr_url', 'N/A')}\n"
+                f"### PR #{pr.get('pr_number')} — {pr_title} [{state_label}]\n"
+                f"**URL**: {pr_url}\n"
                 f"**Repository**: {pr.get('repo_full_name', 'N/A')}\n"
-                f"**Author**: {pr.get('author', 'N/A')}\n"
-                f"**Base branch**: {pr.get('base_branch', 'N/A')}\n"
+                f"**Author**: {pr_author}\n"
+                f"**Base branch**: {pr_base_branch}\n"
                 f"**Files changed**: {pr.get('files_changed', 0)} "
                 f"(+{pr.get('additions', 0)} / -{pr.get('deletions', 0)})\n"
             )
-            if pr.get("reviewers"):
-                message_parts.append(f"**Reviewers**: {', '.join(pr['reviewers'])}\n")
-            if pr.get("labels"):
-                message_parts.append(f"**Labels**: {', '.join(pr['labels'])}\n")
+            if reviewers:
+                message_parts.append(f"**Reviewers**: {', '.join(reviewers)}\n")
+            if labels:
+                message_parts.append(f"**Labels**: {', '.join(labels)}\n")
             if pr.get("merged_at"):
                 message_parts.append(f"**Merged**: {pr['merged_at']}\n")
             body = pr.get("body", "").strip()
             if body:
-                # Cap PR body at 2000 chars to avoid token bloat
+                # Cap PR body at 2000 chars to avoid token bloat, then sanitize
                 truncated = body[:2000] + ("\n...[truncated]" if len(body) > 2000 else "")
-                message_parts.append(f"\n**PR Description**:\n{truncated}\n")
+                safe_body = sanitize_external_input(truncated, source=f"docs:github_pr:{pr_url}")
+                message_parts.append(f"\n**PR Description**:\n{safe_body}\n")
             message_parts.append("\n")
     elif context.get("github_pr_urls"):
         # URLs were found but GitHub token not set — mention them for reference

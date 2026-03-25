@@ -194,7 +194,9 @@ configuration, and manual approval mode.
 
 ---
 
-## PII Redaction Layer
+## Security Layers
+
+### PII Redaction
 
 All data fetched from external sources (Jira tickets, GitHub PRs) is redacted before it enters the agent pipeline. Redaction happens inside the fetch functions themselves — `JiraClient.fetch_ticket()` and `GitHubClient.fetch_pr()` — so PII never appears in workflow state, agent prompts, or dashboard heartbeats.
 
@@ -208,6 +210,18 @@ All data fetched from external sources (Jira tickets, GitHub PRs) is redacted be
 **Disabling:** Set `PII_REDACTION_ENABLED=false` to bypass redaction during local development. This setting must not be used in production.
 
 See [PII Redaction](../07-security/pii-redaction.md) for the full reference.
+
+### Prompt Injection Guard
+
+External free-text fields (issue titles, descriptions, PR bodies) are sanitized inside each agent before the text is embedded into a Claude prompt. The guard strips five categories of injection patterns: role overrides, system-escape sequences, jailbreak tokens, base64-encoded payloads, and delimiter abuse.
+
+Sanitization runs at the agent layer — after PII redaction but before prompt assembly — so injected instructions in external content never reach the model.
+
+**Audit logging:** When a pattern is matched, a `WARNING` log line records the category and source field only. The matched content is never logged.
+
+**Disabling:** Set `PROMPT_GUARD_ENABLED=false` to bypass sanitization during local development. This setting must not be used in production.
+
+See [Prompt Injection Guard](../07-security/prompt-injection-guard.md) for the full reference.
 
 ---
 
