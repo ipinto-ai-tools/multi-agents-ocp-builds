@@ -1,6 +1,6 @@
 # Testing
 
-The test suite validates all agents and the orchestration workflow using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 390 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
+The test suite validates all agents, the orchestration workflow, the skills layer, the PII redaction layer, the Prompt Injection Guard, the Output Sanitizer, and the claude-hooks prompt injection defender using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 659 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
 
 ---
 
@@ -8,8 +8,8 @@ The test suite validates all agents and the orchestration workflow using a dual-
 
 | Metric | Value |
 | ------ | ----- |
-| Total tests | 390 |
-| Core test modules | 14 |
+| Total tests | 659 |
+| Core test modules | 19 |
 | Mock-mode execution time | Completes in seconds |
 | Real API execution time | Varies (network latency) |
 | Test framework | pytest |
@@ -18,9 +18,9 @@ The test suite validates all agents and the orchestration workflow using a dual-
 
 The suite detects your environment at collection time and adjusts automatically.
 
-**Mock mode** runs when `ANTHROPIC_VERTEX_PROJECT_ID` is not set or the `google-auth` package is not installed. All tests that require a live API are skipped; the remaining 384 tests run entirely offline using fixtures and `unittest.mock` patches. This is the default for local development and CI pipelines without credentials.
+**Mock mode** runs when `ANTHROPIC_VERTEX_PROJECT_ID` is not set or the `google-auth` package is not installed. All tests that require a live API are skipped; the remaining 540 tests run entirely offline using fixtures and `unittest.mock` patches. This is the default for local development and CI pipelines without credentials.
 
-**Real API mode** activates when `ANTHROPIC_VERTEX_PROJECT_ID` is set and `google.auth` is importable. All 390 tests run, including the 6 tests that are auto-skipped in mock mode and make actual calls to Claude via Vertex AI. Use this mode to validate end-to-end integration or catch breaking API changes.
+**Real API mode** activates when `ANTHROPIC_VERTEX_PROJECT_ID` is set and `google.auth` is importable. All 430 tests run, including the 6 tests that are auto-skipped in mock mode and make actual calls to Claude via Vertex AI. Use this mode to validate end-to-end integration or catch breaking API changes.
 
 ---
 
@@ -112,8 +112,11 @@ uv run pytest tests/test_agents_validator_design.py::TestDesignAgent::test_desig
 
 | File | Tests | What It Covers |
 | ---- | ----- | -------------- |
+| `test_prompt_guard.py` | 73 | Prompt Injection Guard: all five attack categories, audit log behavior, env var toggle, non-string passthrough |
 | `test_agents_code_review.py` | 90 | Code Review Agent: output parsing, severity classification, auto-fix loop routing, dry-run, validators, mock responses |
 | `test_agents_validator_jira.py` | 68 | Jira ticket fetching, context injection, field parsing, error handling, dry-run mode |
+| `test_pii_redactor.py` | 43 | PII redaction: regex patterns (IPv4, IPv6, email, phone, hostname), allowlist suffix matching, personal name fields, field routing, env var toggle |
+| `test_skills.py` | 31 | `Skill` base class DRY_RUN dispatch, `FetchJiraTicketSkill`, `UpdateJiraSkill`, `FetchGitHubPRsSkill`, `SkillRegistry` |
 | `test_agents_validator_develop.py` | 34 | Development agent code generation, prompt building, output parsing, review feedback injection |
 | `test_agents_validator_orchestration.py` | 29 | Full 5-agent workflow, state management, node execution, graph routing, auto-fix loop |
 | `test_agents_validator_dashboard.py` | 25 | Dashboard heartbeat, enricher pipeline, session storage, REST endpoints |
@@ -322,7 +325,7 @@ When `ANTHROPIC_VERTEX_PROJECT_ID` is not set as a secret, all tests guarded by 
 | Mock patches not applying | Confirm the patch target path matches the import in the module under test (patch where it is used, not where it is defined) |
 | `conftest.py` fixtures not found | Confirm `tests/conftest.py` exists and pytest is invoked from the project root |
 | Vertex AI quota errors | Check GCP console for rate limits; consider running real API tests on a schedule rather than every commit |
-| `384 passed, 6 skipped` result | Expected behavior in mock mode — the 6 skipped tests require `ANTHROPIC_VERTEX_PROJECT_ID` (they use `skipif(not HAS_ANTHROPIC_AUTH)` from `tests/auth_helper.py`) |
+| `540 passed, 6 skipped` result | Expected behavior in mock mode — the 6 skipped tests require `ANTHROPIC_VERTEX_PROJECT_ID` (they use `skipif(not HAS_ANTHROPIC_AUTH)` from `tests/auth_helper.py`) |
 
 ---
 

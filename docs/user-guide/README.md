@@ -61,6 +61,15 @@ This system automates the design, development, testing, and documentation workfl
 | [Output Validation](06-advanced/output-validation.md) | Per-phase validation and manual approval |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
 
+### Section 7 - Security
+
+| Page                                                                        | Description                                                                  |
+|-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| [PII Redaction](07-security/pii-redaction.md)                               | How Jira and GitHub data is redacted before entering the agent pipeline      |
+| [Prompt Injection Guard](07-security/prompt-injection-guard.md)             | How external text is sanitized to prevent prompt injection attacks           |
+| [Log & Output Sanitizer](07-security/output-sanitizer.md)                   | Layer 3: egress protection — scrubs sensitive data from logs and outputs     |
+| [claude-hooks PostToolUse Integration](07-security/claude-hooks.md)         | Layer 4: host-level defense via Claude Code hooks                            |
+
 ### Section 7 - Examples
 
 | Page | Description |

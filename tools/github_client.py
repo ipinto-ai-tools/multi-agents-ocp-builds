@@ -15,6 +15,8 @@ from typing import Any
 
 import requests
 
+from tools.pii_redactor import redact_pii
+
 logger = logging.getLogger(__name__)
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
@@ -83,7 +85,7 @@ class GitHubClient:
         merged = data.get("merged", False)
         state = "merged" if merged else data.get("state", "")
 
-        return {
+        pr_dict = {
             "pr_number": data.get("number"),
             "pr_url": data.get("html_url", ""),
             "title": data.get("title", ""),
@@ -103,6 +105,7 @@ class GitHubClient:
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),
         }
+        return redact_pii(pr_dict, source=f"github:{owner}/{repo}#{pr_number}")
 
     def fetch_prs_from_urls(self, pr_urls: list[str]) -> list[dict[str, Any]]:
         """Fetch multiple PRs from a list of GitHub PR URLs.

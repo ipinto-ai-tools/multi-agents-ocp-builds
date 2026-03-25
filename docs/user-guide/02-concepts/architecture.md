@@ -194,6 +194,63 @@ configuration, and manual approval mode.
 
 ---
 
+## Security Layers
+
+### PII Redaction
+
+All data fetched from external sources (Jira tickets, GitHub PRs) is redacted before it enters the agent pipeline. Redaction happens inside the fetch functions themselves — `JiraClient.fetch_ticket()` and `GitHubClient.fetch_pr()` — so PII never appears in workflow state, agent prompts, or dashboard heartbeats.
+
+**What is redacted:**
+
+- Personal name fields (`reporter`, `assignee`, `author`, `reviewers`) are replaced with `[CUSTOMER_REDACTED]`
+- Free-text fields (`summary`, `description`, `title`, `body`, `comments`, `acceptance_criteria`) are scanned for IPv4/IPv6 addresses, email addresses, phone numbers, and internal hostnames
+
+**Public domain allowlist:** URLs and email addresses belonging to known public domains (such as `github.com`, `redhat.com`, `kubernetes.io`) are preserved. The full list is defined in `config/redaction_config.py`.
+
+**Disabling:** Set `PII_REDACTION_ENABLED=false` to bypass redaction during local development. This setting must not be used in production.
+
+See [PII Redaction](../07-security/pii-redaction.md) for the full reference.
+
+### Prompt Injection Guard
+
+External free-text fields (issue titles, descriptions, PR bodies) are sanitized inside each agent before the text is embedded into a Claude prompt. The guard strips five categories of injection patterns: role overrides, system-escape sequences, jailbreak tokens, base64-encoded payloads, and delimiter abuse.
+
+Sanitization runs at the agent layer — after PII redaction but before prompt assembly — so injected instructions in external content never reach the model.
+
+**Audit logging:** When a pattern is matched, a `WARNING` log line records the category and source field only. The matched content is never logged.
+
+**Disabling:** Set `PROMPT_GUARD_ENABLED=false` to bypass sanitization during local development. This setting must not be used in production.
+
+See [Prompt Injection Guard](../07-security/prompt-injection-guard.md) for the full reference.
+
+### Output Sanitizer
+
+The Output Sanitizer (Layer 3) protects all egress channels from containing PII. Where Layers 1 and 2 guard data entering the pipeline, Layer 3 guards data leaving it.
+
+**Protected channels:**
+
+- **Python logging** — `SanitizingFilter` is attached to every handler (file and console). It pre-formats log records to resolve `%s`/`%d` placeholders before sanitizing, preventing a bypass where a clean format string is combined with a PII-containing argument.
+- **Generated artifacts** — `test_plan.md` and Go test files written by the Testing Agent are sanitized before being written to disk.
+- **Dashboard heartbeat payloads** — the full heartbeat dict is recursively sanitized before the HTTP POST to the dashboard.
+
+The sanitizer reuses `_redact_text` from `pii_redactor.py`, so the same patterns and replacement tokens apply at both layers. Sanitization is idempotent — running it on already-redacted text is safe.
+
+**Disabling:** Set `OUTPUT_SANITIZER_ENABLED=false` to bypass sanitization during local development. This setting must not be used in production.
+
+See [Output Sanitizer](../07-security/output-sanitizer.md) for the full reference.
+
+### Claude Hooks — PostToolUse Defender
+
+The PostToolUse Prompt Injection Defender (Layer 4) operates at the Claude Code host level, outside the Python application. After every tool call (`Read`, `WebFetch`, `Bash`, `Grep`, `Task`, `mcp__*`), the hook scans the tool output for injection patterns using the same categories as the Prompt Injection Guard plus a custom Jira-specific category.
+
+The hook is warn-only: it always exits with code 0 so tool execution is never blocked. When a pattern is detected, Claude receives a warning alongside the tool output, giving it the context to evaluate the content critically.
+
+**Pattern categories (59+ total):** instruction override, role-playing/DAN, encoding obfuscation, context manipulation, and Jira-specific injection patterns.
+
+See [Claude Hooks](../07-security/claude-hooks.md) for the full reference, including how to add custom patterns.
+
+---
+
 ## Supporting Components
 
 ### Dashboard
@@ -201,6 +258,25 @@ configuration, and manual approval mode.
 The dashboard (`dashboard/backend.py`) is an optional FastAPI server with SQLite storage. Agents emit heartbeats via HTTP POST to `/api/heartbeat`. If the dashboard is unreachable, heartbeats fail silently so the workflow is not blocked.
 
 See [Dashboard Overview](../04-dashboard/overview.md).
+
+### Skills Layer
+
+The `skills/` package is a thin, uniform wrapper over the external integrations in `tools/`. Skills are called exclusively from entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) — agents in the pipeline do not call skills directly.
+
+**Key design properties:**
+
+- Skills do not replace `tools/` — all business logic remains in `tools/` unchanged.
+- `DRY_RUN` handling is centralized: `Skill.run()` checks the `DRY_RUN` environment variable and automatically routes to `_mock_response()` instead of `_execute()`, so every skill gets offline mode for free.
+- Each skill declares `input_schema` and `output_schema` as JSON Schema dicts, making them MCP-ready without additional glue code.
+- `__init_subclass__` enforces required class attributes (`name`, `description`, `input_schema`, `output_schema`) at class definition time, catching misconfigured skills before runtime.
+
+**Registered skills (`skills/default_registry` via `skills/__init__.py`):**
+
+| Skill name | Wraps | Input | Output |
+| --- | --- | --- | --- |
+| `fetch_jira_ticket` | `mcp.jira_stub.fetch_ticket()` + `tools.jira_client.map_ticket_to_state()` | `{"ticket_id": str}` | AgentState Jira fields |
+| `update_jira` | `tools.jira_client.JiraClient.update_ticket()` | `{"ticket_id": str, "comment": str}` | `{"success": bool}` |
+| `fetch_github_prs` | `tools.github_client.GitHubClient.fetch_prs_from_urls()` | `{"pr_urls": list[str]}` | `{"pr_data": list[dict]}` |
 
 ### Repository Analysis Tools
 
@@ -210,6 +286,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 - `tools/rag_search.py` - Documentation search with RAG for the docs agent
 - `tools/git_ops.py` - Git operations and repository utilities
 - `tools/github_client.py` - GitHub REST API client for fetching PR metadata linked to Jira tickets via remote links
+- `tools/pii_redactor.py` - PII redaction applied at fetch time to all Jira and GitHub data
 
 ### Configuration
 
@@ -217,6 +294,7 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 - `config/agent_prompts.py` - System prompts for each agent
 - `config/testing_config.py` - Ginkgo v2 test patterns and templates
 - `config/mock_responses.py` - Mock API responses for dry run mode
+- `config/redaction_config.py` - Public domain allowlist for PII redaction
 
 ### Agent Prompts (`config/agent_prompts.py`)
 
@@ -267,8 +345,14 @@ muilti-agents-ocp-builds/
 ├── graph/           # AgentState schema (state.py)
 ├── mcp/             # MCP server stubs (future integrations)
 ├── scripts/         # orchestrate.py, run_dashboard.py, test_agents.py
+├── skills/          # Thin entry-point wrappers over tools/ (MCP-ready, DRY_RUN-aware)
+│   ├── __init__.py  # default_registry pre-populated with all three skills
+│   ├── base.py      # Skill ABC: run() dispatches to _mock_response() or _execute()
+│   ├── registry.py  # SkillRegistry with register/get/list_skills
+│   ├── jira.py      # FetchJiraTicketSkill, UpdateJiraSkill
+│   └── github.py    # FetchGitHubPRsSkill
 ├── tests/           # pytest test suite
-├── tools/           # repo_search, rag_search, git_ops, github_client
+├── tools/           # repo_search, rag_search, git_ops, github_client, pii_redactor
 └── utils/           # logging_config.py
 ```
 

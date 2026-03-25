@@ -105,3 +105,6 @@ Tests are in `tests/` and use pytest. The `conftest.py` provides shared fixtures
 | `DASHBOARD_URL` | Dashboard URL (default: `http://localhost:8080`) |
 | `DASHBOARD_ENABLED` | Enable heartbeats (default: `true`) |
 | `DASHBOARD_DB_PATH` | SQLite DB path (default: `/tmp/claude/dashboard.db`) |
+| `PII_REDACTION_ENABLED` | Redact PII from Jira/GitHub data at fetch time (default: `true`). Set to `false` for local dev only. |
+| `PROMPT_GUARD_ENABLED` | Sanitize external text for prompt injection patterns before prompt assembly (default: `true`). Set to `false` for local dev only. |
+| `OUTPUT_SANITIZER_ENABLED` | Enable/disable output sanitizer (default: `true`) |

@@ -14,6 +14,8 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
+from tools.output_sanitizer import SanitizingFilter
+
 # Base logs directory
 LOGS_DIR = Path(__file__).parent.parent / "logs"
 
@@ -61,6 +63,7 @@ def get_logger(
     if console_output:
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
+        console_handler.addFilter(SanitizingFilter())
         logger.addHandler(console_handler)
 
     # File handler
@@ -92,6 +95,7 @@ def get_logger(
             backupCount=5
         )
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(SanitizingFilter())
         logger.addHandler(file_handler)
 
     return logger
