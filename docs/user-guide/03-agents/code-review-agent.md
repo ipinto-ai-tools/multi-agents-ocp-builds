@@ -113,19 +113,44 @@ By default, the Code Review Agent uses Claude to perform the review. No addition
 
 To enable enhanced static analysis via Qodo CLI:
 
-1. Install the Qodo CLI:
-
-```bash
-npm install -g @qodo/command
-```
-
-2. Add the binary path to your `.env` file:
-
-```bash
-QODO_CLI_PATH=/usr/local/bin/qodo
-```
+1. Install the Qodo CLI: `npm install -g @qodo/command`
+2. Authenticate with Qodo (see [Qodo Authentication](#qodo-authentication) below).
+3. Set `QODO_CLI_PATH` in your `.env` file to the absolute path of the binary, for example: `QODO_CLI_PATH=/home/user/.npm-global/bin/qodo`
+4. Optionally set `QODO_API_KEY` for CI or headless environments (see below).
 
 When `QODO_CLI_PATH` is set, the agent runs the Qodo CLI against each generated file and merges its output with Claude's review before classifying findings. If the Qodo CLI is unavailable, exits with an error, or times out, the agent automatically falls back to Claude-only review and logs a warning. The pipeline is never blocked by a Qodo CLI failure.
+
+### Qodo Authentication
+
+Qodo supports two authentication methods:
+
+#### Browser OAuth (recommended for local development)
+
+Run `qodo login` once before using the CLI. This opens a browser window, completes the OAuth flow, and stores the token at `~/.qodo/auth.key`. No API key is required after this step.
+
+```bash
+qodo login
+```
+
+#### API key (for CI and headless environments)
+
+Generate an API key at <https://app.qodo.ai/settings/api-keys> and set it as an environment variable:
+
+```bash
+export QODO_API_KEY=your-api-key-here
+```
+
+Add `QODO_API_KEY` to your `.env` file or CI secrets so it is available at runtime.
+
+### Running in Non-TTY Environments (Claude Code, CI)
+
+Qodo's default interface is an interactive TUI that requires a real terminal. When invoked from Claude Code or a CI pipeline, use the `--ci` flag to run in headless mode:
+
+```bash
+qodo review --ci -y --model claude-sonnet-4-6 <path>
+```
+
+The `QODO_CLI_PATH` configuration in this project automatically appends `--ci` when invoking Qodo from the orchestrator, so no manual flag is needed during normal workflow execution.
 
 ---
 

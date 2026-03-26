@@ -315,8 +315,11 @@ def _parse_design_output(design_text: str) -> Dict[str, Any]:
         "implementation_plan": [],
     }
 
+    import re
+
     lines = design_text.split("\n")
     current_section = None
+    _risks_header_seen = False
 
     for line in lines:
         line_stripped = line.strip()
@@ -327,6 +330,7 @@ def _parse_design_output(design_text: str) -> Dict[str, Any]:
             continue
         elif "### Risks" in line or "## Risks" in line:
             current_section = "risks"
+            _risks_header_seen = False
             continue
         elif "### Acceptance Criteria" in line or "## Acceptance Criteria" in line:
             current_section = "acceptance_criteria"
@@ -334,16 +338,37 @@ def _parse_design_output(design_text: str) -> Dict[str, Any]:
         elif "### Implementation Plan" in line or "## Implementation Plan" in line:
             current_section = "implementation_plan"
             continue
-        elif line_stripped.startswith("##") or line_stripped.startswith("###"):
-            # New section that we're not tracking
+        elif line_stripped.startswith("###"):
+            # Sub-heading inside a tracked section — keep current_section
+            # Sub-heading outside — current_section is already None, stays None
+            continue
+        elif line_stripped.startswith("##"):
+            # Top-level heading for an untracked section — reset
             current_section = None
             continue
 
-        # Extract bullet points from current section
-        if current_section and line_stripped.startswith("-"):
-            item = line_stripped[1:].strip()
-            if item:
-                result[current_section].append(item)
+        # Extract bullet points and numbered list items from current section
+        if current_section:
+            if line_stripped.startswith("-"):
+                item = line_stripped[1:].strip()
+                if item:
+                    result[current_section].append(item)
+            elif re.match(r'^\d+\.\s+', line_stripped):
+                item = re.sub(r'^\d+\.\s+', '', line_stripped)
+                if item:
+                    result[current_section].append(item)
+            elif current_section == "risks" and line_stripped.startswith("|"):
+                # Collect Markdown table rows for risks, skip separator rows
+                if re.match(r'^\|[\s\-:|]+\|', line_stripped):
+                    # Separator row — skip
+                    continue
+                if not _risks_header_seen:
+                    # First non-separator | row is the header — skip it
+                    _risks_header_seen = True
+                    continue
+                item = line_stripped.strip("|").strip()
+                if item:
+                    result[current_section].append(item)
 
     # Also extract component names mentioned in the document
     for component_name in COMPONENTS.keys():
