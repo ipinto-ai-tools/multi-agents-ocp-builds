@@ -9,6 +9,7 @@ implementation planning.
 """
 
 import os
+import re
 from typing import Dict, Any, Optional
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT
@@ -334,8 +335,8 @@ def _parse_design_output(design_text: str) -> Dict[str, Any]:
         elif "### Implementation Plan" in line or "## Implementation Plan" in line:
             current_section = "implementation_plan"
             continue
-        elif line_stripped.startswith("##") or line_stripped.startswith("###"):
-            # New section that we're not tracking
+        elif line_stripped.startswith("##") and not line_stripped.startswith("###"):
+            # New ## section that we're not tracking; ### subheadings do NOT reset
             current_section = None
             continue
 
@@ -344,6 +345,12 @@ def _parse_design_output(design_text: str) -> Dict[str, Any]:
             item = line_stripped[1:].strip()
             if item:
                 result[current_section].append(item)
+        elif current_section:
+            numbered = re.match(r'^\d+\.\s+(.*)', line_stripped)
+            if numbered:
+                item = numbered.group(1).strip()
+                if item:
+                    result[current_section].append(item)
 
     # Also extract component names mentioned in the document
     for component_name in COMPONENTS.keys():
