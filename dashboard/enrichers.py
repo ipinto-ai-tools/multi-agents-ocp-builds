@@ -232,6 +232,10 @@ class TimestampEnricher(Enricher):
         if timestamp_str:
             try:
                 timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                # If still offset-naive (e.g. produced by datetime.utcnow().isoformat()),
+                # attach UTC so subtraction against an aware datetime doesn't raise TypeError.
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.replace(tzinfo=timezone.utc)
                 heartbeat["timestamp_formatted"] = timestamp.strftime("%Y-%m-%d %H:%M:%S")
                 heartbeat["timestamp_relative"] = self._relative_time(timestamp)
             except (ValueError, AttributeError):
