@@ -350,6 +350,53 @@
         .jira-badge:hover {
             background: #0065FF;
         }
+
+        .stale-badge {
+            display: inline-block;
+            background: #b45309;
+            color: #fef3c7;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .session-card.stale {
+            border-color: #b45309;
+            opacity: 0.85;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .toast.visible {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -362,6 +409,9 @@
             <button id="clearSessionsBtn" class="btn btn-danger">
                 Clear Completed Sessions
             </button>
+            <button id="clearStuckBtn" class="btn btn-secondary" title="Remove sessions that have not received updates in 6+ hours">
+                Clear Stuck Sessions
+            </button>
             <button id="refreshBtn" class="btn btn-primary">
                 Refresh
             </button>
@@ -372,6 +422,8 @@
         <button id="autoRefreshBtn" class="active">Auto-Refresh (5s)</button>
         <div class="status connected" id="statusIndicator">● Connected</div>
     </div>
+
+    <div id="toastEl" class="toast"></div>
 
     <div class="sessions-grid" id="sessionsGrid">
         <div class="empty-state">
@@ -395,6 +447,17 @@
         const refreshBtn = document.getElementById('refreshBtn');
         const autoRefreshBtn = document.getElementById('autoRefreshBtn');
         const clearSessionsBtn = document.getElementById('clearSessionsBtn');
+        const clearStuckBtn = document.getElementById('clearStuckBtn');
+        const toastEl = document.getElementById('toastEl');
+
+        // Show a brief toast notification
+        let toastTimer = null;
+        function showToast(message) {
+            toastEl.textContent = message;
+            toastEl.classList.add('visible');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove('visible'), 3000);
+        }
 
         // Fetch sessions from API
         async function fetchSessions() {
@@ -446,6 +509,14 @@
             if (status === 'complete') statusClass = 'complete';
             else if (status === 'error') statusClass = 'error';
 
+            // Stale detection: last update older than 2 hours and not in terminal phase
+            const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000;
+            const lastUpdate = session.updated_at ? new Date(session.updated_at) : null;
+            const isTerminal = status === 'complete' || status === 'error';
+            const isStale = lastUpdate && !isTerminal && (Date.now() - lastUpdate.getTime()) > STALE_THRESHOLD_MS;
+            const staleHtml = isStale ? '<span class="stale-badge">STALE</span>' : '';
+            const cardStaleClass = isStale ? ' stale' : '';
+
             // Jira ticket badge
             const jiraHtml = session.jira_ticket_id ? `
                 <a href="${session.jira_ticket_url || '#'}" target="_blank" class="jira-badge">
@@ -476,13 +547,13 @@
                 'pending';
 
             return `
-                <div class="session-card" data-session-id="${session.id}">
+                <div class="session-card${cardStaleClass}" data-session-id="${session.id}">
                     <div class="session-header">
                         <div class="status-dot ${statusClass}"></div>
                         <span class="session-id">${session.id.substring(0, 8)}</span>
                     </div>
 
-                    <div class="issue-title">${session.issue_title || 'Unknown Task'}${jiraHtml}</div>
+                    <div class="issue-title">${session.issue_title || 'Unknown Task'}${jiraHtml}${staleHtml}</div>
                     <span class="issue-type ${session.issue_type || 'feature'}">${session.issue_type || 'feature'}</span>
 
                     <div class="agents-status">
@@ -588,6 +659,34 @@
                 // Re-enable button
                 clearSessionsBtn.disabled = false;
                 clearSessionsBtn.textContent = 'Clear Completed Sessions';
+            }
+        });
+
+        // Clear stuck sessions button
+        clearStuckBtn.addEventListener('click', async () => {
+            if (!confirm('Clear all stuck/incomplete sessions (no update in 6+ hours)?')) return;
+
+            clearStuckBtn.disabled = true;
+            clearStuckBtn.textContent = 'Clearing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions/stuck?max_stale_hours=6`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                showToast(`Cleared ${data.sessions_deleted} stuck session(s)`);
+                await fetchSessions();
+            } catch (error) {
+                console.error('Error clearing stuck sessions:', error);
+                showToast('Failed to clear stuck sessions. Please try again.');
+            } finally {
+                clearStuckBtn.disabled = false;
+                clearStuckBtn.textContent = 'Clear Stuck Sessions';
             }
         });
 
