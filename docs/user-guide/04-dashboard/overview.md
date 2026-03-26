@@ -64,24 +64,65 @@ Session abc123
 Issue: Add timeout support to BuildRun
 Type: feature
 
-Design Agent     Complete
-Development      Complete
-Testing          In Progress
-Documentation    Waiting
+[ Design ] --> [ Dev ] --> [ Review ] --> [ Testing ] --> [ Docs ]
+  done           done        active         pending        pending
+
+Tests: 12 unit / 4 integration / 2 e2e
+Code files: 6    Artifacts: /tmp/claude/sessions/abc123/
+Review: PASS
+
+Started: 2026-03-26 14:00:00    Last updated: 2s ago
 
 Context: 64%
 Model: claude-sonnet-4
-Last update: 2s ago
 ```
 
-### Key Metrics
+### Session Card Layout
+
+Each session card displays the following fields:
+
+**Phase timeline strip**
+A row of five phase bubbles — Design, Dev, Review, Testing, Docs — shown in order. Each bubble carries one of three states:
+
+- `done` — the phase completed successfully
+- `active` — the phase is currently running
+- `pending` — the phase has not started yet
+
+The timeline gives an at-a-glance view of where the workflow is without reading individual status labels.
+
+**Test counts**
+Unit, integration, and end-to-end test counts produced by the Testing agent. Displayed as `N unit / N integration / N e2e`. These values are populated once the testing phase completes.
+
+**Code files count**
+The number of code files generated or modified by the Development agent.
+
+**Artifact path link**
+A clickable path to the session output directory on disk. Use this to locate generated code, test files, and documentation artifacts.
+
+**Review badge**
+A `PASS` or `FAIL` badge from the Code Review agent. A `FAIL` badge indicates the auto-fix loop is still iterating or that review did not pass before the workflow ended.
+
+**Dual timestamps**
+
+- **Started** — when the session was first created (first heartbeat received)
+- **Last updated** — time elapsed since the most recent heartbeat
+
+**Context and model**
+Context window usage percentage and the Claude model name in use.
+
+**Risks**
+If the Design agent identified risks, they are rendered directly in the card for quick reference.
+
+### Key Metrics and What to Monitor
 
 | Metric | What to watch for |
 |--------|-------------------|
-| **Context percentage** | Monitor for >80% - agent may run out of space before completing |
-| **Phase progression** | Confirms workflow is advancing (Design → Dev → Test → Docs → Done) |
+| **Phase timeline strip** | Check that bubbles progress left-to-right; a bubble stuck on `active` for a long time may indicate a hung agent |
+| **Context percentage** | Monitor for >80% — agent may run out of space before completing |
+| **Phase progression** | Confirms workflow is advancing (Design → Dev → Review → Test → Docs → Done) |
 | **Component impact** | Which parts of the Shipwright codebase are being analyzed |
-| **Last update** | If this stops updating, the agent may have hung or crashed |
+| **Last updated** | If this stops advancing, the agent may have hung or crashed |
+| **Review badge** | A persistent `FAIL` badge means the review loop did not converge — check agent logs |
 
 ---
 

@@ -26,6 +26,17 @@ uv run python scripts/orchestrate.py \
   --description "Users need ability to specify build timeout to prevent hanging builds"
 ```
 
+To save artifacts to a local directory, add `--output-dir`:
+
+```bash
+uv run python scripts/orchestrate.py \
+  --title "Add timeout support to BuildRun" \
+  --description "Users need ability to specify build timeout to prevent hanging builds" \
+  --output-dir ./my-output
+```
+
+The directory is created if it does not exist. Artifacts saved include `state.json`, generated code under `code/`, tests under `tests/`, design analysis under `design/`, and documentation under `docs/`. The `--output-dir` path is required by `scripts/publish.py` when pushing artifacts to GitHub or Jira.
+
 ### What Happens
 
 The workflow runs through five sequential phases:
@@ -42,6 +53,27 @@ State transitions:
 ```
 init → design_complete → develop_complete → review_complete → testing_complete → done
 ```
+
+While the workflow runs, the terminal prints a header for each phase showing its position in the sequence and a per-phase timer:
+
+```text
+Phase 1/5 · Design
+Phase 2/5 · Development
+Phase 3/5 · Code Review
+Phase 4/5 · Testing
+Phase 5/5 · Documentation
+```
+
+When all phases finish, a summary block is printed:
+
+```text
+Run complete
+  Duration:   3m 42s
+  Artifacts:  ./my-output
+  Dashboard:  http://localhost:8080
+```
+
+The dashboard URL is omitted if `DASHBOARD_ENABLED` is set to `false`.
 
 If an agent raises an unhandled exception, the workflow sets `current_phase = "error"` and stops early. The final state contains the error message.
 

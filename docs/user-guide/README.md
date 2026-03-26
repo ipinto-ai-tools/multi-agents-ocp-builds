@@ -84,9 +84,10 @@ This system automates the design, development, testing, and documentation workfl
 
 ### Section 9 - Integrations
 
-| Page | Description |
-|------|-------------|
-| [Jira & Rovo](09-integrations/jira-rovo.md) | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup |
+| Page                                                               | Description                                                                       |
+|--------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| [Jira & Rovo](09-integrations/jira-rovo.md)                        | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup                  |
+| [Publishing Artifacts (`publish.py`)](09-integrations/publish.md)  | Push generated code, docs, and summaries to GitHub or Jira                        |
 
 ---
 
@@ -105,6 +106,7 @@ This system automates the design, development, testing, and documentation workfl
 | Debug a failing workflow | [Troubleshooting](06-advanced/troubleshooting.md) |
 | Understand how state flows between agents | [State Management](02-concepts/state-management.md) |
 | Use a Jira ticket as workflow input | [Jira & Rovo Integration](09-integrations/jira-rovo.md) |
+| Publish code/docs to GitHub or Jira | [Publishing Artifacts](09-integrations/publish.md) |
 | Review generated code automatically | [Code Review Agent](03-agents/code-review-agent.md) |
 
 ---

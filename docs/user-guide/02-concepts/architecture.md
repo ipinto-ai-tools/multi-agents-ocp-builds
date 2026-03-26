@@ -251,6 +251,36 @@ See [Claude Hooks](../07-security/claude-hooks.md) for the full reference, inclu
 
 ---
 
+## Terminal Output
+
+When you run the pipeline via `scripts/orchestrate.py`, each phase prints a numbered header so you can track progress at a glance. After every phase completes, the elapsed time for that phase is printed. When all phases finish, a summary is printed containing the total duration, the path to the saved output artifacts, and the dashboard URL.
+
+**Phase headers:**
+
+```text
+Phase 1/5 · Design
+Phase 2/5 · Development
+Phase 2.5/5 · Code Review
+Phase 3/5 · Testing
+Phase 4/5 · Documentation
+```
+
+**Per-phase completion line (example):**
+
+```text
+Design completed in 45.2s
+```
+
+**Final summary (example):**
+
+```text
+Pipeline completed in 3m 12s
+Artifacts: ./output/session-abc123/
+Dashboard: http://localhost:8080
+```
+
+---
+
 ## Supporting Components
 
 ### Dashboard

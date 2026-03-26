@@ -15,6 +15,15 @@ planning → executing → done
 
 Active sessions (any phase other than `done` or `error`) are never touched by cleanup operations.
 
+### Dual Timestamps
+
+Each session card in the UI shows two timestamps:
+
+- **Started** — when the first heartbeat for the session was received. This is the wall-clock time the workflow began.
+- **Last updated** — time elapsed since the most recent heartbeat. This value refreshes every 3 seconds while the dashboard is open.
+
+Use the gap between these two values to identify stuck sessions. If "Last updated" has not advanced for several minutes while the session is still in an active phase, the agent has likely hung or lost connectivity. See [Troubleshooting](#troubleshooting) for steps to investigate.
+
 ---
 
 ## Automatic Cleanup
