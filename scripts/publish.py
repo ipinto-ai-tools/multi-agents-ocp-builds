@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 import uuid
 
 from dotenv import find_dotenv, load_dotenv
@@ -25,7 +26,6 @@ load_dotenv(find_dotenv())
 
 def _safe_str(value: str) -> str:
     """Strip control characters and newlines from a string for safe use in git args."""
-    import unicodedata
     return "".join(c for c in value if not unicodedata.category(c).startswith("C"))
 
 
@@ -151,6 +151,8 @@ def _push_code(output_dir: pathlib.Path, config: dict, dry_run: bool) -> None:
 
     branch_name = f"feat/{jira_ticket_id.lower()}-{_slug(issue_title)}"
     commit_msg = f"feat({jira_ticket_id}): {issue_title}"
+    if len(commit_msg) > 72:
+        commit_msg = commit_msg[:69] + "..."
 
     # -- collect files --------------------------------------------------------
     code_files = _collect_files(output_dir / "code")
@@ -182,10 +184,7 @@ def _push_code(output_dir: pathlib.Path, config: dict, dry_run: bool) -> None:
         return
 
     # -- clone + push ---------------------------------------------------------
-    os.makedirs("/tmp/claude", exist_ok=True)
-    tmp_dir = pathlib.Path(
-        tempfile.mkdtemp(dir="/tmp/claude", prefix=f"publish-{uuid.uuid4().hex[:8]}-")
-    )
+    tmp_dir = pathlib.Path(tempfile.mkdtemp(prefix="publish-"))
     clone_dir = tmp_dir / "repo"
 
     # Build credential helper script so the token never appears in the clone URL.
@@ -197,7 +196,6 @@ def _push_code(output_dir: pathlib.Path, config: dict, dry_run: bool) -> None:
     env = {
         **os.environ,
         "GIT_ASKPASS": str(cred_script),
-        "GIT_USERNAME": "x-token",
         "GIT_TOKEN": github_token,
     }
 
@@ -289,11 +287,7 @@ def _push_jira(output_dir: pathlib.Path, config: dict, dry_run: bool) -> None:
     email = config.get("email", "")
     api_token = config.get("api_token", "")
 
-    missing = []
-    if not base_url:
-        missing.append("JIRA_BASE_URL")
-    if not api_token:
-        missing.append("JIRA_API_TOKEN")
+    missing = [k for k, v in {"JIRA_BASE_URL": base_url, "JIRA_API_TOKEN": api_token, "JIRA_USER_EMAIL": email}.items() if not v]
 
     if missing:
         print(
@@ -380,8 +374,6 @@ def _post_comment(session, base_url: str, ticket_id: str, body: str, label: str 
 
     Prints a confirmation or warning; never raises.
     """
-    import requests
-
     url = f"{base_url.rstrip('/')}/rest/api/2/issue/{ticket_id}/comment"
     try:
         resp = session.post(url, json={"body": body})
