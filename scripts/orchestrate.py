@@ -108,8 +108,14 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
         lines = "\n".join(f"- {step}" for step in implementation_plan)
         _write(pathlib.Path("design") / "implementation_plan.md", lines)
 
-    # code/<original_path>  — support both code_files and code_changes keys
-    code_dict: dict = state.get("code_files") or state.get("code_changes") or {}
+    # code/<original_path>  — support both code_files (List[dict]) and code_changes ({path: desc}) keys
+    raw_code = state.get("code_files") or state.get("code_changes") or []
+    if isinstance(raw_code, list):
+        code_dict = {item["path"]: item.get("content", "") for item in raw_code if isinstance(item, dict) and item.get("path")}
+    elif isinstance(raw_code, dict):
+        code_dict = raw_code
+    else:
+        code_dict = {}
     for file_path, content in code_dict.items():
         if content:
             target = (root / "code" / file_path).resolve()
@@ -210,6 +216,15 @@ def orchestrate(
         "current_phase": "init",
     }
 
+    # Propagate orchestrator session_id to the global heartbeat emitter so all
+    # emit_heartbeat() calls use the same session throughout the pipeline.
+    try:
+        from dashboard.heartbeat import get_global_emitter
+        emitter = get_global_emitter()
+        emitter.session_id = session_id
+    except Exception:
+        pass  # dashboard unavailable, non-blocking
+
     print_header(f"Multi-Agent Workflow: {title or jira_ticket or 'TBD'}")
     print(f"  Session: {session_id}")
     print(f"  Manual approval: {'ON' if MANUAL_APPROVAL else 'OFF'}")
@@ -271,6 +286,11 @@ def orchestrate(
             design_output = run_design(title, description, repo_path=repo_path)
             state.update(design_output)
             state["current_phase"] = "design_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("design", state)
+            except Exception:
+                pass
         except Exception as e:
             print(f"  Design Agent failed: {e}")
             return state
@@ -294,6 +314,11 @@ def orchestrate(
             develop_output = run_development(state)
             state.update(develop_output)
             state["current_phase"] = "develop_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("develop", state)
+            except Exception:
+                pass
         except Exception as e:
             print(f"  Development Agent failed: {e}")
             return state
@@ -323,9 +348,14 @@ def orchestrate(
                 "issue_description": description,
                 "issue_type": issue_type,
             }
-            testing_output = run_testing(context)
+            testing_output = run_testing(context, output_dir=pathlib.Path(output_dir) if output_dir else None)
             state.update(testing_output)
             state["current_phase"] = "testing_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("testing", state)
+            except Exception:
+                pass
         except Exception as e:
             print(f"  Testing Agent failed: {e}")
             return state
@@ -373,6 +403,11 @@ def orchestrate(
             docs_output = run_docs(context)
             state.update(docs_output)
             state["current_phase"] = "done"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("docs", state)
+            except Exception:
+                pass
         except Exception as e:
             print(f"  Documentation Agent failed: {e}")
             return state
