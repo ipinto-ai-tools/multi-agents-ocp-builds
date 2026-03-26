@@ -6,7 +6,7 @@ state to the dashboard for real-time monitoring.
 
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 import requests
 
@@ -64,7 +64,7 @@ class Heartbeat:
         self.agent = agent
         self.phase = phase
         self.raw_state = raw_state
-        self.timestamp = timestamp or datetime.utcnow()
+        self.timestamp = timestamp or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert heartbeat to dictionary for API transmission.
