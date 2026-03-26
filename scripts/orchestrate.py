@@ -123,22 +123,14 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
     if design_analysis:
         _write(pathlib.Path("design") / "design_analysis.md", design_analysis)
 
-    # design/implementation_plan.md  (numbered markdown list)
+    # design/implementation_plan.md  (one item per line, prefixed with "- ")
     implementation_plan = state.get("implementation_plan")
     if implementation_plan:
-        lines = []
-        for i, step in enumerate(implementation_plan, 1):
-            lines.append(f"{i}. {step}")
-        _write(pathlib.Path("design") / "implementation_plan.md", "\n".join(lines))
+        lines = "\n".join(f"- {step}" for step in implementation_plan)
+        _write(pathlib.Path("design") / "implementation_plan.md", lines)
 
-    # code/<original_path>  — support both code_files (List[dict]) and code_changes ({path: desc}) keys
-    raw_code = state.get("code_files") or state.get("code_changes") or []
-    if isinstance(raw_code, list):
-        code_dict = {item["path"]: item.get("content", "") for item in raw_code if isinstance(item, dict) and item.get("path")}
-    elif isinstance(raw_code, dict):
-        code_dict = raw_code
-    else:
-        code_dict = {}
+    # code/<original_path>  — support both code_files and code_changes keys
+    code_dict: dict = state.get("code_files") or state.get("code_changes") or {}
     for file_path, content in code_dict.items():
         if content:
             target = (root / "code" / file_path).resolve()
@@ -494,6 +486,7 @@ def orchestrate(
         total_duration = time.time() - pipeline_start
         print_final_summary(completed_phases, state, output_dir=output_dir, total_duration=total_duration)
         return state
+
 
     finally:
         if output_dir and state.get("current_phase") not in (None, "init"):

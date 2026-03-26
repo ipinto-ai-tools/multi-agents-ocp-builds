@@ -59,7 +59,7 @@ class TestSaveArtifacts:
         assert _read(target) == "# My Design\n\nSome content."
 
     # ------------------------------------------------------------------
-    # 2. implementation_plan list → design/implementation_plan.md as numbered list
+    # 2. implementation_plan list → design/implementation_plan.md with "- " bullets
     # ------------------------------------------------------------------
 
     def test_implementation_plan_saved_as_bullets(self, tmp_path):
@@ -70,8 +70,8 @@ class TestSaveArtifacts:
         target = tmp_path / "design" / "implementation_plan.md"
         assert target.exists(), "design/implementation_plan.md should be written"
         content = _read(target)
-        for i, step in enumerate(steps, 1):
-            assert f"{i}. {step}" in content
+        for step in steps:
+            assert f"- {step}" in content
 
     # ------------------------------------------------------------------
     # 3. code_files preserve sub-directory paths under code/
