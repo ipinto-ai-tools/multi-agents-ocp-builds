@@ -209,6 +209,67 @@ def test_cleanup_no_sessions():
     print("✓ Test passed!")
 
 
+def test_cleanup_stuck_sessions():
+    """Test cleanup_stuck_sessions method."""
+    print("\n=== Test: cleanup_stuck_sessions ===")
+
+    db = setup_test_db()
+
+    # Stuck sessions: old heartbeat, non-terminal phase (should be deleted)
+    insert_test_session(db, "stuck_1", "planning", hours_ago=8)
+    insert_test_session(db, "stuck_2", "executing", hours_ago=10)
+
+    # Terminal sessions that are old: should NOT be deleted (phase is done/error)
+    insert_test_session(db, "old_done_1", "done", hours_ago=12)
+    insert_test_session(db, "old_error_1", "error", hours_ago=15)
+
+    # Recent non-terminal session: should NOT be deleted (fresh heartbeat)
+    insert_test_session(db, "recent_active_1", "planning", hours_ago=1)
+
+    print(f"Initial sessions: {count_sessions(db)}")
+    print(f"Initial heartbeats: {count_heartbeats(db)}")
+
+    # Run stuck cleanup with 6-hour threshold
+    result = db.cleanup_stuck_sessions(max_stale_hours=6)
+
+    print(f"\nCleanup result: {result}")
+    print(f"Remaining sessions: {count_sessions(db)}")
+    print(f"Remaining heartbeats: {count_heartbeats(db)}")
+
+    # Only stuck_1 and stuck_2 should be removed
+    assert result["sessions_deleted"] == 2, f"Expected 2 sessions deleted, got {result['sessions_deleted']}"
+    assert result["heartbeats_deleted"] == 2, f"Expected 2 heartbeats deleted, got {result['heartbeats_deleted']}"
+    assert len(result["session_ids"]) == 2, f"Expected 2 session IDs in result"
+    assert count_sessions(db) == 3, f"Expected 3 remaining sessions, got {count_sessions(db)}"
+    assert count_heartbeats(db) == 3, f"Expected 3 remaining heartbeats, got {count_heartbeats(db)}"
+
+    print("✓ Test passed!")
+
+
+def test_cleanup_stuck_sessions_none_found():
+    """Test cleanup_stuck_sessions when no stuck sessions exist."""
+    print("\n=== Test: cleanup_stuck_sessions (none found) ===")
+
+    db = setup_test_db()
+
+    # All sessions are either recent or terminal
+    insert_test_session(db, "recent_1", "planning", hours_ago=1)
+    insert_test_session(db, "done_1", "done", hours_ago=10)
+
+    print(f"Initial sessions: {count_sessions(db)}")
+
+    result = db.cleanup_stuck_sessions(max_stale_hours=6)
+
+    print(f"Cleanup result: {result}")
+
+    assert result["sessions_deleted"] == 0, f"Expected 0 sessions deleted, got {result['sessions_deleted']}"
+    assert result["heartbeats_deleted"] == 0, f"Expected 0 heartbeats deleted, got {result['heartbeats_deleted']}"
+    assert result["session_ids"] == [], f"Expected empty session_ids list"
+    assert count_sessions(db) == 2, f"Expected 2 remaining sessions, got {count_sessions(db)}"
+
+    print("✓ Test passed!")
+
+
 def test_cleanup_custom_threshold():
     """Test cleanup with custom age threshold."""
     print("\n=== Test: cleanup with custom threshold ===")
@@ -243,6 +304,8 @@ if __name__ == "__main__":
         test_clear_completed_sessions()
         test_cleanup_no_sessions()
         test_cleanup_custom_threshold()
+        test_cleanup_stuck_sessions()
+        test_cleanup_stuck_sessions_none_found()
 
         print("\n" + "=" * 50)
         print("All tests passed! ✓")

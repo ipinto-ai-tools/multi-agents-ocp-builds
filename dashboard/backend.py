@@ -7,7 +7,7 @@ import json
 import os
 import sqlite3
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 
@@ -312,6 +312,61 @@ class Database:
 
         return result
 
+    def cleanup_stuck_sessions(self, max_stale_hours: int = 6) -> dict:
+        """Delete sessions that have not received a heartbeat in max_stale_hours
+        AND whose phase is not 'done' or 'error' (i.e., stuck/incomplete).
+
+        Args:
+            max_stale_hours: Hours without a heartbeat before a session is
+                considered stuck
+
+        Returns:
+            dict with counts of deleted sessions and heartbeats, and session_ids
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_stale_hours)).isoformat()
+        conn = sqlite3.connect(self.db_path)
+        try:
+            # Find stuck session IDs: last heartbeat older than cutoff, phase not terminal
+            stuck = conn.execute("""
+                SELECT s.id
+                FROM sessions s
+                JOIN (
+                    SELECT session_id, MAX(timestamp) AS last_beat
+                    FROM heartbeats
+                    GROUP BY session_id
+                ) h ON s.id = h.session_id
+                WHERE h.last_beat < ?
+                  AND s.id NOT IN (
+                    SELECT DISTINCT session_id FROM heartbeats
+                    WHERE json_extract(raw_state, '$.current_phase') IN ('done', 'error')
+                  )
+            """, (cutoff,)).fetchall()
+            stuck_ids = [r[0] for r in stuck]
+            if not stuck_ids:
+                logger.info(f"No stuck sessions found (stale threshold: {max_stale_hours}h)")
+                return {"sessions_deleted": 0, "heartbeats_deleted": 0, "session_ids": []}
+            placeholders = ",".join("?" * len(stuck_ids))
+            hb_del = conn.execute(
+                f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})", stuck_ids
+            )
+            s_del = conn.execute(
+                f"DELETE FROM sessions WHERE id IN ({placeholders})", stuck_ids
+            )
+            conn.commit()
+            result = {
+                "sessions_deleted": s_del.rowcount,
+                "heartbeats_deleted": hb_del.rowcount,
+                "session_ids": stuck_ids,
+            }
+            logger.info(
+                f"Cleaned up {result['sessions_deleted']} stuck sessions "
+                f"and {result['heartbeats_deleted']} heartbeats "
+                f"(stale threshold: {max_stale_hours}h): {stuck_ids}"
+            )
+            return result
+        finally:
+            conn.close()
+
     def clear_completed_sessions(self) -> dict:
         """Clear all completed or failed sessions (phase='done' or 'error').
 
@@ -376,6 +431,10 @@ async def periodic_cleanup():
             # Clean up sessions older than 24 hours
             result = db.cleanup_old_sessions(max_age_hours=24)
             logger.info(f"Automatic cleanup: {result}")
+
+            # Clean up stuck sessions (no heartbeat for 4+ hours, non-terminal)
+            stuck_result = db.cleanup_stuck_sessions(max_stale_hours=4)
+            logger.info(f"Automatic stuck session cleanup: {stuck_result}")
         except asyncio.CancelledError:
             logger.info("Periodic cleanup task cancelled")
             break
@@ -524,6 +583,24 @@ async def clear_completed_sessions():
     logger.info("Clear all completed/error sessions requested")
     result = db.clear_completed_sessions()
     logger.info(f"Manual session cleanup: {result}")
+    return result
+
+
+@app.delete("/api/sessions/stuck")
+async def delete_stuck_sessions(max_stale_hours: int = 6):
+    """Delete sessions that have not received a heartbeat in max_stale_hours
+    and are not in a terminal phase (done/error).
+
+    Args:
+        max_stale_hours: Hours without a heartbeat before a session is
+            considered stuck (default: 6)
+
+    Returns:
+        dict with sessions_deleted count, heartbeats_deleted count, and session_ids list
+    """
+    logger.info(f"Stuck session cleanup requested (max_stale_hours={max_stale_hours})")
+    result = db.cleanup_stuck_sessions(max_stale_hours=max_stale_hours)
+    logger.info(f"Stuck session cleanup: {result}")
     return result
 
 

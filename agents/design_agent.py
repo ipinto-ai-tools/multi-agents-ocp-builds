@@ -9,6 +9,7 @@ implementation planning.
 """
 
 import os
+import re
 from typing import Dict, Any, Optional
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT

@@ -9,6 +9,7 @@ import json
 import os
 import pathlib
 import sys
+import time
 import uuid
 import argparse
 from datetime import datetime
@@ -61,11 +62,31 @@ def request_approval(phase: str, next_phase: str) -> bool:
         return False
 
 
-def print_final_summary(completed_phases: list[str], state: dict) -> None:
+def print_final_summary(
+    completed_phases: list[str],
+    state: dict,
+    output_dir: str | None = None,
+    total_duration: float | None = None,
+) -> None:
     print_header("Workflow Complete")
     print(f"  Completed phases: {', '.join(p.upper() for p in completed_phases)}")
     print(f"  Session ID: {state.get('session_id', 'N/A')}")
     print(f"  Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if total_duration is not None:
+        mins, secs = divmod(int(total_duration), 60)
+        print(f"  Total duration: {mins}m {secs}s")
+
+    # Stats
+    code_files = state.get("code_files") or []
+    n_code = len(code_files) if isinstance(code_files, list) else len(code_files)
+    n_unit = len(state.get("unit_tests") or {})
+    n_int = len(state.get("integration_tests") or {})
+    if n_code:
+        print(f"  Code files: {n_code}  |  Tests: {n_unit} unit, {n_int} integration")
+
+    if output_dir:
+        print(f"\n  Artifacts: {output_dir}")
+    print(f"  Dashboard: http://localhost:8080")
     print()
 
 
@@ -200,6 +221,7 @@ def orchestrate(
     """
     session_id = str(uuid.uuid4())[:8]
     completed_phases: list[str] = []
+    pipeline_start = time.time()
 
     state: dict = {
         "session_id": session_id,
@@ -209,6 +231,15 @@ def orchestrate(
         "repo_path": repo_path,
         "current_phase": "init",
     }
+
+    # Propagate orchestrator session_id to the global heartbeat emitter so all
+    # emit_heartbeat() calls use the same session throughout the pipeline.
+    try:
+        from dashboard.heartbeat import get_global_emitter
+        emitter = get_global_emitter()
+        emitter.session_id = session_id
+    except Exception:
+        pass  # dashboard unavailable, non-blocking
 
     print_header(f"Multi-Agent Workflow: {title or jira_ticket or 'TBD'}")
     print(f"  Session: {session_id}")
@@ -265,18 +296,29 @@ def orchestrate(
                     os.environ.pop("DRY_RUN", None)
 
         # -- Phase 1: Design ------------------------------------------------------
-        print_header("Phase 1: Design Agent")
+        print_header("Phase 1/5: Design Agent")
         from agents.design_agent import run_design
         try:
+            phase_start = time.time()
             design_output = run_design(title, description, repo_path=repo_path)
+            phase_duration = time.time() - phase_start
             state.update(design_output)
             state["current_phase"] = "design_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("design", state)
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Design Agent failed: {e}")
             return state
 
         result = validate_phase("design", state)
         print_phase_summary("Design", result)
+        print(f"  Duration: {phase_duration:.1f}s")
+        print(f"  Implementation steps: {len(state.get('implementation_plan', []))}")
+        print(f"  Risks identified: {len(state.get('risks', []))}")
+        print(f"  Acceptance criteria: {len(state.get('acceptance_criteria', []))}")
         if not result.passed:
             print("  Stopping workflow due to validation failure.")
             print("  Fix the issues above before continuing.")
@@ -288,29 +330,66 @@ def orchestrate(
             return state
 
         # -- Phase 2: Development -------------------------------------------------
-        print_header("Phase 2: Development Agent")
+        print_header("Phase 2/5: Development Agent")
         from agents.go_k8s_developer import run_development
         try:
+            phase_start = time.time()
             develop_output = run_development(state)
+            phase_duration = time.time() - phase_start
             state.update(develop_output)
             state["current_phase"] = "develop_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("develop", state)
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Development Agent failed: {e}")
             return state
 
         result = validate_phase("develop", state)
         print_phase_summary("Development", result)
+        print(f"  Duration: {phase_duration:.1f}s")
+        _code_files = state.get("code_files") or []
+        _total_lines = sum(
+            len((f.get("content", "") if isinstance(f, dict) else "").splitlines())
+            for f in (_code_files if isinstance(_code_files, list) else [])
+        )
+        print(f"  Files generated: {len(_code_files) if isinstance(_code_files, list) else len(_code_files)}")
+        print(f"  Lines of code: ~{_total_lines}")
         if not result.passed:
             print("  Stopping workflow due to validation failure.")
             return state
         completed_phases.append("develop")
-        if not request_approval("develop", "testing"):
+        if not request_approval("develop", "code_review"):
             print("  Workflow stopped by user after Development phase.")
             print_final_summary(completed_phases, state)
             return state
 
+        # -- Phase 2.5: Code Review -----------------------------------------------
+        print_header("Phase 2.5/5: Code Review Agent")
+        from agents.code_review_agent import run_code_review
+        phase_start = time.time()
+        try:
+            review_output = run_code_review(state)
+            state.update(review_output)
+            state["current_phase"] = "review_complete"
+        except Exception as e:
+            print(f"  Code Review Agent failed (non-blocking): {e}")
+            # Code review failure is non-blocking — continue to testing
+        phase_duration = time.time() - phase_start
+
+        review_result = validate_phase("code_review", state)
+        print_phase_summary("Code Review", review_result)
+        print(f"  Duration: {phase_duration:.1f}s")
+        completed_phases.append("code_review")
+        if not request_approval("code_review", "testing"):
+            print("  Workflow stopped by user after Code Review phase.")
+            print_final_summary(completed_phases, state)
+            return state
+
         # -- Phase 3: Testing -----------------------------------------------------
-        print_header("Phase 3: Testing Agent")
+        print_header("Phase 3/5: Testing Agent")
         from agents.testing_agent import run_testing
         try:
             context = {
@@ -322,16 +401,29 @@ def orchestrate(
                 "issue_title": title,
                 "issue_description": description,
                 "issue_type": issue_type,
+                "session_id": session_id,
             }
-            testing_output = run_testing(context)
+            phase_start = time.time()
+            testing_output = run_testing(context, output_dir=pathlib.Path(output_dir) if output_dir else None)
+            phase_duration = time.time() - phase_start
             state.update(testing_output)
             state["current_phase"] = "testing_complete"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("testing", state)
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Testing Agent failed: {e}")
             return state
 
         result = validate_phase("testing", state)
         print_phase_summary("Testing", result)
+        print(f"  Duration: {phase_duration:.1f}s")
+        _unit = len(state.get("unit_tests") or {})
+        _integration = len(state.get("integration_tests") or {})
+        _e2e = len(state.get("e2e_tests") or {})
+        print(f"  Tests: {_unit} unit, {_integration} integration, {_e2e} e2e")
         if not result.passed:
             print("  Stopping workflow due to validation failure.")
             return state
@@ -342,7 +434,7 @@ def orchestrate(
             return state
 
         # -- Phase 4: Documentation -----------------------------------------------
-        print_header("Phase 4: Documentation Agent")
+        print_header("Phase 4/5: Documentation Agent")
         from agents.docs_agent import run_docs
         try:
             context = {
@@ -369,20 +461,32 @@ def orchestrate(
                 # github outputs
                 "github_pr_urls": state.get("github_pr_urls", []),
                 "github_pr_data": state.get("github_pr_data", []),
+                # session
+                "session_id": session_id,
             }
+            phase_start = time.time()
             docs_output = run_docs(context)
+            phase_duration = time.time() - phase_start
             state.update(docs_output)
             state["current_phase"] = "done"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("docs", state)
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Documentation Agent failed: {e}")
             return state
 
         result = validate_phase("docs", state)
         print_phase_summary("Documentation", result)
+        print(f"  Duration: {phase_duration:.1f}s")
         completed_phases.append("docs")
 
-        print_final_summary(completed_phases, state)
+        total_duration = time.time() - pipeline_start
+        print_final_summary(completed_phases, state, output_dir=output_dir, total_duration=total_duration)
         return state
+
 
     finally:
         if output_dir and state.get("current_phase") not in (None, "init"):
