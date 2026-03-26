@@ -175,13 +175,13 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
 # -- main workflow ------------------------------------------------------------
 
 def orchestrate(
-    title: str = None,
-    description: str = None,
+    title: str | None = None,
+    description: str | None = None,
     issue_type: str = "feature",
-    repo_path: str = None,
-    jira_ticket: str = None,
+    repo_path: str | None = None,
+    jira_ticket: str | None = None,
     dry_run: bool = False,
-    output_dir: str = None,
+    output_dir: str | None = None,
 ) -> dict:
     """Run the full multi-agent workflow with validation and optional approval.
 
@@ -428,7 +428,7 @@ Examples:
     )
     parser.add_argument(
         "--output-dir",
-        default=None,
+        default=os.getenv("OUTPUT_DIR"),
         metavar="PATH",
         help="Save all pipeline artifacts to this directory after completion.",
     )
