@@ -592,9 +592,9 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
 
     # Extract each section
     output["pr_summary"] = sections.get("pr summary", "").strip()
-    output["release_notes"] = sections.get("release note", "").strip()
-    output["upgrade_notes"] = sections.get("upgrade note", "").strip()
-    output["known_limitations"] = sections.get("known limitation", "").strip()
+    output["release_notes"] = (sections.get("release notes") or sections.get("release note") or "").strip()
+    output["upgrade_notes"] = (sections.get("upgrade notes") or sections.get("upgrade note") or "").strip()
+    output["known_limitations"] = (sections.get("known limitations") or sections.get("known limitation") or "").strip()
     output["high_level_design"] = sections.get("high-level design", sections.get("high level design", "")).strip()
 
     # Format-specific sections

@@ -289,8 +289,8 @@ def orchestrate(
             try:
                 from dashboard.heartbeat import emit_heartbeat
                 emit_heartbeat("design", state)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Design Agent failed: {e}")
             return state
@@ -317,8 +317,8 @@ def orchestrate(
             try:
                 from dashboard.heartbeat import emit_heartbeat
                 emit_heartbeat("develop", state)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Development Agent failed: {e}")
             return state
@@ -329,8 +329,27 @@ def orchestrate(
             print("  Stopping workflow due to validation failure.")
             return state
         completed_phases.append("develop")
-        if not request_approval("develop", "testing"):
+        if not request_approval("develop", "code_review"):
             print("  Workflow stopped by user after Development phase.")
+            print_final_summary(completed_phases, state)
+            return state
+
+        # -- Phase 2.5: Code Review -----------------------------------------------
+        print_header("Phase 2.5: Code Review Agent")
+        from agents.code_review_agent import run_code_review
+        try:
+            review_output = run_code_review(state)
+            state.update(review_output)
+            state["current_phase"] = "review_complete"
+        except Exception as e:
+            print(f"  Code Review Agent failed (non-blocking): {e}")
+            # Code review failure is non-blocking — continue to testing
+
+        review_result = validate_phase("code_review", state)
+        print_phase_summary("Code Review", review_result)
+        completed_phases.append("code_review")
+        if not request_approval("code_review", "testing"):
+            print("  Workflow stopped by user after Code Review phase.")
             print_final_summary(completed_phases, state)
             return state
 
@@ -347,6 +366,7 @@ def orchestrate(
                 "issue_title": title,
                 "issue_description": description,
                 "issue_type": issue_type,
+                "session_id": session_id,
             }
             testing_output = run_testing(context, output_dir=pathlib.Path(output_dir) if output_dir else None)
             state.update(testing_output)
@@ -354,8 +374,8 @@ def orchestrate(
             try:
                 from dashboard.heartbeat import emit_heartbeat
                 emit_heartbeat("testing", state)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Testing Agent failed: {e}")
             return state
@@ -399,6 +419,8 @@ def orchestrate(
                 # github outputs
                 "github_pr_urls": state.get("github_pr_urls", []),
                 "github_pr_data": state.get("github_pr_data", []),
+                # session
+                "session_id": session_id,
             }
             docs_output = run_docs(context)
             state.update(docs_output)
@@ -406,8 +428,8 @@ def orchestrate(
             try:
                 from dashboard.heartbeat import emit_heartbeat
                 emit_heartbeat("docs", state)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Documentation Agent failed: {e}")
             return state
