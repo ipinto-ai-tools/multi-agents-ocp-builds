@@ -578,6 +578,7 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
     # Initialize output structure
     output = {
         "pr_summary": "",
+        "pr_description": "",
         "release_notes": "",
         "docs_changes": {},
         "upgrade_notes": "",
@@ -592,6 +593,20 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
 
     # Extract each section
     output["pr_summary"] = sections.get("pr summary", "").strip()
+
+    pr_description = (
+        sections.get("pr description")
+        or sections.get("pull request description")
+        or sections.get("pr")
+        or ""
+    ).strip()
+    if len(pr_description) < 100:
+        import logging
+        logging.getLogger(__name__).warning(
+            "pr_description is very short (%d chars) — check docs agent prompt", len(pr_description)
+        )
+    output["pr_description"] = pr_description
+
     output["release_notes"] = (sections.get("release notes") or sections.get("release note") or "").strip()
     output["upgrade_notes"] = (sections.get("upgrade notes") or sections.get("upgrade note") or "").strip()
     output["known_limitations"] = (sections.get("known limitations") or sections.get("known limitation") or "").strip()
