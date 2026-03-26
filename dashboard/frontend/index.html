@@ -364,6 +364,156 @@
             vertical-align: middle;
         }
 
+        /* Phase timeline strip */
+        .phase-timeline {
+            display: flex;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        .phase-bubble {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            flex: 1;
+            position: relative;
+        }
+
+        .phase-bubble:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: calc(50% + 8px);
+            right: calc(-50% + 8px);
+            height: 2px;
+            background: #30363d;
+            z-index: 0;
+        }
+
+        .phase-bubble.done:not(:last-child)::after {
+            background: #238636;
+        }
+
+        .phase-circle {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #30363d;
+            background: #161b22;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .phase-bubble.done .phase-circle {
+            background: #238636;
+            border-color: #238636;
+            color: white;
+        }
+
+        .phase-bubble.active .phase-circle {
+            background: #1f6feb;
+            border-color: #58a6ff;
+            animation: pulseBorder 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulseBorder {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.4); }
+            50% { box-shadow: 0 0 0 4px rgba(88, 166, 255, 0); }
+        }
+
+        .phase-label {
+            font-size: 9px;
+            color: #8b949e;
+            white-space: nowrap;
+        }
+
+        .phase-bubble.done .phase-label {
+            color: #7ee787;
+        }
+
+        .phase-bubble.active .phase-label {
+            color: #58a6ff;
+        }
+
+        /* Extra metrics row */
+        .extra-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 11px;
+            color: #8b949e;
+        }
+
+        .extra-metric-item {
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        .extra-metric-item .em-value {
+            color: #c9d1d9;
+            font-weight: 600;
+        }
+
+        /* Review badge */
+        .review-badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .review-badge.passed {
+            background: #23863633;
+            color: #7ee787;
+            border: 1px solid #238636;
+        }
+
+        .review-badge.failed {
+            background: #da363333;
+            color: #f85149;
+            border: 1px solid #da3633;
+        }
+
+        /* Artifact path */
+        .artifact-path {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #8b949e;
+            word-break: break-all;
+        }
+
+        .artifact-path a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .artifact-path a:hover {
+            text-decoration: underline;
+        }
+
+        /* Dual timestamp */
+        .timestamps {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 10px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
         .session-card.stale {
             border-color: #b45309;
             opacity: 0.85;
@@ -495,6 +645,68 @@
             sessionsGrid.innerHTML = sessions.map(session => renderSessionCard(session)).join('');
         }
 
+        // Helper: compute relative time from an ISO timestamp string
+        function relativeTime(isoStr) {
+            if (!isoStr) return 'Unknown';
+            try {
+                const ts = new Date(isoStr.endsWith('Z') ? isoStr : isoStr + 'Z');
+                const diffSec = (Date.now() - ts.getTime()) / 1000;
+                if (diffSec < 60) return `${Math.floor(diffSec)}s ago`;
+                if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+                if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+                return `${Math.floor(diffSec / 86400)}d ago`;
+            } catch (e) {
+                return 'Unknown';
+            }
+        }
+
+        // Build phase timeline HTML
+        function buildPhaseTimeline(currentPhase, overallStatus) {
+            const phases = [
+                { key: 'design',  label: 'Design',  donePhase: 'design_complete' },
+                { key: 'develop', label: 'Dev',     donePhase: 'develop_complete' },
+                { key: 'review',  label: 'Review',  donePhase: 'review_complete' },
+                { key: 'testing', label: 'Testing', donePhase: 'testing_complete' },
+                { key: 'docs',    label: 'Docs',    donePhase: 'done' }
+            ];
+
+            // Determine which phases are done based on current_phase ordering
+            const phaseOrder = ['design_complete', 'develop_complete', 'review_complete', 'testing_complete', 'done'];
+            const currentIdx = phaseOrder.indexOf(currentPhase);
+            const isDone = overallStatus === 'complete';
+
+            const bubbles = phases.map((phase, idx) => {
+                let state;
+                if (isDone || (currentIdx !== -1 && idx < currentIdx + 1)) {
+                    // All phases up to and including current completed phase are done
+                    state = 'done';
+                } else if (currentIdx === -1 && currentPhase) {
+                    // In-progress phases (e.g. 'design', 'develop', 'review', 'testing', 'docs')
+                    const inProgressMap = {
+                        'design': 0, 'develop': 1, 'code_review': 2, 'testing': 3, 'docs': 4
+                    };
+                    const inProgressIdx = inProgressMap[currentPhase];
+                    if (inProgressIdx !== undefined) {
+                        if (idx < inProgressIdx) state = 'done';
+                        else if (idx === inProgressIdx) state = 'active';
+                        else state = 'pending';
+                    } else {
+                        state = 'pending';
+                    }
+                } else {
+                    state = 'pending';
+                }
+
+                const checkmark = state === 'done' ? '&#10003;' : '';
+                return `<div class="phase-bubble ${state}">
+                    <div class="phase-circle">${checkmark}</div>
+                    <div class="phase-label">${phase.label}</div>
+                </div>`;
+            });
+
+            return `<div class="phase-timeline">${bubbles.join('')}</div>`;
+        }
+
         // Render a single session card
         function renderSessionCard(session) {
             const hb = session.latest_heartbeat || {};
@@ -503,6 +715,7 @@
             const components = hb.impacted_components || [];
             const riskLevel = hb.risk_level || 'none';
             const riskCount = hb.risk_count || 0;
+            const rawState = (hb.raw_state && typeof hb.raw_state === 'object') ? hb.raw_state : {};
 
             // Determine status dot color
             let statusClass = 'active';
@@ -546,6 +759,60 @@
                 (hb.agent === 'docs' || hb.phase === 'testing_complete') ? 'in-progress' :
                 'pending';
 
+            // --- New feature data ---
+
+            // Phase timeline
+            const currentPhase = rawState.current_phase || hb.phase || '';
+            const phaseTimelineHtml = buildPhaseTimeline(currentPhase, status);
+
+            // Test counts from raw_state
+            const unitTests = rawState.unit_tests && typeof rawState.unit_tests === 'object' ? Object.keys(rawState.unit_tests).length : null;
+            const integrationTests = rawState.integration_tests && typeof rawState.integration_tests === 'object' ? Object.keys(rawState.integration_tests).length : null;
+            const e2eTests = rawState.e2e_tests && typeof rawState.e2e_tests === 'object' ? Object.keys(rawState.e2e_tests).length : null;
+            const hasTestData = unitTests !== null || integrationTests !== null || e2eTests !== null;
+            const testMetricHtml = hasTestData ? `<span class="extra-metric-item">Tests: <span class="em-value">${unitTests || 0} unit</span> &middot; <span class="em-value">${integrationTests || 0} int</span> &middot; <span class="em-value">${e2eTests || 0} e2e</span></span>` : '';
+
+            // Code files count
+            const codeFiles = Array.isArray(rawState.code_files) ? rawState.code_files.length : null;
+            const codeFilesHtml = codeFiles !== null ? `<span class="extra-metric-item">Code files: <span class="em-value">${codeFiles}</span></span>` : '';
+
+            // Review badge
+            let reviewBadgeHtml = '';
+            if (rawState.review_passed === true) {
+                reviewBadgeHtml = '<span class="review-badge passed">&#10003; Review</span>';
+            } else if (rawState.review_passed === false) {
+                reviewBadgeHtml = '<span class="review-badge failed">&#10007; Review</span>';
+            }
+
+            // Combine extra metrics
+            const extraMetricsHtml = (testMetricHtml || codeFilesHtml || reviewBadgeHtml)
+                ? `<div class="extra-metrics">${testMetricHtml}${codeFilesHtml}${reviewBadgeHtml}</div>`
+                : '';
+
+            // Artifact output path
+            const outputDir = rawState.output_dir || null;
+            const artifactHtml = outputDir
+                ? `<div class="artifact-path">&#128193; <a href="#" onclick="navigator.clipboard.writeText('${outputDir}').then(()=>showToast('Path copied!')); return false;" title="Click to copy path">${outputDir}</a></div>`
+                : '';
+
+            // Risks - improved display with colored badge
+            let risksHtml = '';
+            if (riskCount > 0) {
+                const riskLabel = `${riskCount} Risk${riskCount !== 1 ? 's' : ''}`;
+                risksHtml = `<div class="risks-section">
+                    <span class="risk-level ${riskLevel}">${riskLabel}</span>
+                    <span style="font-size:11px;color:#8b949e;margin-left:6px;">${riskLevel.toUpperCase()} severity</span>
+                </div>`;
+            }
+
+            // Dual timestamps
+            const startedAgo = relativeTime(session.created_at);
+            const updatedAgo = relativeTime(session.updated_at);
+            const timestampsHtml = `<div class="timestamps">
+                <span>Started: ${startedAgo}</span>
+                <span>Updated: ${updatedAgo}</span>
+            </div>`;
+
             return `
                 <div class="session-card${cardStaleClass}" data-session-id="${session.id}">
                     <div class="session-header">
@@ -556,18 +823,20 @@
                     <div class="issue-title">${session.issue_title || 'Unknown Task'}${jiraHtml}${staleHtml}</div>
                     <span class="issue-type ${session.issue_type || 'feature'}">${session.issue_type || 'feature'}</span>
 
+                    ${phaseTimelineHtml}
+
                     <div class="agents-status">
                         <div class="agent-badge ${designStatus}">
-                            Design Agent ${designStatus === 'complete' ? '✓' : designStatus === 'in-progress' ? '⏳' : '⏸'}
+                            Design Agent ${designStatus === 'complete' ? '&#10003;' : designStatus === 'in-progress' ? '&#9203;' : '&#9208;'}
                         </div>
                         <div class="agent-badge ${developStatus}">
-                            Development Agent ${developStatus === 'complete' ? '✓' : developStatus === 'in-progress' ? '⏳' : '⏸'}
+                            Development Agent ${developStatus === 'complete' ? '&#10003;' : developStatus === 'in-progress' ? '&#9203;' : '&#9208;'}
                         </div>
                         <div class="agent-badge ${testingStatus}">
-                            Testing Agent ${testingStatus === 'complete' ? '✓' : testingStatus === 'in-progress' ? '⏳' : '⏸'}
+                            Testing Agent ${testingStatus === 'complete' ? '&#10003;' : testingStatus === 'in-progress' ? '&#9203;' : '&#9208;'}
                         </div>
                         <div class="agent-badge ${docsStatus}">
-                            Docs Agent ${docsStatus === 'complete' ? '✓' : docsStatus === 'in-progress' ? '⏳' : '⏸'}
+                            Docs Agent ${docsStatus === 'complete' ? '&#10003;' : docsStatus === 'in-progress' ? '&#9203;' : '&#9208;'}
                         </div>
                     </div>
 
@@ -586,6 +855,8 @@
                         <div class="context-fill" style="width: ${Math.min(contextPercent, 100)}%"></div>
                     </div>
 
+                    ${extraMetricsHtml}
+
                     ${components.length > 0 ? `
                         <div class="components-list">
                             <div class="components-title">Impacted Components:</div>
@@ -594,15 +865,11 @@
                         </div>
                     ` : ''}
 
-                    ${riskCount > 0 ? `
-                        <div class="risks-section">
-                            <span class="risk-level ${riskLevel}">${riskCount} Risk${riskCount !== 1 ? 's' : ''} - ${riskLevel.toUpperCase()}</span>
-                        </div>
-                    ` : ''}
+                    ${risksHtml}
 
-                    <div class="timestamp">
-                        ${hb.timestamp_relative || 'Unknown'}
-                    </div>
+                    ${artifactHtml}
+
+                    ${timestampsHtml}
                 </div>
             `;
         }
