@@ -285,7 +285,7 @@ The dashboard backend must be running before you execute this script:
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 ```
 
 ### How to Run
