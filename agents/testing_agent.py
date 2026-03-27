@@ -8,6 +8,7 @@ output types), and generates structured test plans along with working Ginkgo v2 
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -672,7 +673,8 @@ def _write_test_plan_md(output: Dict[str, Any], output_dir: Path) -> None:
         all_test_files: list = []
         for section, subdir in section_subdirs.items():
             for path in output.get(section, {}).keys():
-                all_test_files.append(f"- `{subdir}/{path}`")
+                clean_path = _strip_test_category_prefix(path)
+                all_test_files.append(f"- `{subdir}/{clean_path}`")
 
         patterns = output.get("patterns_detected", {})
         strategies = patterns.get("strategies", [])
@@ -714,6 +716,11 @@ def _write_test_plan_md(output: Dict[str, Any], output_dir: Path) -> None:
         logger.error(f"Failed to write test_plan.md: {e}")
 
 
+def _strip_test_category_prefix(path: str) -> str:
+    """Remove leading test category prefix from Claude-generated paths."""
+    return re.sub(r'^test/(unit|integration|e2e|e2e_tests)/', '', path)
+
+
 def _write_go_test_files(output: Dict[str, Any], output_dir: Path) -> None:
     """Write Go test files to tests/unit, tests/integration, tests/e2e under output_dir."""
     section_dirs = {
@@ -728,7 +735,8 @@ def _write_go_test_files(output: Dict[str, Any], output_dir: Path) -> None:
         for full_path, code in files.items():
             if not code:
                 continue
-            dest = dest_dir / full_path
+            clean_path = _strip_test_category_prefix(full_path)
+            dest = dest_dir / clean_path
             dest.parent.mkdir(parents=True, exist_ok=True)
             safe_code = sanitize(code, source=f"testing_agent:go_test:{dest.name}")
             dest.write_text(safe_code, encoding="utf-8")
