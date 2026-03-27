@@ -1022,12 +1022,34 @@ async def serve_index():
     return HTMLResponse("<h1>Dashboard</h1><p>Frontend not built. Run: cd dashboard/frontend && npm run build</p>")
 
 
+_STATIC_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
+                      ".webp", ".woff", ".woff2", ".ttf", ".eot", ".css", ".js", ".map"}
+
+
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def serve_spa(full_path: str):
-    """Serve React SPA for all non-API client-side routes."""
-    # Don't intercept API routes
+    """Serve React SPA for all non-API client-side routes.
+
+    Static files (images, fonts, etc.) placed directly in dist/ are served
+    from disk when they exist.  Unknown static-extension paths and API/asset
+    prefixes are passed through as 404 so they are not silently replaced with
+    the SPA HTML.
+    """
+    # Don't intercept API or asset-bundle routes
     if full_path.startswith("api/") or full_path.startswith("assets/"):
         raise HTTPException(status_code=404, detail="Not found")
+
+    # Serve static files (e.g. /redhat.png) that live directly in dist/
+    _, ext = os.path.splitext(full_path)
+    if ext.lower() in _STATIC_EXTENSIONS:
+        candidate = os.path.join(_dist_dir, full_path)
+        if os.path.isfile(candidate):
+            import mimetypes
+            media_type, _ = mimetypes.guess_type(candidate)
+            with open(candidate, "rb") as fh:
+                return Response(content=fh.read(), media_type=media_type or "application/octet-stream")
+        raise HTTPException(status_code=404, detail="Not found")
+
     dist_index = os.path.join(_dist_dir, "index.html")
     if os.path.exists(dist_index):
         with open(dist_index) as f:
