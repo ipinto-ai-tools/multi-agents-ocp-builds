@@ -22,6 +22,14 @@ export default function Layout({ children }) {
             >
               Dashboard
             </Link>
+            <a
+              href="https://github.com/ipinto-ai-tools/multi-agents-ocp-builds/blob/feature/initial-setup/docs/user-guide/01-getting-started/quick-start.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-sky-400 transition-colors text-gray-300"
+            >
+              Help
+            </a>
           </nav>
         </div>
         <span className="text-xs text-gray-400">Feature SDLC Pipeline</span>
