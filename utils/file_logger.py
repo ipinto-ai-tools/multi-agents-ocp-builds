@@ -23,7 +23,7 @@ LOGS_DIR = Path(__file__).parent.parent / "logs"
 def get_logger(
     name: str,
     log_file: Optional[str] = None,
-    level: int = logging.INFO,
+    level: int = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO),
     console_output: bool = True,
     file_output: bool = True,
 ) -> logging.Logger:
