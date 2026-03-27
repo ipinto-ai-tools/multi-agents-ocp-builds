@@ -374,22 +374,56 @@ def orchestrate(
             print_final_summary(completed_phases, state)
             return state
 
-        # -- Phase 2.5: Code Review -----------------------------------------------
-        print_header("Phase 2.5/5: Code Review Agent")
+        # -- Phase 2.5: Code Review (with retry loop) --------------------------------
         from agents.code_review_agent import run_code_review
-        phase_start = time.time()
-        try:
-            review_output = run_code_review(state)
-            state.update(review_output)
-            state["current_phase"] = "review_complete"
-        except Exception as e:
-            print(f"  Code Review Agent failed (non-blocking): {e}")
-            # Code review failure is non-blocking — continue to testing
-        phase_duration = time.time() - phase_start
+        max_review_iterations = int(os.getenv("MAX_REVIEW_ITERATIONS", "2"))
+        review_iteration = 0
 
-        review_result = validate_phase("code_review", state)
-        print_phase_summary("Code Review", review_result)
-        print(f"  Duration: {phase_duration:.1f}s")
+        while review_iteration < max_review_iterations:
+            review_iteration += 1
+            iteration_label = f"Phase 2.5/5: Code Review Agent" if review_iteration == 1 else f"Phase 2.5/5: Code Review Agent (retry {review_iteration}/{max_review_iterations})"
+            print_header(iteration_label)
+            phase_start = time.time()
+            try:
+                review_output = run_code_review(state)
+                state.update(review_output)
+                state["current_phase"] = "review_complete"
+            except Exception as e:
+                print(f"  Code Review Agent failed (non-blocking): {e}")
+                break
+            phase_duration = time.time() - phase_start
+
+            review_result = validate_phase("code_review", state)
+            print_phase_summary("Code Review", review_result)
+            print(f"  Duration: {phase_duration:.1f}s")
+
+            review_passed = state.get("review_passed", True)
+            if review_passed:
+                break  # review passed — continue to testing
+
+            if review_iteration < max_review_iterations:
+                # Re-run development with review findings as feedback
+                print_header(f"Phase 2/5: Development Agent (fix review findings — attempt {review_iteration + 1})")
+                try:
+                    phase_start = time.time()
+                    develop_output = run_development(state)
+                    phase_duration = time.time() - phase_start
+                    state.update(develop_output)
+                    state["current_phase"] = "develop_complete"
+                    try:
+                        from dashboard.heartbeat import emit_heartbeat
+                        emit_heartbeat("develop", state)
+                    except Exception as e:
+                        print(f"  [heartbeat] emit failed: {e}")
+                    result = validate_phase("develop", state)
+                    print_phase_summary("Development (retry)", result)
+                    print(f"  Duration: {phase_duration:.1f}s")
+                except Exception as e:
+                    print(f"  Development Agent (retry) failed: {e}")
+                    break
+            else:
+                print(f"  Max review iterations ({max_review_iterations}) reached — continuing to testing.")
+
         completed_phases.append("code_review")
         if not request_approval("code_review", "testing"):
             print("  Workflow stopped by user after Code Review phase.")
