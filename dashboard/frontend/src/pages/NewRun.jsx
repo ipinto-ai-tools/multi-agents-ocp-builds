@@ -13,6 +13,11 @@ export default function NewRun() {
   const [issueType, setIssueType] = useState('feature')
   const [selectedStages, setSelectedStages] = useState(new Set(STAGES))
   const [manualApproval, setManualApproval] = useState(false)
+  const [dryRun, setDryRun] = useState(false)
+  const [qodoEnabled, setQodoEnabled] = useState(true)
+  const [qodoThreshold, setQodoThreshold] = useState('high')
+  const [maxReviewIterations, setMaxReviewIterations] = useState(3)
+  const [qodoCliPath, setQodoCliPath] = useState('')
   const [debug, setDebug] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -43,6 +48,11 @@ export default function NewRun() {
         issue_type: issueType,
         stages: [...selectedStages],
         manual_approval: manualApproval,
+        dry_run: dryRun,
+        qodo_enabled: qodoEnabled,
+        qodo_threshold: qodoThreshold,
+        max_review_iterations: maxReviewIterations,
+        qodo_cli_path: qodoCliPath.trim() || null,
         debug: debug,
       }
       const { session_id } = await launchRun(payload)
@@ -152,6 +162,66 @@ export default function NewRun() {
                     {opt.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Dry Run</label>
+              <div className="flex gap-2">
+                {[{ value: false, label: 'Off' }, { value: true, label: 'Dry Run (no API calls)' }].map(opt => (
+                  <button key={String(opt.value)} type="button"
+                    onClick={() => setDryRun(opt.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${dryRun === opt.value ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 text-gray-600 hover:border-sky-400'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <label className="block text-xs font-semibold text-gray-700 mb-3">Code Review</label>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Review</label>
+                  <div className="flex gap-2">
+                    {[{ value: true, label: 'Enabled' }, { value: false, label: 'Disabled' }].map(opt => (
+                      <button key={String(opt.value)} type="button"
+                        onClick={() => setQodoEnabled(opt.value)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${qodoEnabled === opt.value ? 'bg-indigo-500 text-white border-indigo-500' : 'border-gray-300 text-gray-600 hover:border-indigo-400'}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Block on severity</label>
+                  <div className="flex gap-2">
+                    {['high', 'medium', 'low'].map(t => (
+                      <button key={t} type="button"
+                        onClick={() => setQodoThreshold(t)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${qodoThreshold === t ? 'bg-indigo-500 text-white border-indigo-500' : 'border-gray-300 text-gray-600 hover:border-indigo-400'}`}>
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Max auto-fix iterations</label>
+                    <input type="number" min={1} max={10}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      value={maxReviewIterations}
+                      onChange={e => setMaxReviewIterations(Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Qodo CLI path (optional)</label>
+                    <input type="text"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      placeholder="/usr/local/bin/qodo"
+                      value={qodoCliPath}
+                      onChange={e => setQodoCliPath(e.target.value)} />
+                  </div>
+                </div>
               </div>
             </div>
 

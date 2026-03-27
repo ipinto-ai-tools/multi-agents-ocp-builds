@@ -75,6 +75,11 @@ class RunRequest(BaseModel):
     manual_approval: bool = False
     dry_run: bool = False
     debug: bool = False
+    # Qodo / code review settings
+    qodo_enabled: bool = True
+    qodo_threshold: str = "high"          # "high", "medium", "low"
+    max_review_iterations: int = 3
+    qodo_cli_path: Optional[str] = None
 
 
 def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
@@ -105,6 +110,11 @@ def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
         env["MANUAL_APPROVAL"] = "true"
     else:
         env["MANUAL_APPROVAL"] = "false"
+    env["QODO_REVIEW_ENABLED"] = "true" if run_request.qodo_enabled else "false"
+    env["QODO_BLOCKING_THRESHOLD"] = run_request.qodo_threshold
+    env["MAX_REVIEW_ITERATIONS"] = str(run_request.max_review_iterations)
+    if run_request.qodo_cli_path:
+        env["QODO_CLI_PATH"] = run_request.qodo_cli_path
 
     with open(log_file_path, "w") as log_file:
         subprocess.Popen(
