@@ -161,7 +161,8 @@ To skip the code review phase entirely, set `QODO_REVIEW_ENABLED=false`:
 ```bash
 QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
   --title "Quick feature" \
-  --description "Simple change"
+  --description "Simple change" \
+  --output-dir ./output
 ```
 
 When disabled, the pipeline routes directly from Development to Testing with no review state written.
@@ -174,11 +175,16 @@ In dry-run mode, the agent does not call the Claude API or the Qodo CLI. It read
 
 ```bash
 # Simulate a passing review (default dry-run behavior)
-uv run python scripts/orchestrate.py --jira-ticket SHIP-123 --dry-run
+uv run python scripts/orchestrate.py \
+  --jira-ticket SHIP-123 \
+  --output-dir ./output \
+  --dry-run
 
 # Simulate a blocking review (triggers mock auto-fix loop)
 MOCK_CODE_REVIEW_PASS=false uv run python scripts/orchestrate.py \
-  --jira-ticket SHIP-123 --dry-run
+  --jira-ticket SHIP-123 \
+  --output-dir ./output \
+  --dry-run
 ```
 
 ---

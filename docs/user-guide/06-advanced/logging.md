@@ -132,7 +132,10 @@ Set `LOG_FORMAT=json` for structured log output compatible with log aggregation 
 Set `LOG_LEVEL=DEBUG` in `.env`, then run:
 
 ```bash
-uv run python scripts/orchestrate.py --title "Test" --description "Debug run"
+uv run python scripts/orchestrate.py \
+  --title "Test" \
+  --description "Debug run" \
+  --output-dir ./output
 tail -f /tmp/muilti-agents-debug.log
 ```
 
