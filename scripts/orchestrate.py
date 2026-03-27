@@ -132,8 +132,14 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
         _write(pathlib.Path("design") / "implementation_plan.md", lines)
 
     # code/<original_path>  — support both code_files and code_changes keys
-    code_dict: dict = state.get("code_files") or state.get("code_changes") or {}
-    for file_path, content in code_dict.items():
+    # code_files from development agent is a list of dicts with "path"/"content" keys;
+    # code_changes may be a plain dict mapping path→content.
+    code_raw = state.get("code_files") or state.get("code_changes") or {}
+    if isinstance(code_raw, list):
+        code_items = ((item["path"], item.get("content", "")) for item in code_raw)
+    else:
+        code_items = code_raw.items()
+    for file_path, content in code_items:
         if content:
             target = (root / "code" / file_path).resolve()
             if not str(target).startswith(str(root.resolve()) + os.sep):
