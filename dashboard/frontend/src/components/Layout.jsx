@@ -32,7 +32,10 @@ export default function Layout({ children }) {
             </a>
           </nav>
         </div>
-        <span className="text-xs text-gray-400">Feature SDLC Pipeline</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">Feature SDLC Pipeline</span>
+          <img src="/redhat.svg" alt="Red Hat" className="h-8 w-auto opacity-90" />
+        </div>
       </header>
       <main className="flex-1 p-6">{children}</main>
     </div>
