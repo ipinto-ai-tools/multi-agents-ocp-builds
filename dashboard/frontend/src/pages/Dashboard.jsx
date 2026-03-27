@@ -2,7 +2,25 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSessions, approveSession, pauseSession, archiveSession } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
-import PipelineProgress from '../components/PipelineProgress'
+
+const PHASE_LABELS = {
+  init:             { label: 'Starting',    color: 'bg-gray-100 text-gray-500' },
+  design_complete:  { label: 'Design ✓',    color: 'bg-purple-100 text-purple-700' },
+  develop_complete: { label: 'Dev ✓',       color: 'bg-blue-100 text-blue-700' },
+  review_complete:  { label: 'Review ✓',    color: 'bg-indigo-100 text-indigo-700' },
+  testing_complete: { label: 'Tests ✓',     color: 'bg-teal-100 text-teal-700' },
+  done:             { label: 'Done ✓',      color: 'bg-green-100 text-green-700' },
+  error:            { label: 'Error',       color: 'bg-red-100 text-red-600' },
+}
+
+function PhaseChip({ phase }) {
+  const { label, color } = PHASE_LABELS[phase] || { label: phase || 'Init', color: 'bg-gray-100 text-gray-500' }
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${color}`}>
+      {label}
+    </span>
+  )
+}
 
 function deriveStatus(session) {
   const phase = session.latest_heartbeat?.phase || session.status || 'init'
@@ -98,6 +116,7 @@ export default function Dashboard() {
             No runs yet. <button className="text-sky-600 underline" onClick={() => navigate('/')}>Start one</button>
           </div>
         ) : (
+          <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-400 uppercase border-b border-gray-100">
@@ -128,7 +147,7 @@ export default function Dashboard() {
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-5 py-3">
-                      <PipelineProgress currentPhase={phase} />
+                      <PhaseChip phase={phase} />
                     </td>
                     <td className="px-5 py-3">
                       <StatusBadge status={status} />
@@ -156,9 +175,9 @@ export default function Dashboard() {
                             Archive
                           </button>
                         )}
-                        <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                        <button className="px-2 py-1 text-xs bg-sky-50 text-sky-600 border border-sky-200 rounded hover:bg-sky-100 font-medium"
                           onClick={() => navigate(`/runs/${session.id}`)}>
-                          Open
+                          Open →
                         </button>
                       </div>
                     </td>
@@ -167,6 +186,7 @@ export default function Dashboard() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
