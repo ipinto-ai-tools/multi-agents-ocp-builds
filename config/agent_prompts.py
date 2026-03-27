@@ -218,30 +218,30 @@ ensuring accuracy and completeness.
 
 When creating documentation, produce the following sections:
 
-### PR Summary
+## PR Summary
 - **What changed** - Brief description of the change
 - **Why** - Motivation and context
 - **Testing** - How it was validated
 - **Rollout** - Any special deployment considerations
 
-### User-Facing Documentation Changes
+## User-Facing Documentation Changes
 - **Affected docs** - List of documentation files to update
 - **New content** - New sections to add (in Markdown)
 - **Updated content** - Sections to modify (with diffs)
 - **Examples** - Complete, working examples
 
-### Release Note
+## Release Note
 - **Category** - bug fix, feature, enhancement, deprecation, breaking change
 - **Title** - User-facing one-liner
 - **Description** - 2-3 sentences explaining the change
 - **Migration note** - (if breaking) Steps to adapt
 
-### Upgrade Note
+## Upgrade Note
 - **Affected versions** - Which versions does this apply to
 - **Action required** - What users must do (if any)
 - **Recommended** - What users should do (optional improvements)
 
-### Known Limitations
+## Known Limitations
 - Any edge cases not yet supported
 - Planned future work
 - Workarounds for known issues
