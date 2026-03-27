@@ -5,15 +5,20 @@ FastAPI server for receiving heartbeats and serving dashboard UI.
 
 import json
 import os
+import re
 import sqlite3
 import asyncio
+import sys
+import subprocess
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles  # requires: pip install aiofiles
 from pydantic import BaseModel
 
 from dashboard.enrichers import enrich_heartbeat
@@ -25,6 +30,11 @@ logger = get_logger('dashboard.backend')
 
 # Database path
 DB_PATH = os.getenv("DASHBOARD_DB_PATH", "/tmp/claude/dashboard.db")
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ORCHESTRATE_SCRIPT = os.path.join(PROJECT_ROOT, "scripts", "orchestrate.py")
+LOG_DIR = Path("/tmp/claude/logs")
+SIGNAL_DIR = Path("/tmp/claude/signals")
 
 
 # Pydantic models
@@ -48,6 +58,58 @@ class SessionResponse(BaseModel):
     latest_heartbeat: Optional[Dict[str, Any]] = None
     jira_ticket_id: Optional[str] = None
     jira_ticket_url: Optional[str] = None
+
+
+class RunRequest(BaseModel):
+    """Request to launch a new pipeline run."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    issue_type: str = "feature"
+    jira_ticket: Optional[str] = None
+    repo_path: Optional[str] = None
+    output_dir: Optional[str] = None
+    stages: List[str] = ["design", "develop", "test", "docs"]
+    manual_approval: bool = False
+    dry_run: bool = False
+
+
+def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
+    """Launch orchestrate.py subprocess and capture output to log file."""
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file_path = LOG_DIR / f"{session_id}.log"
+
+    cmd = [sys.executable, ORCHESTRATE_SCRIPT, "--session-id", session_id]
+    if run_request.title:
+        cmd += ["--title", run_request.title]
+    if run_request.description:
+        cmd += ["--description", run_request.description]
+    if run_request.jira_ticket:
+        cmd += ["--jira-ticket", run_request.jira_ticket]
+    if run_request.repo_path:
+        cmd += ["--repo-path", run_request.repo_path]
+    if run_request.output_dir:
+        cmd += ["--output-dir", run_request.output_dir]
+    if run_request.issue_type:
+        cmd += ["--issue-type", run_request.issue_type]
+    if run_request.dry_run:
+        cmd.append("--dry-run")
+
+    env = os.environ.copy()
+    if run_request.manual_approval:
+        env["MANUAL_APPROVAL"] = "true"
+    else:
+        env["MANUAL_APPROVAL"] = "false"
+
+    with open(log_file_path, "w") as log_file:
+        subprocess.Popen(
+            cmd,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            env=env,
+            cwd=PROJECT_ROOT,
+            start_new_session=True,
+        )
+    logger.info(f"Launched orchestrate.py for session {session_id}, log: {log_file_path}")
 
 
 # Database operations
@@ -420,6 +482,14 @@ db = Database()
 # Global background task
 cleanup_task = None
 
+_SESSION_ID_RE = re.compile(r'^[0-9a-f]{8}$')
+
+
+def _validate_session_id(session_id: str) -> None:
+    """Validate session_id to prevent path traversal attacks."""
+    if not _SESSION_ID_RE.fullmatch(session_id):
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
+
 
 async def periodic_cleanup():
     """Background task to clean up old sessions every 6 hours."""
@@ -481,7 +551,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -550,6 +619,7 @@ async def get_session(session_id: str):
     Raises:
         HTTPException: If session not found
     """
+    _validate_session_id(session_id)
     session = db.get_session(session_id)
     if not session:
         logger.warning(f"Session not found: {session_id}")
@@ -614,33 +684,139 @@ async def health():
     return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 
-# Serve frontend
-@app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    """Serve the dashboard frontend.
+@app.post("/api/runs")
+async def launch_run(run_request: RunRequest, background_tasks: BackgroundTasks):
+    """Launch a new pipeline run via the web UI."""
+    import uuid
+    session_id = str(uuid.uuid4())[:8]
 
-    Returns:
-        HTML response
-    """
-    frontend_path = os.path.join(
-        os.path.dirname(__file__),
-        "frontend",
-        "index.html"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    SIGNAL_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Validate: need title or jira_ticket
+    if not run_request.title and not run_request.jira_ticket:
+        raise HTTPException(status_code=422, detail="Either title or jira_ticket is required")
+
+    # Create session record immediately so dashboard shows it
+    db.upsert_session(
+        session_id=session_id,
+        issue_title=run_request.title or run_request.jira_ticket or "New Run",
+        issue_type=run_request.issue_type,
     )
 
-    if os.path.exists(frontend_path):
-        with open(frontend_path, "r") as f:
-            return HTMLResponse(content=f.read())
-    else:
-        return HTMLResponse(content="""
-        <html>
-            <head><title>Dashboard</title></head>
-            <body>
-                <h1>Multi-Agent Dashboard</h1>
-                <p>Frontend not found. API is available at /api/sessions</p>
-            </body>
-        </html>
-        """)
+    # Launch subprocess in background
+    background_tasks.add_task(_launch_orchestrate, session_id, run_request)
+
+    logger.info(f"New run queued: session_id={session_id}")
+    return {"session_id": session_id, "status": "started"}
+
+
+@app.get("/api/sessions/{session_id}/logs")
+async def stream_logs(session_id: str, request: Request):
+    """Stream pipeline logs for a session via Server-Sent Events."""
+    _validate_session_id(session_id)
+    log_file_path = LOG_DIR / f"{session_id}.log"
+
+    async def log_generator():
+        # Yield existing lines first
+        if log_file_path.exists():
+            with open(log_file_path, "r", errors="replace") as f:
+                for line in f:
+                    yield f"data: {json.dumps({'line': line.rstrip()})}\n\n"
+
+        # Wait up to 10 s for the subprocess to create the log file
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        deadline = asyncio.get_event_loop().time() + 10
+        while not log_file_path.exists():
+            if asyncio.get_event_loop().time() > deadline:
+                yield f"data: {json.dumps({'line': '[log file not created — subprocess may have failed to start]'})}\n\n"
+                return
+            await asyncio.sleep(0.5)
+
+        # Tail for new lines
+        with open(log_file_path, "r", errors="replace") as f:
+            f.seek(0, 2)  # seek to end (existing content already yielded above)
+            while not await request.is_disconnected():
+                line = f.readline()
+                if line:
+                    yield f"data: {json.dumps({'line': line.rstrip()})}\n\n"
+                else:
+                    await asyncio.sleep(0.2)
+
+    return StreamingResponse(
+        log_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.post("/api/sessions/{session_id}/approve")
+async def approve_session(session_id: str, action: str = "approve"):
+    """Signal approval or rejection for a waiting pipeline phase.
+
+    Args:
+        session_id: Session ID
+        action: 'approve' to continue, 'reject' to stop
+    """
+    _validate_session_id(session_id)
+    if action not in ("approve", "reject"):
+        raise HTTPException(status_code=422, detail="action must be 'approve' or 'reject'")
+    SIGNAL_DIR.mkdir(parents=True, exist_ok=True)
+    approve_file = SIGNAL_DIR / f"approve-{session_id}"
+    approve_file.write_text(action)
+    logger.info(f"Approval signal written: session={session_id}, action={action}")
+    return {"status": "ok", "action": action}
+
+
+@app.post("/api/sessions/{session_id}/pause")
+async def pause_session(session_id: str):
+    """Signal a running pipeline to pause after the current phase."""
+    _validate_session_id(session_id)
+    SIGNAL_DIR.mkdir(parents=True, exist_ok=True)
+    pause_file = SIGNAL_DIR / f"pause-{session_id}"
+    pause_file.touch()
+    logger.info(f"Pause signal written: session={session_id}")
+    return {"status": "ok"}
+
+
+# Serve frontend — React build (dist/) takes priority over legacy index.html
+_dist_dir = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+_legacy_index = os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+
+if os.path.exists(_dist_dir):
+    # Mount assets directory
+    _assets_dir = os.path.join(_dist_dir, "assets")
+    if os.path.exists(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    """Serve the SPA entry point."""
+    dist_index = os.path.join(_dist_dir, "index.html")
+    if os.path.exists(dist_index):
+        with open(dist_index) as f:
+            return HTMLResponse(f.read())
+    elif os.path.exists(_legacy_index):
+        with open(_legacy_index) as f:
+            return HTMLResponse(f.read())
+    return HTMLResponse("<h1>Dashboard</h1><p>Frontend not built. Run: cd dashboard/frontend && npm run build</p>")
+
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def serve_spa(full_path: str):
+    """Serve React SPA for all non-API client-side routes."""
+    # Don't intercept API routes
+    if full_path.startswith("api/") or full_path.startswith("assets/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    dist_index = os.path.join(_dist_dir, "index.html")
+    if os.path.exists(dist_index):
+        with open(dist_index) as f:
+            return HTMLResponse(f.read())
+    elif os.path.exists(_legacy_index):
+        with open(_legacy_index) as f:
+            return HTMLResponse(f.read())
+    raise HTTPException(status_code=404, detail="Frontend not built")
 
 
 if __name__ == "__main__":
