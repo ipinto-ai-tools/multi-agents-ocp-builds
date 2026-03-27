@@ -187,6 +187,18 @@ export default function NewRun() {
           </button>
         </div>
       </form>
+      <p className="text-xs text-gray-400">
+        <a
+          href="https://github.com/ipinto-ai-tools/multi-agents-ocp-builds"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-gray-600 underline"
+        >
+          View on GitHub
+        </a>
+        {' · '}
+        Feature SDLC Automation for Shipwright / OpenShift Builds
+      </p>
     </div>
   )
 }

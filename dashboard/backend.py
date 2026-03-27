@@ -211,6 +211,22 @@ class Database:
         conn.commit()
         conn.close()
 
+    def update_session_status(self, session_id: str, status: str) -> bool:
+        """Update the status of a session (e.g., 'archived').
+
+        Returns True if a row was updated, False if session not found.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sessions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (status, session_id),
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        conn.close()
+        return updated
+
     def insert_heartbeat(self, enriched: Dict[str, Any]):
         """Insert an enriched heartbeat.
 
@@ -242,11 +258,12 @@ class Database:
         conn.commit()
         conn.close()
 
-    def get_sessions(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_sessions(self, limit: int = 100, include_archived: bool = False) -> List[Dict[str, Any]]:
         """Get all sessions with latest heartbeat.
 
         Args:
             limit: Maximum number of sessions to return
+            include_archived: Whether to include archived sessions (default: False)
 
         Returns:
             List of session dictionaries
@@ -255,7 +272,8 @@ class Database:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute("""
+        where_clause = "" if include_archived else "WHERE s.status != 'archived'"
+        cursor.execute(f"""
             SELECT
                 s.id, s.created_at, s.updated_at,
                 s.issue_title, s.issue_type, s.status,
@@ -266,6 +284,7 @@ class Database:
                        ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY timestamp DESC) as rn
                 FROM heartbeats
             ) h ON s.id = h.session_id AND h.rn = 1
+            {where_clause}
             ORDER BY s.updated_at DESC
             LIMIT ?
         """, (limit,))
@@ -609,16 +628,8 @@ async def receive_heartbeat(heartbeat: HeartbeatRequest):
 
 
 @app.get("/api/sessions", response_model=List[SessionResponse])
-async def get_sessions(limit: int = 100):
-    """Get all sessions with latest heartbeat.
-
-    Args:
-        limit: Maximum sessions to return
-
-    Returns:
-        List of sessions
-    """
-    sessions = db.get_sessions(limit=limit)
+async def get_sessions(limit: int = 100, include_archived: bool = False):
+    sessions = db.get_sessions(limit=limit, include_archived=include_archived)
     logger.debug(f"Retrieved {len(sessions)} sessions")
     return sessions
 
@@ -794,6 +805,89 @@ async def pause_session(session_id: str):
     pause_file.touch()
     logger.info(f"Pause signal written: session={session_id}")
     return {"status": "ok"}
+
+
+@app.patch("/api/sessions/{session_id}/archive")
+async def archive_session(session_id: str):
+    """Archive a session — hides it from the dashboard but preserves all data and artifacts."""
+    _validate_session_id(session_id)
+    updated = db.update_session_status(session_id, "archived")
+    if not updated:
+        raise HTTPException(status_code=404, detail="Session not found")
+    logger.info(f"Session archived: {session_id}")
+    return {"status": "archived", "session_id": session_id}
+
+
+@app.get("/api/sessions/{session_id}/download/all")
+async def download_all(session_id: str):
+    """Download all artifacts (design, code, tests, docs) as a single zip archive."""
+    _validate_session_id(session_id)
+    state = _get_latest_state(session_id)
+
+    buf = io.BytesIO()
+    files_added = 0
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Design
+        design = state.get("design_analysis") or ""
+        if design:
+            zf.writestr("design/design_analysis.md", design)
+            files_added += 1
+
+        impl_plan = state.get("implementation_plan")
+        if impl_plan:
+            lines = "\n".join(f"- {s}" for s in impl_plan) if isinstance(impl_plan, list) else str(impl_plan)
+            zf.writestr("design/implementation_plan.md", lines)
+            files_added += 1
+
+        # Code
+        code_files = state.get("code_files") or []
+        if isinstance(code_files, list):
+            for f in code_files:
+                path = f.get("path", "unknown.go")
+                content = f.get("content", "")
+                if content:
+                    zf.writestr(f"code/{path}", content)
+                    files_added += 1
+        else:
+            for path, content in (code_files or {}).items():
+                if content:
+                    zf.writestr(f"code/{path}", content)
+                    files_added += 1
+
+        # Tests
+        for category, tests in [
+            ("unit", state.get("unit_tests") or {}),
+            ("integration", state.get("integration_tests") or {}),
+            ("e2e", state.get("e2e_tests") or {}),
+        ]:
+            for path, content in tests.items():
+                if content:
+                    zf.writestr(f"tests/{category}/{path}", content)
+                    files_added += 1
+
+        # Docs
+        for fname, key in [
+            ("pr_summary.md", "pr_summary"),
+            ("release_notes.md", "release_notes"),
+            ("pr_description.md", "pr_description"),
+        ]:
+            content = state.get(key) or ""
+            if content:
+                zf.writestr(f"docs/{fname}", content)
+                files_added += 1
+
+    if files_added == 0:
+        raise HTTPException(status_code=404, detail="No artifacts available yet")
+
+    buf.seek(0)
+    title = state.get("issue_title", "run").replace(" ", "_")[:40]
+    filename = f"{session_id}_{title}.zip"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/sessions/{session_id}/download/design")

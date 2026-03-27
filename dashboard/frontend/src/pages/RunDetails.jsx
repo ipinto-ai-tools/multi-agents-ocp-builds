@@ -120,6 +120,15 @@ export default function RunDetails() {
               Pause
             </button>
           )}
+          {(currentPhase === 'done') && (
+            <a
+              href={`/api/sessions/${sessionId}/download/all`}
+              download
+              className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-700 flex items-center gap-1"
+            >
+              ↓ Download All
+            </a>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSessions, approveSession, pauseSession } from '../api/client'
+import { getSessions, approveSession, pauseSession, archiveSession } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import PipelineProgress from '../components/PipelineProgress'
 
@@ -22,10 +22,11 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [showArchived, setShowArchived] = useState(false)
 
   async function load() {
     try {
-      const data = await getSessions()
+      const data = await getSessions(showArchived)
       setSessions(data)
     } catch (e) {
       console.error(e)
@@ -38,7 +39,7 @@ export default function Dashboard() {
     load()
     const t = setInterval(load, 3000)
     return () => clearInterval(t)
-  }, [])
+  }, [showArchived])
 
   const counts = sessions.reduce((acc, s) => {
     const st = deriveStatus(s)
@@ -69,6 +70,15 @@ export default function Dashboard() {
             <div className="text-sm text-gray-500">{label}</div>
           </button>
         ))}
+      </div>
+
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={() => setShowArchived(v => !v)}
+          className="text-xs text-gray-400 hover:text-gray-600 underline"
+        >
+          {showArchived ? 'Hide archived' : 'Show archived'}
+        </button>
       </div>
 
       {/* Table */}
@@ -138,6 +148,12 @@ export default function Dashboard() {
                           <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
                             onClick={() => pauseSession(session.id).then(load)}>
                             Pause
+                          </button>
+                        )}
+                        {(status === 'completed' || status === 'failed') && (
+                          <button className="px-2 py-1 text-xs border border-gray-300 text-gray-500 rounded hover:bg-gray-50"
+                            onClick={() => archiveSession(session.id).then(load)}>
+                            Archive
                           </button>
                         )}
                         <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"

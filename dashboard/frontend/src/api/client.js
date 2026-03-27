@@ -10,8 +10,8 @@ export async function launchRun(payload) {
   return res.json()
 }
 
-export async function getSessions() {
-  const res = await fetch(`${BASE}/api/sessions`)
+export async function getSessions(includeArchived = false) {
+  const res = await fetch(`${BASE}/api/sessions?include_archived=${includeArchived}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
@@ -32,6 +32,12 @@ export async function approveSession(sessionId, action = 'approve') {
 
 export async function pauseSession(sessionId) {
   const res = await fetch(`${BASE}/api/sessions/${sessionId}/pause`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function archiveSession(sessionId) {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}/archive`, { method: 'PATCH' })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
