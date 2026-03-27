@@ -155,19 +155,20 @@ export default function NewRun() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-2">Debug Mode</label>
-              <button
-                type="button"
-                onClick={() => setDebug(v => !v)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${debug ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-300 text-gray-600 hover:border-orange-400'}`}
-              >
-                {debug ? '🐛 Debug ON' : 'Debug OFF'}
-              </button>
-              {debug && <p className="text-xs text-orange-600 mt-1">Sets LOG_LEVEL=DEBUG — verbose output in logs tab</p>}
-            </div>
           </div>
         )}
+
+        {/* Debug toggle — always visible */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setDebug(v => !v)}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${debug ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-300 text-gray-500 hover:border-orange-400'}`}
+          >
+            {debug ? '🐛 Debug ON' : 'Debug OFF'}
+          </button>
+          {debug && <span className="text-xs text-orange-600">Verbose logging enabled</span>}
+        </div>
 
         <div className="flex gap-3 justify-center">
           <button
