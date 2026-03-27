@@ -17,6 +17,8 @@ from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 MANUAL_APPROVAL = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
 
 from agents.validators import validate_phase
