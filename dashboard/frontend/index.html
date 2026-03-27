@@ -547,6 +547,142 @@
         .toast.visible {
             opacity: 1;
         }
+
+        /* Risks modal */
+        .risks-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .risks-modal-overlay.open {
+            display: flex;
+        }
+
+        .risks-modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        .risks-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #30363d;
+            flex-shrink: 0;
+        }
+
+        .risks-modal-header h2 {
+            font-size: 1em;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin: 0;
+        }
+
+        .risks-modal-close {
+            background: none;
+            border: none;
+            color: #8b949e;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 0 4px;
+            border-radius: 4px;
+        }
+
+        .risks-modal-close:hover {
+            color: #c9d1d9;
+            background: #21262d;
+        }
+
+        .risks-modal-body {
+            overflow-y: auto;
+            padding: 16px 20px;
+            flex: 1;
+        }
+
+        .risk-item {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-left-width: 3px;
+            border-radius: 4px;
+            padding: 10px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .risk-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .risk-item.severity-high {
+            border-left-color: #da3633;
+        }
+
+        .risk-item.severity-medium {
+            border-left-color: #db6d28;
+        }
+
+        .risk-item.severity-low {
+            border-left-color: #d29922;
+        }
+
+        .risk-number {
+            font-size: 11px;
+            font-weight: 700;
+            color: #8b949e;
+            white-space: nowrap;
+            padding-top: 1px;
+            flex-shrink: 0;
+        }
+
+        .risk-text {
+            font-size: 13px;
+            color: #c9d1d9;
+            line-height: 1.55;
+        }
+
+        .risks-modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #30363d;
+            font-size: 12px;
+            color: #8b949e;
+            flex-shrink: 0;
+        }
+
+        /* Clickable risks badge */
+        .risks-badge {
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0;
+            font: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .risks-badge:hover .risk-level {
+            filter: brightness(1.15);
+        }
+
+        .risks-badge:hover .risks-hint {
+            color: #c9d1d9;
+        }
     </style>
 </head>
 <body>
@@ -574,6 +710,18 @@
     </div>
 
     <div id="toastEl" class="toast"></div>
+
+    <!-- Risks modal -->
+    <div class="risks-modal-overlay" id="risksModalOverlay" role="dialog" aria-modal="true" aria-labelledby="risksModalTitle">
+        <div class="risks-modal">
+            <div class="risks-modal-header">
+                <h2 id="risksModalTitle">Risks</h2>
+                <button class="risks-modal-close" id="risksModalClose" aria-label="Close risks modal">&times;</button>
+            </div>
+            <div class="risks-modal-body" id="risksModalBody"></div>
+            <div class="risks-modal-footer" id="risksModalFooter"></div>
+        </div>
+    </div>
 
     <div class="sessions-grid" id="sessionsGrid">
         <div class="empty-state">
@@ -795,13 +943,19 @@
                 ? `<div class="artifact-path">&#128193; <a href="#" onclick="navigator.clipboard.writeText('${outputDir}').then(()=>showToast('Path copied!')); return false;" title="Click to copy path">${outputDir}</a></div>`
                 : '';
 
-            // Risks - improved display with colored badge
+            // Risks - clickable badge that opens the risks modal
             let risksHtml = '';
             if (riskCount > 0) {
                 const riskLabel = `${riskCount} Risk${riskCount !== 1 ? 's' : ''}`;
+                const risks = hb.risks || [];
+                const sessionTitle = session.issue_title || 'Unknown Task';
+                const risksJson = JSON.stringify(risks).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                const titleEscaped = sessionTitle.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
                 risksHtml = `<div class="risks-section">
-                    <span class="risk-level ${riskLevel}">${riskLabel}</span>
-                    <span style="font-size:11px;color:#8b949e;margin-left:6px;">${riskLevel.toUpperCase()} severity</span>
+                    <button class="risks-badge" title="Click to view risks" onclick="openRisksModal(JSON.parse(this.dataset.risks), this.dataset.title);" data-risks="${risksJson}" data-title="${titleEscaped}">
+                        <span class="risk-level ${riskLevel}">${riskLabel}</span>
+                        <span class="risks-hint" style="font-size:11px;color:#8b949e;">${riskLevel.toUpperCase()} severity</span>
+                    </button>
                 </div>`;
             }
 
@@ -873,6 +1027,72 @@
                 </div>
             `;
         }
+
+        // Risks modal
+        const risksModalOverlay = document.getElementById('risksModalOverlay');
+        const risksModalTitle = document.getElementById('risksModalTitle');
+        const risksModalBody = document.getElementById('risksModalBody');
+        const risksModalFooter = document.getElementById('risksModalFooter');
+        const risksModalClose = document.getElementById('risksModalClose');
+
+        function openRisksModal(risks, title) {
+            risks = Array.isArray(risks) ? risks : [];
+            const count = risks.length;
+
+            // Determine severity class for left border
+            let severityClass;
+            if (count > 5) severityClass = 'severity-high';
+            else if (count >= 3) severityClass = 'severity-medium';
+            else severityClass = 'severity-low';
+
+            // Header title
+            risksModalTitle.textContent = `Risks \u2014 ${title}`;
+
+            // Body: numbered risk cards
+            if (count === 0) {
+                risksModalBody.innerHTML = '<p style="color:#8b949e;font-size:13px;">No risk details available.</p>';
+            } else {
+                risksModalBody.innerHTML = risks.map((risk, idx) => `
+                    <div class="risk-item ${severityClass}">
+                        <span class="risk-number">#${idx + 1}</span>
+                        <span class="risk-text">${escapeHtml(risk)}</span>
+                    </div>
+                `).join('');
+            }
+
+            // Footer summary
+            const severityLabel = count > 5 ? 'HIGH' : count >= 3 ? 'MEDIUM' : 'LOW';
+            risksModalFooter.textContent = `Total: ${count} risk${count !== 1 ? 's' : ''} \u00b7 ${severityLabel} severity`;
+
+            risksModalOverlay.classList.add('open');
+            risksModalClose.focus();
+        }
+
+        function closeRisksModal() {
+            risksModalOverlay.classList.remove('open');
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Close modal handlers
+        risksModalClose.addEventListener('click', closeRisksModal);
+
+        risksModalOverlay.addEventListener('click', (e) => {
+            if (e.target === risksModalOverlay) closeRisksModal();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && risksModalOverlay.classList.contains('open')) {
+                closeRisksModal();
+            }
+        });
 
         // Start auto-refresh
         function startAutoRefresh() {
