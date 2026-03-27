@@ -8,6 +8,7 @@ Set MANUAL_APPROVAL=true in .env to pause for user approval between phases.
 import json
 import os
 import pathlib
+import re
 import sys
 import time
 import uuid
@@ -110,6 +111,12 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
     if root.exists() and any(root.iterdir()):
         print(f"  WARNING: Output directory already exists and will be overwritten: {root}")
 
+    def _strip_test_prefix(path: str) -> str:
+        """Remove leading test category prefix from Claude-generated paths."""
+        stripped = re.sub(r'^test/(unit|integration|e2e|e2e_tests)/', '', path)
+        stripped = re.sub(r'^test/', '', stripped)
+        return stripped
+
     def _write(rel: pathlib.Path, content: str) -> None:
         target = root / rel
         try:
@@ -150,29 +157,32 @@ def _save_artifacts(state: dict, output_dir: str) -> pathlib.Path:
     # tests/unit/<filename>
     for filename, content in (state.get("unit_tests") or {}).items():
         if content:
-            target = (root / "tests" / "unit" / filename).resolve()
+            clean_name = _strip_test_prefix(filename)
+            target = (root / "tests" / "unit" / clean_name).resolve()
             if not str(target).startswith(str(root.resolve()) + os.sep):
                 print(f"  SKIPPED (unsafe path): {filename}")
                 continue
-            _write(pathlib.Path("tests") / "unit" / filename, content)
+            _write(pathlib.Path("tests") / "unit" / clean_name, content)
 
     # tests/integration/<filename>
     for filename, content in (state.get("integration_tests") or {}).items():
         if content:
-            target = (root / "tests" / "integration" / filename).resolve()
+            clean_name = _strip_test_prefix(filename)
+            target = (root / "tests" / "integration" / clean_name).resolve()
             if not str(target).startswith(str(root.resolve()) + os.sep):
                 print(f"  SKIPPED (unsafe path): {filename}")
                 continue
-            _write(pathlib.Path("tests") / "integration" / filename, content)
+            _write(pathlib.Path("tests") / "integration" / clean_name, content)
 
     # tests/e2e/<filename>
     for filename, content in (state.get("e2e_tests") or {}).items():
         if content:
-            target = (root / "tests" / "e2e" / filename).resolve()
+            clean_name = _strip_test_prefix(filename)
+            target = (root / "tests" / "e2e" / clean_name).resolve()
             if not str(target).startswith(str(root.resolve()) + os.sep):
                 print(f"  SKIPPED (unsafe path): {filename}")
                 continue
-            _write(pathlib.Path("tests") / "e2e" / filename, content)
+            _write(pathlib.Path("tests") / "e2e" / clean_name, content)
 
     # docs/pr_description.md
     pr_description = state.get("pr_description")
