@@ -156,7 +156,7 @@ With a live dashboard:
 
 ```bash
 # Terminal 1: start the dashboard
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 
 # Terminal 2: run dashboard tests
 uv run python scripts/test_agents.py --dashboard --debug

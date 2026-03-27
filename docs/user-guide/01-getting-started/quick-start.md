@@ -155,7 +155,7 @@ Start the dashboard before running the orchestrator to watch each agent's progre
 **Terminal 1 - Start the dashboard:**
 
 ```bash
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 ```
 
 Open http://localhost:8080 in your browser.
