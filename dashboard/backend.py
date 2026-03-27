@@ -52,9 +52,9 @@ class SessionResponse(BaseModel):
     id: str
     created_at: str
     updated_at: str
-    issue_title: str
-    issue_type: str
-    status: str
+    issue_title: Optional[str] = ""
+    issue_type: Optional[str] = "feature"
+    status: Optional[str] = "active"
     latest_heartbeat: Optional[Dict[str, Any]] = None
     jira_ticket_id: Optional[str] = None
     jira_ticket_url: Optional[str] = None
