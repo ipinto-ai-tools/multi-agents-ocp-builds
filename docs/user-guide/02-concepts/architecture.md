@@ -1,6 +1,27 @@
 # Architecture
 
-The multi-agent system is a LangGraph pipeline of five specialized AI agents that process a feature request or bug report end-to-end.
+## Feature SDLC Pipeline
+
+The system automates the complete feature software development lifecycle (SDLC) — from a Jira ticket or issue description through to deployable artifacts — without manual handoffs between stages.
+
+Each run of `scripts/orchestrate.py` executes a fixed sequence of SDLC phases:
+
+```
+Requirements → Design → Development → Code Review → Testing → Documentation → Publish
+```
+
+The first phase (Requirements) is provided by the caller as an issue title and description. The remaining phases are carried out by specialized AI agents orchestrated by LangGraph. The final Publish step writes artifacts to disk via `publish.py`.
+
+### SDLC Phase Overview
+
+| Phase | SDLC Stage | Agent | Duration (typical) |
+| ----- | ---------- | ----- | ------------------ |
+| 1 | Design & Architecture | Design Agent | ~90s |
+| 2 | Development | Development Agent | ~3min |
+| 2.5 | Code Review | Code Review Agent | ~45s (+ retry loop) |
+| 3 | Testing | Testing Agent | ~3min |
+| 4 | Documentation | Documentation Agent | ~2min |
+| — | Publish | publish.py | ~30s |
 
 ---
 
@@ -37,9 +58,9 @@ The multi-agent system is a LangGraph pipeline of five specialized AI agents tha
 
 ---
 
-## LangGraph Pipeline
+## Pipeline Implementation
 
-The orchestrator (`agents/graph.py`) builds a `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which node runs next.
+The orchestrator (`agents/graph.py`) implements the SDLC phase sequence as a LangGraph `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which SDLC phase runs next.
 
 ```
 design_node → develop_node → code_review_node → testing_node → docs_node → END

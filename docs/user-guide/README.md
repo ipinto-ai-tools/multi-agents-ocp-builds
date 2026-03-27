@@ -1,9 +1,16 @@
-# Multi-Agent OCP Builds - User Guide
+# Feature SDLC Automation — User Guide
 
-AI-powered development orchestrator for Shipwright Build using Claude AI and LangGraph.
+End-to-end automation of the feature development lifecycle for Shipwright / OpenShift Builds projects.
 
 This system automates the design, development, testing, and documentation workflow for OpenShift and Shipwright Build projects. You provide a feature request or bug report; the agent pipeline returns a design document, production Go code, Ginkgo v2 tests, and full documentation.
 
+**SDLC flow:**
+
+```text
+Jira Ticket → Design → Development → Code Review → Testing → Documentation → Publish
+```
+
+Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-dir` and can be pushed to GitHub and Jira via `publish.py`.
 
 ![Multi-Agent OCP Build Orchestrator: Automated Workflow & Data Flow](assets/workflow-diagram-detailed.png)
 
@@ -19,7 +26,7 @@ This system automates the design, development, testing, and documentation workfl
 | [Quick Start](01-getting-started/quick-start.md) | Complete setup guide covering all integrations (Jira, GitHub, Qodo, Vertex AI, repo paths) |
 | [Configuration](01-getting-started/configuration.md) | Environment variables and `.env` setup |
 
-### Section 2 - Core Concepts
+### Section 2 - Core Concepts & SDLC Pipeline
 
 | Page | Description |
 |------|-------------|
@@ -93,6 +100,7 @@ This system automates the design, development, testing, and documentation workfl
 
 | I want to... | Go to |
 |---|---|
+| Run the full SDLC from a Jira ticket | [Quick Start](01-getting-started/quick-start.md) |
 | Install the system for the first time | [Installation](01-getting-started/installation.md) |
 | Run my first workflow | [Quick Start](01-getting-started/quick-start.md) |
 | Configure environment variables | [Configuration](01-getting-started/configuration.md) |
