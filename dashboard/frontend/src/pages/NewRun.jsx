@@ -13,6 +13,7 @@ export default function NewRun() {
   const [issueType, setIssueType] = useState('feature')
   const [selectedStages, setSelectedStages] = useState(new Set(STAGES))
   const [manualApproval, setManualApproval] = useState(false)
+  const [debug, setDebug] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -42,6 +43,7 @@ export default function NewRun() {
         issue_type: issueType,
         stages: [...selectedStages],
         manual_approval: manualApproval,
+        debug: debug,
       }
       const { session_id } = await launchRun(payload)
       navigate(`/runs/${session_id}`)
@@ -151,6 +153,18 @@ export default function NewRun() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Debug Mode</label>
+              <button
+                type="button"
+                onClick={() => setDebug(v => !v)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${debug ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-300 text-gray-600 hover:border-orange-400'}`}
+              >
+                {debug ? '🐛 Debug ON' : 'Debug OFF'}
+              </button>
+              {debug && <p className="text-xs text-orange-600 mt-1">Sets LOG_LEVEL=DEBUG — verbose output in logs tab</p>}
             </div>
           </div>
         )}

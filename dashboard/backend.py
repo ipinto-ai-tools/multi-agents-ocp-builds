@@ -15,7 +15,10 @@ from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+import io
+import zipfile
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles  # requires: pip install aiofiles
@@ -71,6 +74,7 @@ class RunRequest(BaseModel):
     stages: List[str] = ["design", "develop", "test", "docs"]
     manual_approval: bool = False
     dry_run: bool = False
+    debug: bool = False
 
 
 def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
@@ -93,6 +97,8 @@ def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
         cmd += ["--issue-type", run_request.issue_type]
     if run_request.dry_run:
         cmd.append("--dry-run")
+    if run_request.debug:
+        cmd.append("--debug")
 
     env = os.environ.copy()
     if run_request.manual_approval:
@@ -491,6 +497,17 @@ def _validate_session_id(session_id: str) -> None:
         raise HTTPException(status_code=400, detail="Invalid session_id format")
 
 
+def _get_latest_state(session_id: str) -> dict:
+    """Get the latest raw_state from a session's most recent heartbeat."""
+    session = db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    heartbeats = session.get("heartbeats", [])
+    if not heartbeats:
+        raise HTTPException(status_code=404, detail="No heartbeats found for session")
+    return heartbeats[-1].get("raw_state", {})
+
+
 async def periodic_cleanup():
     """Background task to clean up old sessions every 6 hours."""
     while True:
@@ -777,6 +794,114 @@ async def pause_session(session_id: str):
     pause_file.touch()
     logger.info(f"Pause signal written: session={session_id}")
     return {"status": "ok"}
+
+
+@app.get("/api/sessions/{session_id}/download/design")
+async def download_design(session_id: str):
+    """Download design analysis as a markdown file."""
+    _validate_session_id(session_id)
+    state = _get_latest_state(session_id)
+    content = state.get("design_analysis") or ""
+    if not content:
+        raise HTTPException(status_code=404, detail="No design analysis available")
+
+    title = state.get("issue_title", "design").replace(" ", "_")[:40]
+    filename = f"design_{title}.md"
+
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/sessions/{session_id}/download/code")
+async def download_code(session_id: str):
+    """Download all generated code files as a zip archive."""
+    _validate_session_id(session_id)
+    state = _get_latest_state(session_id)
+    code_files = state.get("code_files") or []
+
+    if not code_files:
+        raise HTTPException(status_code=404, detail="No code files available")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if isinstance(code_files, list):
+            for f in code_files:
+                path = f.get("path", "unknown.go")
+                content = f.get("content", "")
+                zf.writestr(path, content)
+        else:
+            for path, content in code_files.items():
+                zf.writestr(path, content or "")
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="code.zip"'},
+    )
+
+
+@app.get("/api/sessions/{session_id}/download/tests")
+async def download_tests(session_id: str):
+    """Download all generated test files as a zip archive."""
+    _validate_session_id(session_id)
+    state = _get_latest_state(session_id)
+
+    unit = state.get("unit_tests") or {}
+    integration = state.get("integration_tests") or {}
+    e2e = state.get("e2e_tests") or {}
+
+    if not unit and not integration and not e2e:
+        raise HTTPException(status_code=404, detail="No test files available")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path, content in unit.items():
+            zf.writestr(f"unit/{path}", content or "")
+        for path, content in integration.items():
+            zf.writestr(f"integration/{path}", content or "")
+        for path, content in e2e.items():
+            zf.writestr(f"e2e/{path}", content or "")
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="tests.zip"'},
+    )
+
+
+@app.get("/api/sessions/{session_id}/download/docs")
+async def download_docs(session_id: str):
+    """Download documentation files as a zip archive."""
+    _validate_session_id(session_id)
+    state = _get_latest_state(session_id)
+
+    pr_summary = state.get("pr_summary") or ""
+    release_notes = state.get("release_notes") or ""
+    pr_description = state.get("pr_description") or ""
+
+    if not pr_summary and not release_notes and not pr_description:
+        raise HTTPException(status_code=404, detail="No documentation available")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if pr_summary:
+            zf.writestr("pr_summary.md", pr_summary)
+        if release_notes:
+            zf.writestr("release_notes.md", release_notes)
+        if pr_description:
+            zf.writestr("pr_description.md", pr_description)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="docs.zip"'},
+    )
 
 
 # Serve frontend — React build (dist/) takes priority over legacy index.html

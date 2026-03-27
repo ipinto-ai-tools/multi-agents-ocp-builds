@@ -73,6 +73,10 @@ export default function RunDetails() {
   const releaseNotes = state.release_notes || ''
   const testPlan = state.test_plan || ''
 
+  function triggerDownload(url) {
+    window.open(url, '_blank')
+  }
+
   const tabs = [
     { key: 'summary',  label: 'Summary' },
     { key: 'code',     label: `Code (${codeFiles.length})` },
@@ -144,6 +148,15 @@ export default function RunDetails() {
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         {activeTab === 'summary' && (
           <div className="space-y-4">
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => triggerDownload(`/api/sessions/${sessionId}/download/design`)}
+                disabled={!state.design_analysis}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                ↓ Download Design
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="text-2xl font-bold text-gray-800">{codeFiles.length}</div>
@@ -181,6 +194,15 @@ export default function RunDetails() {
 
         {activeTab === 'code' && (
           <div>
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => triggerDownload(`/api/sessions/${sessionId}/download/code`)}
+                disabled={codeFiles.length === 0}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                ↓ Download code.zip
+              </button>
+            </div>
             {codeFiles.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No code files generated yet.</p>
             ) : (
@@ -202,6 +224,15 @@ export default function RunDetails() {
 
         {activeTab === 'tests' && (
           <div className="space-y-6">
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => triggerDownload(`/api/sessions/${sessionId}/download/tests`)}
+                disabled={Object.keys(unitTests).length + Object.keys(integrationTests).length + Object.keys(e2eTests).length === 0}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                ↓ Download tests.zip
+              </button>
+            </div>
             {testPlan && (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">Test Plan</h3>
@@ -228,6 +259,15 @@ export default function RunDetails() {
 
         {activeTab === 'docs' && (
           <div className="space-y-4">
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => triggerDownload(`/api/sessions/${sessionId}/download/docs`)}
+                disabled={!prSummary && !releaseNotes}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                ↓ Download docs.zip
+              </button>
+            </div>
             {prSummary ? (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">PR Summary</h3>
