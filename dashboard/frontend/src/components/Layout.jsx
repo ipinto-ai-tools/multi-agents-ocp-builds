@@ -34,7 +34,7 @@ export default function Layout({ children }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-400">Feature SDLC Pipeline</span>
-          <img src="/redhat.svg" alt="Red Hat" className="h-8 w-auto opacity-90" />
+          <img src="/redhat.png" alt="Red Hat" className="h-8 w-auto opacity-90" />
         </div>
       </header>
       <main className="flex-1 p-6">{children}</main>

@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 150">
-  <!-- brim -->
-  <ellipse cx="100" cy="110" rx="95" ry="22" fill="#EE0000"/>
-  <!-- crown -->
-  <path d="M40 110 Q38 55 100 45 Q162 55 160 110 Z" fill="#EE0000"/>
-  <!-- band -->
-  <path d="M42 96 Q40 82 100 78 Q160 82 158 96 Q160 86 100 82 Q40 86 42 96 Z" fill="#1a1a1a"/>
-</svg>
