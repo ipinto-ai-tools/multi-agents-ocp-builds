@@ -243,9 +243,10 @@ def orchestrate(
     # Propagate orchestrator session_id to the global heartbeat emitter so all
     # emit_heartbeat() calls use the same session throughout the pipeline.
     try:
-        from dashboard.heartbeat import get_global_emitter
+        from dashboard.heartbeat import get_global_emitter, emit_heartbeat
         emitter = get_global_emitter()
         emitter.session_id = session_id
+        emit_heartbeat("orchestrator", state)  # show card immediately on dashboard
     except Exception:
         pass  # dashboard unavailable, non-blocking
 
