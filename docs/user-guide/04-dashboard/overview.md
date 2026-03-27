@@ -177,9 +177,16 @@ logs/
 uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
 
 # Terminal 2: run the workflow
+# From a Jira ticket
+uv run python scripts/orchestrate.py \
+  --jira-ticket SHIP-123 \
+  --output-dir ./output
+
+# Or from a title and description
 uv run python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun" \
-  --description "Users need ability to specify build timeout to prevent hanging builds"
+  --description "Users need ability to specify build timeout to prevent hanging builds" \
+  --output-dir ./output
 ```
 
 The session appears in the dashboard within seconds of the workflow starting.

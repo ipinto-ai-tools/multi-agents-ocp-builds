@@ -174,7 +174,8 @@ Or pass it inline for a single run:
 ```bash
 MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
-  --description "Users need to build from private Git repos using SSH authentication"
+  --description "Users need to build from private Git repos using SSH authentication" \
+  --output-dir ./output
 ```
 
 ### What It Looks Like
@@ -238,7 +239,8 @@ This is the right mode for CI/CD pipelines and unattended runs where you want au
 # Auto mode (default - no changes needed)
 uv run python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
-  --description "Users need to build from private Git repos using SSH authentication"
+  --description "Users need to build from private Git repos using SSH authentication" \
+  --output-dir ./output
 ```
 
 ---

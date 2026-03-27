@@ -397,7 +397,8 @@ Set `QODO_REVIEW_ENABLED=false` to skip the Code Review phase entirely. The pipe
 ```bash
 QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
   --title "Feature title" \
-  --description "Description"
+  --description "Description" \
+  --output-dir ./output
 ```
 
 ### c) Tuning the Auto-fix Loop
@@ -413,7 +414,8 @@ QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
 ```bash
 MAX_REVIEW_ITERATIONS=5 QODO_BLOCKING_THRESHOLD=medium uv run python scripts/orchestrate.py \
   --title "Add timeout support" \
-  --description "Users need configurable timeouts"
+  --description "Users need configurable timeouts" \
+  --output-dir ./output
 ```
 
 ### d) Optional Qodo CLI
@@ -423,7 +425,8 @@ Set `QODO_CLI_PATH` to the absolute path of the Qodo binary to use Qodo as the r
 ```bash
 QODO_CLI_PATH=/usr/local/bin/qodo uv run python scripts/orchestrate.py \
   --title "Add timeout support" \
-  --description "Description"
+  --description "Description" \
+  --output-dir ./output
 ```
 
 ### e) Reading Review Output from State
