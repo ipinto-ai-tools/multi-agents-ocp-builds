@@ -16,7 +16,7 @@ This system automates the design, development, testing, and documentation workfl
 | Page | Description |
 |------|-------------|
 | [Installation](01-getting-started/installation.md) | System requirements and install steps |
-| [Quick Start](01-getting-started/quick-start.md) | Run your first workflow in minutes |
+| [Quick Start](01-getting-started/quick-start.md) | Complete setup guide covering all integrations (Jira, GitHub, Qodo, Vertex AI, repo paths) |
 | [Configuration](01-getting-started/configuration.md) | Environment variables and `.env` setup |
 
 ### Section 2 - Core Concepts
@@ -46,11 +46,9 @@ This system automates the design, development, testing, and documentation workfl
 
 ### Section 5 - Authentication
 
-| Page | Description |
-|------|-------------|
-| [Overview](05-authentication/overview.md) | How authentication works |
-| [Vertex AI](05-authentication/vertex-ai.md) | Google Vertex AI setup guide |
-| [API Key](05-authentication/api-key.md) | Direct API key setup |
+| Page                                                  | Description                            |
+|-------------------------------------------------------|----------------------------------------|
+| [Authentication](05-authentication/authentication.md) | Authentication setup and configuration |
 
 ### Section 6 - Advanced
 
@@ -101,7 +99,7 @@ This system automates the design, development, testing, and documentation workfl
 | Understand what each agent does | [Agents Overview](02-concepts/agents-overview.md) |
 | Call an agent directly from Python | [Design Agent](03-agents/design-agent.md) / [Testing Agent](03-agents/testing-agent.md) |
 | Monitor a running workflow | [Dashboard Overview](04-dashboard/overview.md) |
-| Set up Google Vertex AI authentication | [Vertex AI](05-authentication/vertex-ai.md) |
+| Set up Google Vertex AI authentication | [Authentication](05-authentication/authentication.md) |
 | Test without making API calls | [Dry Run Mode](06-advanced/dry-run-mode.md) |
 | Debug a failing workflow | [Troubleshooting](06-advanced/troubleshooting.md) |
 | Understand how state flows between agents | [State Management](02-concepts/state-management.md) |
