@@ -538,7 +538,15 @@ Examples:
         metavar="PATH",
         help="Save all pipeline artifacts to this directory after completion.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging.",
+    )
     args = parser.parse_args()
+
+    if args.debug:
+        os.environ["LOG_LEVEL"] = "DEBUG"
 
     if not args.jira_ticket and not args.title:
         parser.error("either --title or --jira-ticket is required")
