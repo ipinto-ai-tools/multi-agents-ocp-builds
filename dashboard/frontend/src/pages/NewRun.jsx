@@ -57,8 +57,8 @@ export default function NewRun() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] gap-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-1">AI Agent Control Plane</h1>
-        <p className="text-gray-500">Feature SDLC automation — Design → Develop → Test → Docs</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-1">FlowPilot</h1>
+        <p className="text-gray-500">AI-orchestrated feature pipelines — from idea to pull request.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="w-full max-w-2xl flex flex-col gap-4">

@@ -7,7 +7,7 @@ export default function Layout({ children }) {
       <header className="bg-gray-900 text-white px-6 py-3 flex items-center justify-between shadow">
         <div className="flex items-center gap-6">
           <Link to="/" className="font-bold text-lg tracking-tight">
-            AI Agent Control Plane
+            FlowPilot
           </Link>
           <nav className="flex gap-4 text-sm">
             <Link
