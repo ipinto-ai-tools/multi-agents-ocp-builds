@@ -664,10 +664,15 @@ def _write_test_plan_md(output: Dict[str, Any], output_dir: Path) -> None:
                     lines.append(f"  - Expected: {outcome}")
             return "\n".join(lines) + "\n"
 
+        section_subdirs = {
+            "unit_tests": "tests/unit",
+            "integration_tests": "tests/integration",
+            "e2e_tests": "tests/e2e",
+        }
         all_test_files: list = []
-        for section in ("unit_tests", "integration_tests", "e2e_tests"):
+        for section, subdir in section_subdirs.items():
             for path in output.get(section, {}).keys():
-                all_test_files.append(f"- `go_tests/{path}`")
+                all_test_files.append(f"- `{subdir}/{path}`")
 
         patterns = output.get("patterns_detected", {})
         strategies = patterns.get("strategies", [])
@@ -710,20 +715,20 @@ def _write_test_plan_md(output: Dict[str, Any], output_dir: Path) -> None:
 
 
 def _write_go_test_files(output: Dict[str, Any], output_dir: Path) -> None:
-    """Write Go test files to go_tests/ under output_dir."""
-    go_tests_dir = output_dir / "go_tests"
-    sections = {
-        "unit_tests": output.get("unit_tests", {}),
-        "integration_tests": output.get("integration_tests", {}),
-        "e2e_tests": output.get("e2e_tests", {}),
+    """Write Go test files to tests/unit, tests/integration, tests/e2e under output_dir."""
+    section_dirs = {
+        "unit_tests": output_dir / "tests" / "unit",
+        "integration_tests": output_dir / "tests" / "integration",
+        "e2e_tests": output_dir / "tests" / "e2e",
     }
-    for section_name, files in sections.items():
+    for section_name, dest_dir in section_dirs.items():
+        files = output.get(section_name, {})
         if not isinstance(files, dict):
             continue
         for full_path, code in files.items():
             if not code:
                 continue
-            dest = go_tests_dir / full_path
+            dest = dest_dir / full_path
             dest.parent.mkdir(parents=True, exist_ok=True)
             safe_code = sanitize(code, source=f"testing_agent:go_test:{dest.name}")
             dest.write_text(safe_code, encoding="utf-8")
