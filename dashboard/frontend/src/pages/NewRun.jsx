@@ -9,7 +9,7 @@ export default function NewRun() {
   const [description, setDescription] = useState('')
   const [advanced, setAdvanced] = useState(false)
   const [jiraTicket, setJiraTicket] = useState('')
-  const [repoPath, setRepoPath] = useState('')
+  const [githubIssue, setGithubIssue] = useState('')
   const [issueType, setIssueType] = useState('feature')
   const [selectedStages, setSelectedStages] = useState(new Set(STAGES))
   const [manualApproval, setManualApproval] = useState(false)
@@ -44,7 +44,7 @@ export default function NewRun() {
         title: description.trim().split('\n')[0].slice(0, 120) || null,
         description: description.trim() || null,
         jira_ticket: jiraTicket.trim() || null,
-        repo_path: repoPath.trim() || null,
+        github_issue: githubIssue.trim() || null,
         issue_type: issueType,
         stages: [...selectedStages],
         manual_approval: manualApproval,
@@ -104,12 +104,12 @@ export default function NewRun() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Repository Path (optional)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">GitHub Issue (optional)</label>
                 <input
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
-                  placeholder="/home/user/git/shipwright-build"
-                  value={repoPath}
-                  onChange={e => setRepoPath(e.target.value)}
+                  placeholder="SHIP-123 · owner/repo#123 · https://github.com/..."
+                  value={githubIssue}
+                  onChange={e => setGithubIssue(e.target.value)}
                 />
               </div>
             </div>

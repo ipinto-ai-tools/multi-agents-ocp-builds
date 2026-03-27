@@ -6,6 +6,7 @@ Runs agents sequentially with output validation between phases.
 Set MANUAL_APPROVAL=true in .env to pause for user approval between phases.
 """
 import json
+import logging
 import os
 import pathlib
 import re
@@ -19,6 +20,8 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+logger = logging.getLogger(__name__)
 
 MANUAL_APPROVAL = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
 SIGNAL_DIR = pathlib.Path("/tmp/claude/signals")
@@ -262,6 +265,7 @@ def orchestrate(
     issue_type: str = "feature",
     repo_path: str | None = None,
     jira_ticket: str | None = None,
+    github_issue: str | None = None,
     dry_run: bool = False,
     output_dir: str | None = None,
     session_id: str | None = None,
@@ -274,6 +278,7 @@ def orchestrate(
         issue_type: Type of issue ("feature", "bug", or "refactor").
         repo_path: Optional path to the Shipwright repository for code analysis.
         jira_ticket: Optional Jira ticket ID to fetch title/description from.
+        github_issue: Optional GitHub issue reference (URL, owner/repo#N, or SHIP-NNN).
         dry_run: If True, use mock data instead of real API calls.
         output_dir: Optional path to save all pipeline artifacts after completion.
         session_id: Optional session ID to use (set by web UI when launching from dashboard).
@@ -358,6 +363,27 @@ def orchestrate(
             finally:
                 if _dry_run_set_by_us:
                     os.environ.pop("DRY_RUN", None)
+
+        # -- Pre-phase: GitHub issue fetch ----------------------------------------
+        if github_issue:
+            from tools.github_client import parse_github_issue_ref, GitHubClient, get_github_client
+            parsed = parse_github_issue_ref(github_issue)
+            if parsed:
+                owner, repo, number = parsed
+                gh_client = get_github_client()
+                issue_data = gh_client.fetch_issue(owner, repo, number)
+                if issue_data:
+                    if not title:
+                        title = issue_data["title"]
+                    if not description:
+                        description = issue_data["body"]
+                    elif issue_data["body"]:
+                        description = f"{description}\n\n---\n**GitHub Issue {owner}/{repo}#{number}:**\n{issue_data['body']}"
+                    logger.info(f"Loaded GitHub issue {owner}/{repo}#{number}: {issue_data['title']}")
+                else:
+                    logger.warning(f"Could not fetch GitHub issue: {github_issue}")
+            else:
+                logger.warning(f"Could not parse GitHub issue reference: {github_issue}")
 
         # -- Phase 1: Design ------------------------------------------------------
         print_header("Phase 1/5: Design Agent")
@@ -624,6 +650,11 @@ Examples:
         help="Jira ticket ID to fetch (e.g. SHIP-123). Fetches title, description, and acceptance criteria automatically.",
     )
     parser.add_argument(
+        "--github-issue",
+        help="GitHub issue reference (URL, owner/repo#N, or SHIP-NNN). "
+             "Fetches title and description from GitHub.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Use mock data instead of real API calls (no Jira or Claude API calls).",
@@ -650,8 +681,8 @@ Examples:
     if args.debug:
         os.environ["LOG_LEVEL"] = "DEBUG"
 
-    if not args.jira_ticket and not args.title:
-        parser.error("either --title or --jira-ticket is required")
+    if not args.jira_ticket and not args.title and not args.github_issue:
+        parser.error("either --title, --jira-ticket, or --github-issue is required")
 
     result = orchestrate(
         title=args.title,
@@ -659,6 +690,7 @@ Examples:
         issue_type=args.issue_type,
         repo_path=args.repo_path,
         jira_ticket=args.jira_ticket,
+        github_issue=args.github_issue,
         dry_run=args.dry_run,
         output_dir=args.output_dir,
         session_id=args.session_id,

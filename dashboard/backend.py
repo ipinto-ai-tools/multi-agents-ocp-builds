@@ -69,6 +69,7 @@ class RunRequest(BaseModel):
     description: Optional[str] = None
     issue_type: str = "feature"
     jira_ticket: Optional[str] = None
+    github_issue: Optional[str] = None
     repo_path: Optional[str] = None
     output_dir: Optional[str] = None
     stages: List[str] = ["design", "develop", "test", "docs"]
@@ -94,6 +95,8 @@ def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
         cmd += ["--description", run_request.description]
     if run_request.jira_ticket:
         cmd += ["--jira-ticket", run_request.jira_ticket]
+    if run_request.github_issue:
+        cmd += ["--github-issue", run_request.github_issue]
     if run_request.repo_path:
         cmd += ["--repo-path", run_request.repo_path]
     if run_request.output_dir:
