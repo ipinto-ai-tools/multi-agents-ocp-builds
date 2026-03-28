@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getSession, approveSession, pauseSession, streamLogs } from '../api/client'
+import { getSession, approveSession, pauseSession, streamLogs, deleteSession } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import PipelineProgress from '../components/PipelineProgress'
 
@@ -131,6 +131,18 @@ export default function RunDetails() {
             >
               ↓ Download All
             </a>
+          )}
+          {(status === 'completed' || status === 'failed') && (
+            <button
+              onClick={() => {
+                if (window.confirm('Permanently delete this run and its logs? This cannot be undone.')) {
+                  deleteSession(sessionId).then(() => navigate('/runs'))
+                }
+              }}
+              className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm hover:bg-red-100"
+            >
+              Delete
+            </button>
           )}
         </div>
       </div>

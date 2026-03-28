@@ -250,6 +250,22 @@ class Database:
         conn.close()
         return updated
 
+    def delete_session(self, session_id: str) -> bool:
+        """Permanently delete a session and all its heartbeats.
+
+        Returns True if the session existed and was deleted, False otherwise.
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM heartbeats WHERE session_id = ?", (session_id,))
+            cursor.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted
+        finally:
+            conn.close()
+
     def insert_heartbeat(self, enriched: Dict[str, Any]):
         """Insert an enriched heartbeat.
 
@@ -839,6 +855,28 @@ async def archive_session(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     logger.info(f"Session archived: {session_id}")
     return {"status": "archived", "session_id": session_id}
+
+
+# NOTE: This wildcard route must remain AFTER the fixed-path DELETE routes above
+# (cleanup, completed, stuck) so FastAPI matches literal paths first.
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Permanently delete a session, its heartbeats, and its log file."""
+    _validate_session_id(session_id)
+    deleted = db.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Clean up log file if it exists
+    log_file = LOG_DIR / f"{session_id}.log"
+    if log_file.exists():
+        try:
+            log_file.unlink()
+        except OSError:
+            pass  # Don't fail the delete if log cleanup fails
+
+    logger.info(f"Session permanently deleted: {session_id}")
+    return {"deleted": session_id}
 
 
 @app.get("/api/sessions/{session_id}/download/all")

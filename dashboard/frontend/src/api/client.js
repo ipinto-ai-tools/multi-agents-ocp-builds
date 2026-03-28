@@ -42,6 +42,12 @@ export async function archiveSession(sessionId) {
   return res.json()
 }
 
+export async function deleteSession(sessionId) {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export function streamLogs(sessionId, onLine, onError) {
   const es = new EventSource(`${BASE}/api/sessions/${sessionId}/logs`)
   es.onmessage = (e) => {
