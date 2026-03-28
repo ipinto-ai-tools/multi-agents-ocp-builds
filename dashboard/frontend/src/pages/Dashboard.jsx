@@ -24,10 +24,11 @@ function PhaseChip({ phase }) {
 
 function deriveStatus(session) {
   const phase = session.latest_heartbeat?.phase || session.status || 'init'
-  if (phase === 'done') return 'completed'
-  if (phase === 'error') return 'failed'
-  if (phase?.includes('waiting')) return 'waiting'
-  if (phase === 'init') return 'init'
+  const currentPhase = session.latest_heartbeat?.raw_state?.current_phase
+  if (phase === 'done' || currentPhase === 'done') return 'completed'
+  if (phase === 'error' || currentPhase === 'error') return 'failed'
+  if (phase?.includes('waiting') || currentPhase?.includes('waiting')) return 'waiting'
+  if (phase === 'init' && !currentPhase) return 'init'
   return 'running'
 }
 

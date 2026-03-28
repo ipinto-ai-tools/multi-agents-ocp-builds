@@ -6,9 +6,11 @@ import PipelineProgress from '../components/PipelineProgress'
 
 function deriveStatus(session) {
   const phase = session?.latest_heartbeat?.phase || 'init'
-  if (phase === 'done') return 'completed'
-  if (phase === 'error') return 'failed'
-  if (phase?.includes('waiting')) return 'waiting'
+  const currentPhase = session?.latest_heartbeat?.raw_state?.current_phase
+  if (phase === 'done' || currentPhase === 'done') return 'completed'
+  if (phase === 'error' || currentPhase === 'error') return 'failed'
+  if (phase?.includes('waiting') || currentPhase?.includes('waiting')) return 'waiting'
+  if (phase === 'init' && !currentPhase) return 'init'
   return 'running'
 }
 
@@ -23,6 +25,7 @@ export default function RunDetails() {
   const [session, setSession] = useState(null)
   const [activeTab, setActiveTab] = useState('summary')
   const [logs, setLogs] = useState([])
+  const [copied, setCopied] = useState(false)
   const logsRef = useRef(null)
   const esRef = useRef(null)
 
@@ -296,6 +299,26 @@ export default function RunDetails() {
         )}
 
         {activeTab === 'logs' && (
+          <div>
+          <div className="flex items-center gap-2 mb-2 text-xs text-gray-500">
+            <span className="font-mono bg-gray-100 px-2 py-1 rounded text-gray-700 select-all">
+              /tmp/claude/logs/{sessionId}.log
+            </span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`/tmp/claude/logs/${sessionId}.log`)
+                  .then(() => {
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  })
+                  .catch(() => {})
+              }}
+              className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-500"
+            >
+              {copied ? '✓ Copied' : 'Copy path'}
+            </button>
+            <span className="text-gray-400">— open with: <code className="font-mono text-gray-600">vim /tmp/claude/logs/{sessionId}.log</code></span>
+          </div>
           <div
             ref={logsRef}
             className="bg-gray-900 text-green-400 font-mono text-xs p-4 rounded-lg h-96 overflow-y-auto"
@@ -305,6 +328,7 @@ export default function RunDetails() {
             ) : (
               logs.map((line, i) => <div key={i}>{line}</div>)
             )}
+          </div>
           </div>
         )}
       </div>
