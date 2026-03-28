@@ -521,7 +521,7 @@ def _get_generation_request(output_format: str) -> str:
     """
     base_request = (
         "Based on the above context, generate comprehensive documentation including:\n"
-        "1. PR Summary - concise pull request description\n"
+        "1. ## PR Summary - concise pull request description (use exactly this ## header)\n"
         "2. Release Notes - user-facing changelog entry\n"
         "3. Documentation Changes - specific doc updates needed\n"
         "4. Upgrade Notes - version-specific upgrade guidance\n"
@@ -592,7 +592,15 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
     sections = _split_into_sections(response_text)
 
     # Extract each section
-    output["pr_summary"] = sections.get("pr summary", "").strip()
+    pr_summary = (
+        sections.get("pr summary")
+        or sections.get("pull request summary")
+        or sections.get("pr description")
+        or sections.get("pull request description")
+        or sections.get("summary")
+        or ""
+    ).strip()
+    output["pr_summary"] = pr_summary
 
     pr_description = (
         sections.get("pr description")
@@ -645,8 +653,8 @@ def _split_into_sections(text: str) -> Dict[str, str]:
     current_content = []
 
     for line in text.split("\n"):
-        # Check if line is a section header (## Header only, not ###)
-        if line.startswith("##") and not line.startswith("###"):
+        # Check if line is a section header (# or ## but not ### or deeper)
+        if line.startswith("#") and not line.startswith("###"):
             # Save previous section
             if current_section:
                 sections[current_section] = "\n".join(current_content)
