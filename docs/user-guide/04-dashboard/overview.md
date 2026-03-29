@@ -1,6 +1,6 @@
 # Dashboard Overview
 
-The FlowPilot dashboard is a React single-page application for launching, monitoring, and managing agent pipeline runs. It provides real-time visibility into each phase of the workflow, lets you approve or reject gated phases, download artifacts, stream logs, and manage completed runs.
+The FlowPilot dashboard is the recommended way to create and manage pipeline runs. It is a React single-page application that provides real-time visibility into each phase of the workflow, lets you approve or reject gated phases, download artifacts, stream logs, and manage completed runs. While a CLI is available for scripting and automation, the web UI offers the richest experience for day-to-day use.
 
 ---
 
@@ -74,6 +74,8 @@ The UI has three pages, all wrapped in a shared layout with a top navigation bar
 
 The landing page. Use it to launch a new pipeline run.
 
+![New Run — landing page](../assets/new-run-landing.png)
+
 **Layout:** A centered form with the FlowPilot title and tagline "AI-orchestrated feature pipelines -- from idea to pull request."
 
 **Fields:**
@@ -100,6 +102,8 @@ The landing page. Use it to launch a new pipeline run.
 | Max auto-fix iterations | 1--10 | 3 |
 | Qodo CLI path | Optional filesystem path | empty |
 
+![New Run — Advanced Options](../assets/new-run-advanced.png)
+
 - **Debug toggle** (always visible) -- enables verbose logging.
 
 **Actions:**
@@ -115,6 +119,8 @@ The landing page. Use it to launch a new pipeline run.
 
 The runs list page. Shows all pipeline runs at a glance.
 
+![Dashboard — Feature Runs](../assets/dashboard-default-1.png)
+
 **Status summary cards** (top row, clickable to filter):
 
 ```text
@@ -129,6 +135,9 @@ Click a card to filter the table to that status. Click again to clear the filter
 **Controls:**
 
 - **Show archived / Hide archived** -- toggle link to include or exclude archived runs.
+
+![Dashboard — showing archived runs](../assets/dashboard-archived.png)
+
 - **+ New Run** -- button inside the table header, navigates to `/`.
 
 **Feature Runs table:**
@@ -154,6 +163,8 @@ Click a card to filter the table to that status. Click again to clear the filter
 All rows are clickable and navigate to the Run Details page.
 
 **Empty state:** "No runs yet. Start one" with a link to `/`.
+
+![Dashboard — empty state](../assets/dashboard-empty.png)
 
 ---
 
@@ -348,11 +359,20 @@ logs/
 
 ## Running with the Workflow
 
-```bash
-# Terminal 1: start the dashboard
-uv run python scripts/run_dashboard.py
+Start the dashboard, then use the web UI to create and monitor runs.
 
-# Terminal 2: run the workflow (CLI)
+```bash
+# Start the dashboard
+uv run python scripts/run_dashboard.py
+```
+
+Open `http://localhost:8080` in your browser and use the **New Run** page to launch a pipeline run. Fill in the feature description (and optionally a Jira ticket or GitHub issue), choose your options, and click **Run Feature**. The backend spawns the orchestrate subprocess and the session appears in the Dashboard page within seconds.
+
+### Alternative: CLI
+
+For scripting and automation you can launch runs from the command line instead of the web UI.
+
+```bash
 # From a Jira ticket
 uv run python scripts/orchestrate.py \
   --jira-ticket SHIP-123 \
@@ -365,7 +385,7 @@ uv run python scripts/orchestrate.py \
   --output-dir ./output
 ```
 
-You can also launch runs directly from the **New Run** page in the web UI. The backend spawns the orchestrate subprocess and the session appears in the Dashboard page within seconds.
+CLI runs emit heartbeats to the dashboard like any other run, so you can still monitor progress in the web UI.
 
 ---
 
