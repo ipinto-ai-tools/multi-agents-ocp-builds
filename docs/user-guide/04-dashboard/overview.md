@@ -1,41 +1,48 @@
 # Dashboard Overview
 
-The dashboard provides real-time visibility into agent workflows. It shows which phase each agent is in, how much of the context window has been consumed, which Shipwright components are being analyzed, and a history of completed sessions.
+The FlowPilot dashboard is a React single-page application for launching, monitoring, and managing agent pipeline runs. It provides real-time visibility into each phase of the workflow, lets you approve or reject gated phases, download artifacts, stream logs, and manage completed runs.
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Agent Workflows                          │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐    │
-│  │Design Agent  │──>│Testing Agent │──>│ Docs Agent   │    │
-│  └──────────────┘   └──────────────┘   └──────────────┘    │
-│         │ Heartbeat        │ Heartbeat        │ Heartbeat    │
-│         ↓                  ↓                  ↓              │
-├─────────────────────────────────────────────────────────────┤
-│                  Enricher Pipeline                           │
-│         ModelInfoEnricher → TokenCountEnricher → PhaseStatus│
-│                         │                                    │
-│                         ↓                                    │
-├─────────────────────────────────────────────────────────────┤
-│                  Dashboard Backend                           │
-│              FastAPI + SQLite (dashboard/backend.py)         │
-│    POST /api/heartbeat     GET /api/sessions                 │
-│                         │                                    │
-│                         ↓                                    │
-├─────────────────────────────────────────────────────────────┤
-│                    Web Frontend                              │
-│           HTML + Vanilla JS (3-second auto-refresh)          │
-│    Session Cards | Context % | Phase badges | Components     │
-└─────────────────────────────────────────────────────────────┘
+```text
++-------------------------------------------------------------+
+|                     Agent Workflows                          |
+|  +--------------+   +--------------+   +--------------+     |
+|  | Design Agent |-->| Dev Agent    |-->| Review Agent |     |
+|  +--------------+   +--------------+   +--------------+     |
+|                                              |               |
+|  +--------------+   +--------------+         v               |
+|  | Docs Agent   |<--| Testing Agent|<--------+              |
+|  +--------------+   +--------------+                        |
+|         | Heartbeat        | Heartbeat        | Heartbeat    |
+|         v                  v                  v              |
+|       (All 5 agents emit heartbeats to the backend)         |
++---------+------------------+------------------+--------------+
+|                  Enricher Pipeline                           |
+|  ModelInfo > TokenCount > PhaseStatus > Components > Risks   |
+|  > IssueInfo > JiraInfo > Timestamp                          |
+|                         |                                    |
+|                         v                                    |
++-------------------------------------------------------------+
+|                  Dashboard Backend                           |
+|              FastAPI + SQLite (dashboard/backend.py)         |
+|    POST /api/heartbeat     GET /api/sessions                 |
+|    POST /api/runs          GET /api/sessions/{id}/logs (SSE) |
+|                         |                                    |
+|                         v                                    |
++-------------------------------------------------------------+
+|                    Web Frontend                              |
+|        React 18 + Vite + Tailwind CSS (3-second polling)     |
+|    New Run | Dashboard | Run Details | Risk Report Modal     |
++-------------------------------------------------------------+
 ```
 
 ### Technology Stack
 
+- **Frontend:** React 18 + Vite + Tailwind CSS, polling every 3 seconds
 - **Backend:** FastAPI + SQLite + Uvicorn
-- **Frontend:** Vanilla JavaScript, CSS Grid, polling every 3 seconds
 - **Integration:** Agents emit heartbeats via HTTP POST to `/api/heartbeat`
 - **Storage:** SQLite at `DASHBOARD_DB_PATH` (default: `/tmp/claude/dashboard.db`)
 
@@ -47,82 +54,160 @@ The dashboard provides real-time visibility into agent workflows. It shows which
 uv run python scripts/run_dashboard.py
 ```
 
+The backend serves both the API and the built React frontend from `dashboard/frontend/dist/`.
+
 | Endpoint | URL |
-|----------|-----|
-| Web UI | http://localhost:8080 |
-| API documentation | http://localhost:8080/docs |
-| Health check | http://localhost:8080/api/health |
+| --- | --- |
+| Web UI | `http://localhost:8080` |
+| API documentation | `http://localhost:8080/docs` |
+| Health check | `http://localhost:8080/api/health` |
+
+If the React build is not present, the server falls back to the legacy `index.html` or displays a message asking you to run `cd dashboard/frontend && npm run build`.
 
 ---
 
-## What the Dashboard Shows
+## Pages
 
-Each active session is displayed as a card:
+The UI has three pages, all wrapped in a shared layout with a top navigation bar (FlowPilot logo, New Run link, Dashboard link, Help link to GitHub docs) and a Red Hat logo.
 
+### New Run (`/`)
+
+The landing page. Use it to launch a new pipeline run.
+
+**Layout:** A centered form with the FlowPilot title and tagline "AI-orchestrated feature pipelines -- from idea to pull request."
+
+**Fields:**
+
+- **Feature description** (textarea, required unless a Jira ticket is provided) -- describe the feature to build.
+- **Advanced Options** (collapsible panel, collapsed by default):
+
+| Option | Description | Default |
+| --- | --- | --- |
+| Jira Ticket | Optional ticket ID, e.g. `BUILD-123` | empty |
+| GitHub Issue | Optional, e.g. `SHIP-123`, `owner/repo#123`, or a full URL | empty |
+| Issue Type | Toggle: `feature` / `bug` / `refactor` | `feature` |
+| Stages | Multi-select: Design, Develop, Test, Docs. Code review is configured separately in the Code Review section below. | all selected |
+| Approval Mode | `Auto` or `Require Approval` | Auto |
+| Claude Model | `Sonnet 4.6` or `Opus 4.6` | Sonnet 4.6 |
+| Dry Run | `Off` or `Dry Run (no API calls)` | Off |
+
+  Code Review settings (nested inside Advanced Options):
+
+| Option | Description | Default |
+| --- | --- | --- |
+| Review | `Enabled` or `Disabled` | Enabled |
+| Block on severity | `High` / `Medium` / `Low` | High |
+| Max auto-fix iterations | 1--10 | 3 |
+| Qodo CLI path | Optional filesystem path | empty |
+
+- **Debug toggle** (always visible) -- enables verbose logging.
+
+**Actions:**
+
+- **Run Feature** (primary button) -- submits the form, launches the run, and navigates to the Run Details page.
+- **View Dashboard** -- navigates to `/runs`.
+
+**Footer:** A "View on GitHub" link and project tagline.
+
+---
+
+### Dashboard (`/runs`)
+
+The runs list page. Shows all pipeline runs at a glance.
+
+**Status summary cards** (top row, clickable to filter):
+
+```text
++------------+  +------------+  +------------+  +--------------+
+|  Running   |  |  Waiting   |  |   Failed   |  |  Completed   |
+|     3      |  |     1      |  |     0      |  |      7       |
++------------+  +------------+  +------------+  +--------------+
 ```
-Session abc123
-Issue: Add timeout support to BuildRun
-Type: feature
 
-[ Design ] --> [ Dev ] --> [ Review ] --> [ Testing ] --> [ Docs ]
-  done           done        active         pending        pending
+Click a card to filter the table to that status. Click again to clear the filter.
 
-Tests: 12 unit / 4 integration / 2 e2e
-Code files: 6    Artifacts: /tmp/claude/sessions/abc123/
-Review: PASS
+**Controls:**
 
-Started: 2026-03-26 14:00:00    Last updated: 2s ago
+- **Show archived / Hide archived** -- toggle link to include or exclude archived runs.
+- **+ New Run** -- button inside the table header, navigates to `/`.
 
-Context: 64%
-Model: claude-sonnet-4
+**Feature Runs table:**
+
+| Column | Content |
+| --- | --- |
+| FEATURE | Issue title (or session ID if no title) |
+| JIRA | Linked ticket ID, clickable to the Jira URL |
+| PIPELINE | Phase chip showing latest phase (Starting, Design ✓, Dev ✓, Review ✓, Tests ✓, Done ✓, Error) |
+| STATUS | Colored badge: `running` (blue), `waiting` (yellow), `failed` (red), `completed` (green) |
+| UPDATED | Timestamp of last update |
+| ACTIONS | Context-sensitive buttons (see below) |
+
+**Action buttons per row:**
+
+| Run status | Available actions |
+| --- | --- |
+| `waiting` | Approve, Open |
+| `running` | Pause, Open |
+| `completed` / `failed` | Archive, Open |
+| `archived` | Delete (red, with confirmation dialog), Open |
+
+All rows are clickable and navigate to the Run Details page.
+
+**Empty state:** "No runs yet. Start one" with a link to `/`.
+
+---
+
+### Run Details (`/runs/:sessionId`)
+
+The detail view for a single pipeline run.
+
+**Header:**
+
+- Back link to Dashboard
+- Run title and session ID
+- Status badge and Jira link (if available)
+- Action buttons (context-sensitive):
+
+| Run status | Available actions |
+| --- | --- |
+| `waiting` | Approve & Continue, Reject |
+| `running` | Pause |
+| `completed` / `failed` | Download All, Delete (with confirmation, navigates back to Dashboard) |
+
+**Pipeline progress bar:**
+
+A horizontal strip showing five phases connected by arrows. Each phase is color-coded:
+
+- Green with checkmark -- completed
+- Blue with pulse animation -- currently active
+- Red -- failed (when the run ends in error)
+- Gray -- pending
+
+```text
+[ Design ] --> [ Develop ] --> [ Review ] --> [ Test ] --> [ Docs ]
+   done           done          active        pending      pending
 ```
 
-### Session Card Layout
+**Tabs:**
 
-Each session card displays the following fields:
+1. **Summary** -- Code Files count, Test Files count, Risks Identified count (clickable to open the Risk Report modal), Design Analysis preview (first 2000 characters), PR Summary preview, and a Download Design button.
 
-**Phase timeline strip**
-A row of five phase bubbles — Design, Dev, Review, Testing, Docs — shown in order. Each bubble carries one of three states:
+2. **Code** -- List of generated code files. Each file shows its path in a header bar and content in a scrollable code block. Download code.zip button at top.
 
-- `done` — the phase completed successfully
-- `active` — the phase is currently running
-- `pending` — the phase has not started yet
+3. **Tests** -- Test Plan (if available), then sections for Unit Tests, Integration Tests, and E2E Tests, each listing files with path and content. Download tests.zip button at top.
 
-The timeline gives an at-a-glance view of where the workflow is without reading individual status labels.
+4. **Docs** -- PR Summary and Release Notes sections. Download docs.zip button at top.
 
-**Test counts**
-Unit, integration, and end-to-end test counts produced by the Testing agent. Displayed as `N unit / N integration / N e2e`. These values are populated once the testing phase completes.
+5. **Logs** -- Real-time log stream via Server-Sent Events (SSE). Shows the log file path (`/tmp/claude/logs/{sessionId}.log`) with a Copy path button. Logs auto-scroll and display in a dark terminal-style pane.
 
-**Code files count**
-The number of code files generated or modified by the Development agent.
+**Risk Report Modal:**
 
-**Artifact path link**
-A clickable path to the session output directory on disk. Use this to locate generated code, test files, and documentation artifacts.
+Opens when you click the "Risks Identified" count on the Summary tab.
 
-**Review badge**
-A `PASS` or `FAIL` badge from the Code Review agent. A `FAIL` badge indicates the auto-fix loop is still iterating or that review did not pass before the workflow ended.
-
-**Dual timestamps**
-
-- **Started** — when the session was first created (first heartbeat received)
-- **Last updated** — time elapsed since the most recent heartbeat
-
-**Context and model**
-Context window usage percentage and the Claude model name in use.
-
-**Risks**
-If the Design agent identified risks, they are rendered directly in the card for quick reference.
-
-### Key Metrics and What to Monitor
-
-| Metric | What to watch for |
-|--------|-------------------|
-| **Phase timeline strip** | Check that bubbles progress left-to-right; a bubble stuck on `active` for a long time may indicate a hung agent |
-| **Context percentage** | Monitor for >80% — agent may run out of space before completing |
-| **Phase progression** | Confirms workflow is advancing (Design → Dev → Review → Test → Docs → Done) |
-| **Component impact** | Which parts of the Shipwright codebase are being analyzed |
-| **Last updated** | If this stops advancing, the agent may have hung or crashed |
-| **Review badge** | A persistent `FAIL` badge means the review loop did not converge — check agent logs |
+- Overall risk level badge (derived from highest severity across all risks)
+- Sorted risk list (high first, then medium, then low)
+- Each risk shows a severity badge, description, and mitigation (if provided)
+- Closes on Escape key or clicking outside the modal
 
 ---
 
@@ -139,24 +224,65 @@ If the dashboard is unreachable, heartbeats fail silently. The workflow is never
 
 ### Enricher Pipeline
 
-Raw heartbeat data passes through three enrichers before storage:
+Raw heartbeat data passes through eight enrichers before storage:
 
-- **ModelInfoEnricher** - Reads the Claude model name from state
-- **TokenCountEnricher** - Estimates context window usage percentage based on state size
-- **PhaseStatusEnricher** - Maps `current_phase` to a human-readable status label
+| Enricher | Purpose |
+| --- | --- |
+| **ModelInfoEnricher** | Reads the Claude model name from the environment |
+| **TokenCountEnricher** | Estimates context window usage percentage based on state size |
+| **PhaseStatusEnricher** | Maps `current_phase` to a human-readable status label |
+| **ComponentsEnricher** | Extracts impacted Shipwright components from state |
+| **RisksEnricher** | Extracts risks and derives an overall risk level |
+| **IssueInfoEnricher** | Extracts issue title, type, and description |
+| **JiraInfoEnricher** | Extracts Jira ticket ID, URL, priority, and labels |
+| **TimestampEnricher** | Adds formatted and relative timestamps |
 
 ---
 
 ## API Endpoints
 
+### Core
+
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/heartbeat` | Receive agent heartbeat |
-| GET | `/api/sessions` | List all sessions |
-| GET | `/api/sessions/{id}` | Get specific session details |
-| DELETE | `/api/sessions/cleanup` | Delete completed sessions older than N hours |
-| DELETE | `/api/sessions/completed` | Delete all completed sessions |
+| --- | --- | --- |
 | GET | `/api/health` | Health check |
+| POST | `/api/heartbeat` | Receive agent heartbeat |
+| POST | `/api/runs` | Launch a new pipeline run |
+
+### Sessions
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/sessions` | List all sessions (`?include_archived=true` to include archived) |
+| GET | `/api/sessions/{id}` | Get a specific session with all heartbeats |
+| PATCH | `/api/sessions/{id}/archive` | Archive a session (hides from list, preserves data) |
+| DELETE | `/api/sessions/{id}` | Permanently delete a session, heartbeats, and log file |
+| DELETE | `/api/sessions/cleanup` | Delete completed sessions older than N hours (`?max_age_hours=24`) |
+| DELETE | `/api/sessions/completed` | Delete all completed or errored sessions |
+| DELETE | `/api/sessions/stuck` | Delete stale sessions with no heartbeat in N hours (`?max_stale_hours=6`) |
+
+### Run Control
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/api/sessions/{id}/approve` | Signal approval or rejection (`?action=approve` or `?action=reject`) |
+| POST | `/api/sessions/{id}/pause` | Signal a running pipeline to pause after the current phase |
+
+### Logs
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/sessions/{id}/logs` | Stream pipeline logs via Server-Sent Events (SSE) |
+
+### Artifact Downloads
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/sessions/{id}/download/all` | Download all artifacts as a single zip |
+| GET | `/api/sessions/{id}/download/design` | Download design analysis as Markdown |
+| GET | `/api/sessions/{id}/download/code` | Download generated code files as a zip |
+| GET | `/api/sessions/{id}/download/tests` | Download test files as a zip (unit, integration, e2e) |
+| GET | `/api/sessions/{id}/download/docs` | Download documentation files as a zip |
 
 ---
 
@@ -167,46 +293,55 @@ The dashboard stores data in two SQLite tables:
 ```sql
 CREATE TABLE sessions (
     id TEXT PRIMARY KEY,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     issue_title TEXT,
     issue_type TEXT,
-    status TEXT
+    status TEXT DEFAULT 'active'
 );
 
 CREATE TABLE heartbeats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT,
-    agent TEXT,
+    session_id TEXT NOT NULL,
+    agent TEXT NOT NULL,
     phase TEXT,
-    timestamp TIMESTAMP,
+    timestamp TIMESTAMP NOT NULL,
     model TEXT,
     context_tokens INTEGER,
     context_percent REAL,
-    raw_state JSON,
+    status TEXT,
+    raw_state TEXT,
+    enriched_data TEXT,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
+
+CREATE INDEX idx_session_timestamp
+ON heartbeats(session_id, timestamp DESC);
 ```
+
+A background task runs every 6 hours to clean up completed sessions older than 24 hours and stuck sessions (no heartbeat for 4+ hours in a non-terminal phase).
 
 ---
 
 ## Log Locations
 
-Agent logs are written under the `logs/` directory when logging is configured:
+Pipeline logs are written to `/tmp/claude/logs/{session-id}.log` by the orchestrate subprocess. The Logs tab in Run Details streams this file in real time.
 
-```
+Agent-level logs are written under the `logs/` directory when logging is configured:
+
+```text
 logs/
-├── agents/
-│   ├── design_agent.log
-│   ├── go_k8s_developer.log
-│   ├── testing_agent.log
-│   └── docs_agent.log
-└── sessions/
-    └── {session-id}/
-        ├── design_agent.log
-        ├── development_agent.log
-        ├── testing_agent.log
-        └── docs_agent.log
++-- agents/
+|   +-- design_agent.log
+|   +-- go_k8s_developer.log
+|   +-- testing_agent.log
+|   +-- docs_agent.log
++-- sessions/
+    +-- {session-id}/
+        +-- design_agent.log
+        +-- development_agent.log
+        +-- testing_agent.log
+        +-- docs_agent.log
 ```
 
 ---
@@ -217,7 +352,7 @@ logs/
 # Terminal 1: start the dashboard
 uv run python scripts/run_dashboard.py
 
-# Terminal 2: run the workflow
+# Terminal 2: run the workflow (CLI)
 # From a Jira ticket
 uv run python scripts/orchestrate.py \
   --jira-ticket SHIP-123 \
@@ -226,11 +361,11 @@ uv run python scripts/orchestrate.py \
 # Or from a title and description
 uv run python scripts/orchestrate.py \
   --title "Add timeout support to BuildRun" \
-  --description "Users need ability to specify build timeout to prevent hanging builds" \
+  --description "Users need ability to specify build timeout" \
   --output-dir ./output
 ```
 
-The session appears in the dashboard within seconds of the workflow starting.
+You can also launch runs directly from the **New Run** page in the web UI. The backend spawns the orchestrate subprocess and the session appears in the Dashboard page within seconds.
 
 ---
 
