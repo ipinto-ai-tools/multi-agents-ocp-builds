@@ -26,6 +26,7 @@ export default function RunDetails() {
   const [activeTab, setActiveTab] = useState('summary')
   const [logs, setLogs] = useState([])
   const [copied, setCopied] = useState(false)
+  const [showRisks, setShowRisks] = useState(false)
   const logsRef = useRef(null)
   const esRef = useRef(null)
 
@@ -62,6 +63,14 @@ export default function RunDetails() {
     }
   }, [logs])
 
+  // Close risk modal on Escape key
+  useEffect(() => {
+    if (!showRisks) return
+    const handler = (e) => { if (e.key === 'Escape') setShowRisks(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [showRisks])
+
   if (!session) return <div className="text-gray-400 text-center mt-20">Loading...</div>
 
   const status = deriveStatus(session)
@@ -75,9 +84,26 @@ export default function RunDetails() {
   const prSummary = state.pr_summary || ''
   const releaseNotes = state.release_notes || ''
   const testPlan = state.test_plan || ''
+  const risks = state.risks || []
 
   function triggerDownload(url) {
     window.open(url, '_blank')
+  }
+
+  const sortedRisks = [...risks].sort((a, b) => {
+    const order = { high: 0, medium: 1, low: 2 }
+    return (order[a.level] ?? 3) - (order[b.level] ?? 3)
+  })
+  const overallLevel = risks.length === 0
+    ? 'none'
+    : risks.some(r => r.level === 'high') ? 'high'
+    : risks.some(r => r.level === 'medium') ? 'medium'
+    : 'low'
+  const levelColors = {
+    high: 'bg-red-100 text-red-700',
+    medium: 'bg-amber-100 text-amber-700',
+    low: 'bg-green-100 text-green-700',
+    none: 'bg-gray-100 text-gray-700',
   }
 
   const tabs = [
@@ -192,9 +218,18 @@ export default function RunDetails() {
                 </div>
                 <div className="text-xs text-gray-500">Test Files</div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div
+                className={`bg-gray-50 rounded-lg p-4${risks.length > 0 ? ' cursor-pointer hover:bg-gray-100 transition-colors' : ''}`}
+                onClick={() => risks.length > 0 && setShowRisks(true)}
+                {...(risks.length > 0 ? {
+                  onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowRisks(true) } },
+                  role: 'button',
+                  tabIndex: 0,
+                  'aria-label': `View ${risks.length} identified risk${risks.length !== 1 ? 's' : ''}`,
+                } : {})}
+              >
                 <div className="text-2xl font-bold text-gray-800">
-                  {(state.risks || []).length}
+                  {risks.length}
                 </div>
                 <div className="text-xs text-gray-500">Risks Identified</div>
               </div>
@@ -344,6 +379,62 @@ export default function RunDetails() {
           </div>
         )}
       </div>
+
+      {/* Risk Report Modal */}
+      {showRisks && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="risk-report-title"
+          onClick={() => setShowRisks(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white rounded-xl shadow-lg max-w-lg w-full mx-4 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 id="risk-report-title" className="text-lg font-semibold text-gray-900">Risk Report</h2>
+              <button
+                onClick={() => setShowRisks(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close risk report"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Summary bar */}
+            <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3">
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${levelColors[overallLevel]}`}>
+                {overallLevel.charAt(0).toUpperCase() + overallLevel.slice(1)}
+              </span>
+              <span className="text-sm text-gray-500">{sortedRisks.length} risk{sortedRisks.length !== 1 ? 's' : ''} identified</span>
+            </div>
+
+            {/* Risk list */}
+            <div className="px-6 py-4 overflow-y-auto space-y-3">
+              {sortedRisks.map((risk, i) => (
+                <div key={i} className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${levelColors[risk.level] || 'bg-gray-100 text-gray-700'}`}>
+                      {risk.level}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800">{risk.description}</p>
+                      {risk.mitigation && (
+                        <p className="text-xs text-gray-500 italic mt-1">{risk.mitigation}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
