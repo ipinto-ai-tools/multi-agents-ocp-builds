@@ -84,7 +84,9 @@ export default function RunDetails() {
   const prSummary = state.pr_summary || ''
   const releaseNotes = state.release_notes || ''
   const testPlan = state.test_plan || ''
-  const risks = state.risks || []
+  const risks = (state.risks || []).map(r =>
+    typeof r === 'string' ? { level: 'medium', description: r, mitigation: '' } : r
+  )
 
   function triggerDownload(url) {
     window.open(url, '_blank')
