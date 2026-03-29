@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSessions, approveSession, pauseSession, archiveSession } from '../api/client'
+import { getSessions, approveSession, pauseSession, archiveSession, deleteSession } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 
 const PHASE_LABELS = {
@@ -174,6 +174,16 @@ export default function Dashboard() {
                           <button className="px-2 py-1 text-xs border border-gray-300 text-gray-500 rounded hover:bg-gray-50"
                             onClick={() => archiveSession(session.id).then(load)}>
                             Archive
+                          </button>
+                        )}
+                        {session.status === 'archived' && (
+                          <button className="px-2 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                            onClick={() => {
+                              if (window.confirm('Permanently delete this run? This cannot be undone.')) {
+                                deleteSession(session.id).then(load).catch(err => console.error('Delete failed:', err))
+                              }
+                            }}>
+                            Delete
                           </button>
                         )}
                         <button className="px-2 py-1 text-xs bg-sky-50 text-sky-600 border border-sky-200 rounded hover:bg-sky-100 font-medium"
