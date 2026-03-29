@@ -22,7 +22,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles  # requires: pip install aiofiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from dashboard.enrichers import enrich_heartbeat
 from utils.file_logger import get_logger
@@ -38,6 +38,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORCHESTRATE_SCRIPT = os.path.join(PROJECT_ROOT, "scripts", "orchestrate.py")
 LOG_DIR = Path("/tmp/claude/logs")
 SIGNAL_DIR = Path("/tmp/claude/signals")
+ALLOWED_CLAUDE_MODELS = {"claude-sonnet-4-6", "claude-opus-4-6"}
 
 
 # Pydantic models
@@ -81,6 +82,14 @@ class RunRequest(BaseModel):
     qodo_threshold: str = "high"          # "high", "medium", "low"
     max_review_iterations: int = 3
     qodo_cli_path: Optional[str] = None
+    claude_model: str = "claude-sonnet-4-6"
+
+    @field_validator("claude_model")
+    @classmethod
+    def validate_claude_model(cls, v: str) -> str:
+        if v not in ALLOWED_CLAUDE_MODELS:
+            raise ValueError(f"claude_model must be one of {sorted(ALLOWED_CLAUDE_MODELS)}")
+        return v
 
 
 def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
@@ -118,6 +127,7 @@ def _launch_orchestrate(session_id: str, run_request: RunRequest) -> None:
     env["MAX_REVIEW_ITERATIONS"] = str(run_request.max_review_iterations)
     if run_request.qodo_cli_path:
         env["QODO_CLI_PATH"] = run_request.qodo_cli_path
+    env["CLAUDE_MODEL"] = run_request.claude_model
 
     with open(log_file_path, "w") as log_file:
         subprocess.Popen(

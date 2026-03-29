@@ -13,6 +13,7 @@ export default function NewRun() {
   const [issueType, setIssueType] = useState('feature')
   const [selectedStages, setSelectedStages] = useState(new Set(STAGES))
   const [manualApproval, setManualApproval] = useState(false)
+  const [claudeModel, setClaudeModel] = useState('claude-sonnet-4-6')
   const [dryRun, setDryRun] = useState(false)
   const [qodoEnabled, setQodoEnabled] = useState(true)
   const [qodoThreshold, setQodoThreshold] = useState('high')
@@ -49,6 +50,7 @@ export default function NewRun() {
         stages: [...selectedStages],
         manual_approval: manualApproval,
         dry_run: dryRun,
+        claude_model: claudeModel,
         qodo_enabled: qodoEnabled,
         qodo_threshold: qodoThreshold,
         max_review_iterations: maxReviewIterations,
@@ -159,6 +161,22 @@ export default function NewRun() {
                     onClick={() => setManualApproval(opt.value)}
                     className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${manualApproval === opt.value ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 text-gray-600 hover:border-sky-400'}`}
                   >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Claude Model</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+                  { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+                ].map(opt => (
+                  <button key={opt.value} type="button"
+                    onClick={() => setClaudeModel(opt.value)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${claudeModel === opt.value ? 'bg-sky-500 text-white border-sky-500' : 'border-gray-300 text-gray-600 hover:border-sky-400'}`}>
                     {opt.label}
                   </button>
                 ))}
