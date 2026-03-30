@@ -408,6 +408,12 @@ def orchestrate(
                 print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Design Agent failed: {e}")
+            state["current_phase"] = "error"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("design", state)
+            except Exception:
+                pass
             return state
 
         result = validate_phase("design", state)
@@ -442,6 +448,12 @@ def orchestrate(
                 print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Development Agent failed: {e}")
+            state["current_phase"] = "error"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("develop", state)
+            except Exception:
+                pass
             return state
 
         result = validate_phase("develop", state)
@@ -479,7 +491,13 @@ def orchestrate(
                 state["current_phase"] = "review_complete"
             except Exception as e:
                 print(f"  Code Review Agent failed (non-blocking): {e}")
-                break
+                state["current_phase"] = "error"
+                try:
+                    from dashboard.heartbeat import emit_heartbeat
+                    emit_heartbeat("code_review", state)
+                except Exception:
+                    pass
+                return state
             phase_duration = time.time() - phase_start
 
             review_result = validate_phase("code_review", state)
@@ -546,6 +564,12 @@ def orchestrate(
                 print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Testing Agent failed: {e}")
+            state["current_phase"] = "error"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("testing", state)
+            except Exception:
+                pass
             return state
 
         result = validate_phase("testing", state)
@@ -607,6 +631,12 @@ def orchestrate(
                 print(f"  [heartbeat] emit failed: {e}")
         except Exception as e:
             print(f"  Documentation Agent failed: {e}")
+            state["current_phase"] = "error"
+            try:
+                from dashboard.heartbeat import emit_heartbeat
+                emit_heartbeat("docs", state)
+            except Exception:
+                pass
             return state
 
         result = validate_phase("docs", state)

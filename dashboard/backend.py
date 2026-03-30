@@ -546,7 +546,7 @@ db = Database()
 # Global background task
 cleanup_task = None
 
-_SESSION_ID_RE = re.compile(r'^[0-9a-f]{8}$')
+_SESSION_ID_RE = re.compile(r'^[0-9a-f]{8}(?:-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$')
 
 
 def _validate_session_id(session_id: str) -> None:
@@ -657,6 +657,22 @@ async def receive_heartbeat(heartbeat: HeartbeatRequest):
 
     # Insert heartbeat
     db.insert_heartbeat(enriched)
+
+    # Update session status on terminal phases
+    raw_state = enriched.get("raw_state", {})
+    if isinstance(raw_state, str):
+        try:
+            raw_state = json.loads(raw_state)
+        except (json.JSONDecodeError, TypeError):
+            raw_state = {}
+    current_phase = raw_state.get("current_phase", "")
+    phase = enriched.get("phase", "")
+    if current_phase == "done" or phase == "done":
+        db.update_session_status(enriched["session_id"], "completed")
+        logger.info(f"Session {enriched['session_id']} marked completed")
+    elif current_phase == "error" or phase == "error":
+        db.update_session_status(enriched["session_id"], "failed")
+        logger.info(f"Session {enriched['session_id']} marked failed")
 
     logger.debug(
         f"Received heartbeat: session={enriched['session_id']}, "
