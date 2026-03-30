@@ -140,8 +140,59 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
     }
 
 
+# Repository search patterns by project type
+REPO_PATTERNS = {
+    "go_k8s": {
+        "name": "Go/Kubernetes",
+        "api_patterns": ["**/apis/**/*_types.go", "**/api/**/*_types.go"],
+        "controller_patterns": ["**/controller/**/*.go", "**/controllers/**/*.go", "**/reconciler/**/*.go"],
+        "pkg_root": "pkg",
+    },
+    "go_generic": {
+        "name": "Go",
+        "api_patterns": ["**/*_types.go", "**/types.go", "**/model/**/*.go"],
+        "controller_patterns": ["**/cmd/**/*.go", "**/internal/**/*.go"],
+        "pkg_root": "pkg",
+    },
+}
+
+
+def _detect_project_type(repo_path: str) -> str:
+    """Auto-detect project type from repository contents.
+
+    Args:
+        repo_path: Path to the repository
+
+    Returns:
+        Project type key (e.g., "go_k8s", "go_generic")
+    """
+    from pathlib import Path
+    root = Path(repo_path)
+
+    # Check for Go module
+    has_go_mod = (root / "go.mod").exists()
+    if not has_go_mod:
+        logger.info("No go.mod found, skipping Go-specific analysis")
+        return "go_generic"  # fallback — patterns will find nothing for non-Go repos
+
+    # Check for Kubernetes indicators
+    k8s_indicators = [
+        (root / "pkg" / "apis").exists(),
+        (root / "pkg" / "controller").exists(),
+        (root / "pkg" / "controllers").exists(),
+        (root / "config" / "crd").exists(),
+        (root / "api").exists(),
+    ]
+    if any(k8s_indicators):
+        return "go_k8s"
+
+    return "go_generic"
+
+
 def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
     """Gather relevant context from the repository.
+
+    Automatically detects the project type and uses appropriate search patterns.
 
     Args:
         repo_path: Path to the repository
@@ -154,32 +205,49 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
         "api_files": [],
         "controller_files": [],
         "crd_files": [],
+        "project_type": "unknown",
     }
 
     try:
         searcher = RepoSearch(repo_path)
 
-        # Find API types
+        # Auto-detect project type
+        project_type = _detect_project_type(repo_path)
+        patterns = REPO_PATTERNS.get(project_type, REPO_PATTERNS["go_generic"])
+        context["project_type"] = patterns["name"]
+        logger.info(f"Detected project type: {patterns['name']}")
+
+        # Find API types using detected patterns
         logger.debug("Searching for API types")
-        api_results = searcher.search_files("pkg/apis/**/*_types.go")
+        api_results = []
+        for pattern in patterns["api_patterns"]:
+            api_results.extend(searcher.search_files(pattern))
+        # Deduplicate by file path
+        seen = set()
+        api_results = [r for r in api_results if r.file_path not in seen and not seen.add(r.file_path)]
         context["api_files"] = [r.file_path for r in api_results[:10]]
         logger.debug(f"Found {len(api_results)} API files")
 
-        # Find controllers
+        # Find controllers using detected patterns
         logger.debug("Searching for controllers")
-        controller_results = searcher.search_files("pkg/controller/**/*.go")
+        controller_results = []
+        for pattern in patterns["controller_patterns"]:
+            controller_results.extend(searcher.search_files(pattern))
+        seen = set()
+        controller_results = [r for r in controller_results if r.file_path not in seen and not seen.add(r.file_path)]
         context["controller_files"] = [r.file_path for r in controller_results[:10]]
         logger.debug(f"Found {len(controller_results)} controller files")
 
-        # Find CRD definitions
+        # Find CRD definitions (always relevant for K8s projects)
         logger.debug("Searching for CRD definitions")
         crd_results = searcher.find_kubernetes_crds()
         context["crd_files"] = [r.file_path for r in crd_results[:10]]
         logger.debug(f"Found {len(crd_results)} CRD files")
 
         # Analyze package structure
-        logger.debug("Analyzing package structure")
-        packages = searcher.analyze_go_packages("pkg")
+        pkg_root = patterns.get("pkg_root", "pkg")
+        logger.debug(f"Analyzing package structure under {pkg_root}/")
+        packages = searcher.analyze_go_packages(pkg_root)
         context["package_structure"] = [
             {"name": pkg.name, "path": pkg.path, "file_count": len(pkg.files)}
             for pkg in packages[:20]
@@ -187,7 +255,6 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
         logger.debug(f"Analyzed {len(packages)} packages")
 
     except Exception as e:
-        # If repository analysis fails, continue with component metadata only
         logger.warning(f"Repository analysis failed: {e}", exc_info=True)
         context["error"] = f"Repository analysis failed: {str(e)}"
 

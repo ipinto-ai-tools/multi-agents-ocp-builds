@@ -101,7 +101,9 @@ Tests are in `tests/` and use pytest. The `conftest.py` provides shared fixtures
 | `CLOUD_ML_REGION` | GCP region (default: `us-east5`) |
 | `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-6`) |
 | `CLAUDE_MAX_TOKENS` | Max tokens override |
-| `SHIPWRIGHT_REPO_PATH` / `OPENSHIFT_BUILDS_REPO_PATH` | Repo paths for code analysis |
+| `SHIPWRIGHT_REPO_PATH` | Primary repo path for code analysis (used by Design, Development, and Docs agents) |
+| `OPENSHIFT_BUILDS_REPO_PATH` | Secondary repo path, merged with primary for additional context |
+| `ENABLE_REPO_ANALYSIS` | Enable/disable repo analysis (default: `true`). Set to `false` to skip repo scanning. |
 | `DASHBOARD_URL` | Dashboard URL (default: `http://localhost:8080`) |
 | `DASHBOARD_ENABLED` | Enable heartbeats (default: `true`) |
 | `DASHBOARD_DB_PATH` | SQLite DB path (default: `/tmp/claude/dashboard.db`) |
