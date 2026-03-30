@@ -291,25 +291,11 @@ def orchestrate(
     completed_phases: list[str] = []
     pipeline_start = time.time()
 
-    # Build repo_paths from env vars and CLI arg
-    repo_paths = []
-    if repo_path:
-        repo_paths.append(repo_path)
-
-    # Add env var repo paths if not already included
-    for env_var in ("SHIPWRIGHT_REPO_PATH", "OPENSHIFT_BUILDS_REPO_PATH"):
-        env_path = os.getenv(env_var, "").strip()
-        if env_path and env_path not in repo_paths and os.path.isdir(env_path):
-            repo_paths.append(env_path)
-
-    # Check if repo analysis is enabled
-    enable_repo_analysis = os.getenv("ENABLE_REPO_ANALYSIS", "true").lower() == "true"
-    if not enable_repo_analysis:
-        repo_paths = []
-        repo_path = None
-    else:
-        # Use first repo_path as primary for backward compatibility
-        repo_path = repo_paths[0] if repo_paths else repo_path
+    # Build repo_paths from repos.yaml, env vars, and CLI arg
+    from config.repo_config import load_repo_paths
+    repo_paths = load_repo_paths(cli_repo_path=repo_path)
+    # Use first repo_path as primary for backward compatibility
+    repo_path = repo_paths[0] if repo_paths else None
 
     state: dict = {
         "session_id": session_id,
