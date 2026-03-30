@@ -48,6 +48,12 @@ export async function deleteSession(sessionId) {
   return res.json()
 }
 
+export async function cleanStuckSessions(maxStaleHours = 1) {
+  const res = await fetch(`${BASE}/api/sessions/stuck?max_stale_hours=${maxStaleHours}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export function streamLogs(sessionId, onLine, onError) {
   const es = new EventSource(`${BASE}/api/sessions/${sessionId}/logs`)
   es.onmessage = (e) => {

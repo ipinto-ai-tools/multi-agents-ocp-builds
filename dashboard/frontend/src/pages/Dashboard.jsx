@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSessions, approveSession, pauseSession, archiveSession, deleteSession } from '../api/client'
+import { getSessions, approveSession, pauseSession, archiveSession, deleteSession, cleanStuckSessions } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 
 const PHASE_LABELS = {
@@ -91,7 +91,17 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end gap-3 mb-2">
+        <button
+          onClick={() => {
+            if (window.confirm('Delete all stale sessions (no heartbeat in the last hour)?')) {
+              cleanStuckSessions(1).then(load).catch(err => console.error('Cleanup failed:', err))
+            }
+          }}
+          className="text-xs text-gray-400 hover:text-red-500 underline"
+        >
+          Clean stale sessions
+        </button>
         <button
           onClick={() => setShowArchived(v => !v)}
           className="text-xs text-gray-400 hover:text-gray-600 underline"
