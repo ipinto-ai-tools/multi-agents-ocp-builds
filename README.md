@@ -55,8 +55,13 @@ Development → Code Review ──PASS──→ Testing
 
 ## Repository Support
 
-- **Upstream (Shipwright)**: configured via `SHIPWRIGHT_REPO_PATH` — the open-source Shipwright Build repository, used for design context and component analysis.
-- **Downstream (OpenShift Builds)**: configured via `OPENSHIFT_BUILDS_REPO_PATH` — the Red Hat downstream fork, used for integration context and downstream-specific concerns.
+Configure repository paths so agents can analyze actual Go types, CRDs, and controllers from source. Use `repos.yaml` for multi-repo setups:
+
+```bash
+cp repos.yaml.example repos.yaml  # edit with your local clone paths
+```
+
+See [Configuration](docs/user-guide/01-getting-started/configuration.md#repository-paths) for details. Environment variables (`SHIPWRIGHT_REPO_PATH`, `OPENSHIFT_BUILDS_REPO_PATH`) are also supported for single-repo setups.
 
 ---
 
@@ -68,21 +73,15 @@ git clone <repo> && cd muilti-agents-ocp-builds
 uv venv && uv pip install -r requirements.txt
 cp .env.example .env  # fill in credentials
 
-# 2. Run from a Jira ticket
-uv run python scripts/orchestrate.py \
-  --jira-ticket BUILD-1707 \
-  --output-dir ./output/BUILD-1707
-
-# 3. Monitor in real time
+# 2. Run the dashboard
 uv run python scripts/run_dashboard.py  # http://localhost:8080
-
-# 4. Publish artifacts
-uv run python scripts/publish.py \
-  --output-dir ./output/BUILD-1707 \
-  --push-code --push-jira
 ```
 
-See [Setup and Quick Start](docs/user-guide/01-getting-started/quick-start.md) for full configuration — Jira, GitHub, Qodo, and Vertex AI.
+Open [http://localhost:8080](http://localhost:8080) and click **New Run**. Enter a Jira ticket ID (e.g. `BUILD-1707`) or a feature description, then click **Run Feature**. The pipeline runs all five phases and shows progress in real time.
+
+For CLI and automation usage, see the [CLI Reference](docs/user-guide/10-reference/cli.md).
+
+See [Quick Start](docs/user-guide/01-getting-started/quick-start.md) for full credential setup (Vertex AI, Jira, GitHub).
 
 ---
 
@@ -112,10 +111,12 @@ output/BUILD-1707/
 
 | Section | Content |
 |---------|---------|
-| [Setup & Quick Start](docs/user-guide/01-getting-started/quick-start.md) | All integrations: Jira, GitHub, Qodo, Vertex AI, repo paths |
+| [Quick Start](docs/user-guide/01-getting-started/quick-start.md) | Dashboard-first setup: install, configure credentials, run |
+| [Dashboard](docs/user-guide/04-dashboard/overview.md) | Web UI pages, real-time monitoring, session management |
 | [Architecture](docs/user-guide/02-concepts/architecture.md) | Pipeline design, state management, security layers |
 | [Agents](docs/user-guide/03-agents/design-agent.md) | Per-agent reference |
-| [Dashboard](docs/user-guide/04-dashboard/overview.md) | Real-time monitoring |
+| [CLI Reference](docs/user-guide/10-reference/cli.md) | All CLI commands for scripting and automation |
+| [API Reference](docs/user-guide/10-reference/api.md) | REST API endpoints, heartbeat protocol, database schema |
 | [Authentication](docs/user-guide/05-authentication/authentication.md) | Vertex AI setup |
 | [Publishing](docs/user-guide/09-integrations/publish.md) | Push to GitHub / Jira |
 
@@ -125,7 +126,7 @@ output/BUILD-1707/
 
 | Requirement | Detail |
 |-------------|--------|
-| Python | 3.11+ |
+| Python | 3.12+ |
 | Claude | Google Vertex AI (Application Default Credentials) |
 | Jira | API token for ticket fetching |
 | GitHub | PAT for PR enrichment and publishing |

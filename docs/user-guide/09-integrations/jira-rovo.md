@@ -10,7 +10,7 @@ Before using this integration, confirm you have:
 
 - The system installed and working (see [Installation](../01-getting-started/installation.md))
 - VPN access to reach your internal Jira instance
-- A Jira API token (see [Jira API Token](../05-authentication/api-key.md#jira-api-token))
+- A Jira API token (see [Jira API Token](../05-authentication/authentication.md#jira-api-token))
 
 The three required environment variables are:
 

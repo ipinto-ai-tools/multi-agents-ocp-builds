@@ -48,6 +48,10 @@ Archived runs display a red **Delete** button. Clicking it opens a browser confi
 
 Confirming the dialog permanently removes the session, all associated heartbeat records, and the pipeline log file from disk.
 
+### Clean Stale Sessions
+
+A **Clean stale sessions** button is available above the runs table. Clicking it removes sessions that appear stuck — sessions in an active phase with no recent heartbeat. This is useful when agent processes have crashed or lost connectivity, leaving sessions in a permanently "running" state.
+
 ### Status Card Counts
 
 The four summary cards at the top of the dashboard (Running, Waiting, Failed, Completed) are computed from whichever sessions are currently loaded. By default, archived sessions are excluded from the API response, so they do not contribute to any card count. Archiving a failed run, for example, removes it from view and decreases the Failed count by one. Toggling **Show archived** re-fetches all sessions including archived ones, so their original status is reflected in the counts again.
@@ -115,6 +119,27 @@ Response:
 }
 ```
 
+### Delete Stuck Sessions
+
+Remove sessions that have been inactive (no new heartbeat) for a specified duration while still in a non-terminal phase. Useful for cleaning up sessions where the agent process has crashed or lost connectivity. Defaults to 6 hours.
+
+```bash
+# Default: delete sessions stuck for 6+ hours
+curl -X DELETE http://localhost:8080/api/sessions/stuck
+
+# Custom: delete sessions stuck for 2+ hours
+curl -X DELETE "http://localhost:8080/api/sessions/stuck?max_stale_hours=2"
+```
+
+Response:
+
+```json
+{
+  "sessions_deleted": 2,
+  "heartbeats_deleted": 8
+}
+```
+
 ---
 
 ## Python Client Examples
@@ -135,6 +160,14 @@ print(f"Deleted {result['heartbeats_deleted']} heartbeats")
 response = requests.delete("http://localhost:8080/api/sessions/completed")
 result = response.json()
 print(f"Cleared {result['sessions_cleared']} completed sessions")
+
+# Delete stuck sessions (no heartbeat for 2+ hours)
+response = requests.delete(
+    "http://localhost:8080/api/sessions/stuck",
+    params={"max_stale_hours": 2}
+)
+result = response.json()
+print(f"Deleted {result['sessions_deleted']} stuck sessions")
 ```
 
 ---
@@ -198,7 +231,16 @@ Deletes sessions that meet ANY of these conditions:
 2. No age restriction applies
 3. Cascade: also deletes all associated heartbeat records
 
-**Active sessions are never deleted by either endpoint.**
+### `DELETE /api/sessions/stuck` (stale sessions)
+
+Deletes sessions that meet ALL of these conditions:
+1. Phase is NOT `done` or `error` (i.e., the session appears to still be running)
+2. Last heartbeat was received more than `max_stale_hours` ago (default: 6 hours)
+3. Cascade: also deletes all associated heartbeat records
+
+**Completed and errored sessions are never affected by this endpoint.**
+
+**Active sessions are never deleted by either the cleanup or completed endpoints.**
 
 ---
 
