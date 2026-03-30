@@ -98,7 +98,7 @@ Start the dashboard before running the orchestrator:
 
 ```bash
 # Terminal 1
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 
 # Terminal 2
 uv run python scripts/orchestrate.py --jira-ticket SHIP-123

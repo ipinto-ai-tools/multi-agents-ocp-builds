@@ -141,6 +141,26 @@ class GitHubClient:
 
         return results
 
+    def fetch_issue(self, owner: str, repo: str, issue_number: int) -> dict | None:
+        """Fetch a GitHub issue and return a dict with title, body, labels, state."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
+        try:
+            response = requests.get(url, headers=self.headers, timeout=GITHUB_REQUEST_TIMEOUT)
+            response.raise_for_status()
+            data = response.json()
+            return {
+                "title": data.get("title", ""),
+                "body": data.get("body", "") or "",
+                "labels": [lbl["name"] for lbl in data.get("labels", [])],
+                "state": data.get("state", ""),
+                "url": data.get("html_url", ""),
+                "number": issue_number,
+                "repo": f"{owner}/{repo}",
+            }
+        except Exception as e:
+            logger.warning(f"Failed to fetch GitHub issue {owner}/{repo}#{issue_number}: {e}")
+            return None
+
 
 def get_github_client() -> GitHubClient:
     """Factory: create a GitHubClient from environment variables.
@@ -160,3 +180,40 @@ def get_github_client() -> GitHubClient:
 def is_github_configured() -> bool:
     """Return True if GITHUB_TOKEN is set in the environment."""
     return bool(GITHUB_TOKEN)
+
+
+# ---------------------------------------------------------------------------
+# GitHub Issue support
+# ---------------------------------------------------------------------------
+
+SHIP_ISSUE_REPO = "shipwright-io/build"  # default repo for SHIP-NNN shorthand
+
+
+def parse_github_issue_ref(ref: str) -> tuple[str, str, int] | None:
+    """Parse a GitHub issue reference into (owner, repo, number).
+
+    Supported formats:
+      - https://github.com/owner/repo/issues/123
+      - owner/repo#123
+      - SHIP-123  →  shipwright-io/build#123
+    Returns None if the ref cannot be parsed.
+    """
+    ref = ref.strip()
+
+    # SHIP-NNN shorthand
+    m = re.match(r'^SHIP-(\d+)$', ref, re.IGNORECASE)
+    if m:
+        owner, repo = SHIP_ISSUE_REPO.split("/")
+        return owner, repo, int(m.group(1))
+
+    # Full URL
+    m = re.match(r'^https?://github\.com/([^/]+)/([^/]+)/issues/(\d+)', ref)
+    if m:
+        return m.group(1), m.group(2), int(m.group(3))
+
+    # owner/repo#NNN
+    m = re.match(r'^([^/]+)/([^#]+)#(\d+)$', ref)
+    if m:
+        return m.group(1), m.group(2), int(m.group(3))
+
+    return None

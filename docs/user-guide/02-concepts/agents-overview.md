@@ -1,12 +1,32 @@
-# Agents Overview
+# SDLC Agents
 
-The system contains five specialized AI agents that run in sequence. Each agent reads from the shared `AgentState`, calls the Claude API, and writes its outputs back into state before the next agent begins.
+Each agent in the pipeline represents a distinct phase of the Feature Software Development Lifecycle (SDLC). A Jira ticket enters the system and flows sequentially through design, development, review, testing, and documentation before being published to GitHub and Jira.
+
+Agents do not call each other directly. They communicate through the shared `AgentState` dictionary managed by LangGraph. When an agent finishes, it returns a partial state update. LangGraph merges it into the full state, making all new fields immediately available to the next agent.
 
 ---
 
-## The Agents
+## Pipeline Flow
 
-### 1. Design Agent
+```text
+Jira Ticket
+    ↓
+Phase 1 · Design Agent       — architecture analysis, risks, implementation plan
+    ↓
+Phase 2 · Development Agent  — Go source code, API types, PR description
+    ↓
+Phase 2.5 · Code Review      — blocking/warning findings, auto-fix loop
+    ↓ (retry Development if FAIL, up to MAX_REVIEW_ITERATIONS)
+Phase 3 · Testing Agent      — unit, integration, e2e Ginkgo v2 tests
+    ↓
+Phase 4 · Documentation Agent — PR summary, release notes, SHIP/JTBD docs
+    ↓
+publish.py                   — push code to GitHub, post to Jira
+```
+
+---
+
+## Phase 1: Design Agent
 
 **File:** `agents/design_agent.py`
 
@@ -24,9 +44,26 @@ The Design Agent analyzes a GitHub issue and produces a comprehensive design doc
 
 **Claude API settings:** model `claude-sonnet-4-6`, 8,000 max tokens, temperature 1.0
 
+**Invocation:**
+
+```python
+from agents.design_agent import run_design
+
+result = run_design(
+    title="Add retry logic to failed builds",
+    description="BuildRuns should support automatic retry on transient failures",
+    repo_path="/path/to/shipwright-build"  # optional
+)
+
+print(result["design_analysis"])
+print("Impacted:", result["impacted_components"])
+```
+
+For full parameter documentation, see the [Design Agent](../03-agents/design-agent.md) page.
+
 ---
 
-### 2. Development Agent
+## Phase 2: Development Agent
 
 **File:** `agents/go_k8s_developer.py`
 
@@ -42,9 +79,28 @@ The Development Agent generates production-quality Go code for Kubernetes and Op
 
 **Claude API settings:** model `claude-sonnet-4-6`, 16,000 max tokens, temperature 0.2 (lower for deterministic code output)
 
+**Invocation:**
+
+```python
+from agents.go_k8s_developer import run_development
+
+context = {
+    "issue_title": "Add TLS 1.3 support to build controller",
+    "design_analysis": "...",
+    "implementation_plan": ["Step 1: ...", "Step 2: ..."]
+}
+
+result = run_development(context)
+
+for file in result["code_files"]:
+    print(f"File: {file['path']}")
+```
+
+For full parameter documentation, see the [Development Agent](../03-agents/development-agent.md) page.
+
 ---
 
-### 3. Code Review Agent
+## Phase 2.5: Code Review Agent
 
 **File:** `agents/code_review_agent.py`
 
@@ -79,9 +135,13 @@ The Code Review Agent reviews generated Go code for quality, security, and corre
 
 **Feature flag:** Set `QODO_REVIEW_ENABLED=false` to skip the review phase entirely (backward compatible).
 
+> **Note:** Unlike other phases, code review failures do not stop the workflow. Instead, they trigger the auto-fix loop back to the Development Agent. The validation result for this phase is always `passed=True`; review failures are surfaced as warnings in the phase summary.
+
+For full parameter documentation, see the [Code Review Agent](../03-agents/code-review-agent.md) page.
+
 ---
 
-### 4. Testing Agent
+## Phase 3: Testing Agent
 
 **File:** `agents/testing_agent.py`
 
@@ -90,7 +150,7 @@ The Testing Agent generates comprehensive Ginkgo v2 test suites. It detects Ship
 **Test types generated:**
 
 | Type | Duration | Scope |
-|------|----------|-------|
+| ---- | -------- | ----- |
 | Unit | Fast (<5s) | Isolated functions with mocks |
 | Integration | Medium (~30s) | Real Kubernetes cluster |
 | E2E | Slow (~5m) | Full build workflow execution |
@@ -106,9 +166,11 @@ The Testing Agent generates comprehensive Ginkgo v2 test suites. It detects Ship
 
 **Claude API settings:** model `claude-sonnet-4-6`, 16,000 max tokens
 
+For full parameter documentation, see the [Testing Agent](../03-agents/testing-agent.md) page.
+
 ---
 
-### 5. Documentation Agent
+## Phase 4: Documentation Agent
 
 **File:** `agents/docs_agent.py`
 
@@ -123,11 +185,19 @@ The Documentation Agent generates all documentation artifacts from the combined 
 
 **Claude API settings:** model `claude-sonnet-4-6`, 8,192 max tokens, temperature 0.3 (lower for consistent documentation style)
 
+For full parameter documentation, see the [Docs Agent](../03-agents/docs-agent.md) page.
+
+---
+
+## Publish
+
+After all four phases complete, `publish.py` pushes the generated code to a GitHub branch and posts results back to Jira.
+
+See the [Publish](../04-publishing/publish.md) page for configuration and usage.
+
 ---
 
 ## How Agents Connect
-
-Agents do not call each other directly. They communicate through the shared `AgentState` dictionary managed by LangGraph. When an agent finishes, it returns a partial state update. LangGraph merges it into the full state, making all new fields immediately available to the next agent.
 
 ```text
 Design Agent writes → design_analysis, impacted_components, risks, acceptance_criteria
@@ -146,57 +216,11 @@ Testing Agent reads design fields, writes → test_plan, unit_tests, integration
 Docs Agent reads everything, writes → pr_summary, release_notes, ship_document, jtbd_documentation
 ```
 
-This means the Testing Agent always has access to the original design analysis and the development agent's reviewed outputs, and the Docs Agent sees the complete picture from all four prior agents.
+The Testing Agent always has access to the original design analysis and the development agent's reviewed outputs. The Documentation Agent sees the complete picture from all four prior phases.
 
 ---
 
-## Calling an Agent Directly
-
-Agents are normally invoked automatically by the orchestrator. For advanced use cases, each agent exposes a Python entry point for direct invocation.
-
-**Design Agent:**
-
-```python
-from agents.design_agent import run_design
-
-result = run_design(
-    title="Add retry logic to failed builds",
-    description="BuildRuns should support automatic retry on transient failures",
-    repo_path="/path/to/shipwright-build"  # optional
-)
-
-print(result["design_analysis"])
-print("Impacted:", result["impacted_components"])
-```
-
-**Development Agent:**
-
-```python
-from agents.go_k8s_developer import run_development
-
-context = {
-    "issue_title": "Add TLS 1.3 support to build controller",
-    "design_analysis": "...",
-    "implementation_plan": ["Step 1: ...", "Step 2: ..."]
-}
-
-result = run_development(context)
-
-for file in result["code_files"]:
-    print(f"File: {file['path']}")
-```
-
-For full parameter documentation, see each agent's dedicated page:
-
-- [Design Agent](../03-agents/design-agent.md)
-- [Development Agent](../03-agents/development-agent.md)
-- [Code Review Agent](../03-agents/code-review-agent.md)
-- [Testing Agent](../03-agents/testing-agent.md)
-- [Docs Agent](../03-agents/docs-agent.md)
-
----
-
-## Validation & Approval Between Phases
+## Validation Between Phases
 
 After each agent completes, the orchestrator:
 
@@ -206,8 +230,6 @@ After each agent completes, the orchestrator:
 4. **Asks for approval** (if `MANUAL_APPROVAL=true`) — prompts `[Y/n]` before the next phase
 
 This ensures bad data from one agent never silently flows into the next agent.
-
-> **Code Review phase:** Unlike other phases, code review failures do not stop the workflow. Instead, they trigger an auto-fix loop back to the Development Agent. The validation result for this phase is always `passed=True`; review failures are surfaced as warnings in the phase summary.
 
 ---
 

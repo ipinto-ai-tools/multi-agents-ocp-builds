@@ -1,6 +1,27 @@
 # Architecture
 
-The multi-agent system is a LangGraph pipeline of five specialized AI agents that process a feature request or bug report end-to-end.
+## Feature SDLC Pipeline
+
+The system automates the complete feature software development lifecycle (SDLC) — from a Jira ticket or issue description through to deployable artifacts — without manual handoffs between stages.
+
+Each run of `scripts/orchestrate.py` executes a fixed sequence of SDLC phases:
+
+```
+Requirements → Design → Development → Code Review → Testing → Documentation → Publish
+```
+
+The first phase (Requirements) is provided by the caller as an issue title and description. The remaining phases are carried out by specialized AI agents orchestrated by LangGraph. The final Publish step writes artifacts to disk via `publish.py`.
+
+### SDLC Phase Overview
+
+| Phase | SDLC Stage | Agent | Duration (typical) |
+| ----- | ---------- | ----- | ------------------ |
+| 1 | Design & Architecture | Design Agent | ~90s |
+| 2 | Development | Development Agent | ~3min |
+| 2.5 | Code Review | Code Review Agent | ~45s (+ retry loop) |
+| 3 | Testing | Testing Agent | ~3min |
+| 4 | Documentation | Documentation Agent | ~2min |
+| — | Publish | publish.py | ~30s |
 
 ---
 
@@ -37,9 +58,9 @@ The multi-agent system is a LangGraph pipeline of five specialized AI agents tha
 
 ---
 
-## LangGraph Pipeline
+## Pipeline Implementation
 
-The orchestrator (`agents/graph.py`) builds a `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which node runs next.
+The orchestrator (`agents/graph.py`) implements the SDLC phase sequence as a LangGraph `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which SDLC phase runs next.
 
 ```
 design_node → develop_node → code_review_node → testing_node → docs_node → END
@@ -248,6 +269,36 @@ The hook is warn-only: it always exits with code 0 so tool execution is never bl
 **Pattern categories (59+ total):** instruction override, role-playing/DAN, encoding obfuscation, context manipulation, and Jira-specific injection patterns.
 
 See [Claude Hooks](../07-security/claude-hooks.md) for the full reference, including how to add custom patterns.
+
+---
+
+## Terminal Output
+
+When you run the pipeline via `scripts/orchestrate.py`, each phase prints a numbered header so you can track progress at a glance. After every phase completes, the elapsed time for that phase is printed. When all phases finish, a summary is printed containing the total duration, the path to the saved output artifacts, and the dashboard URL.
+
+**Phase headers:**
+
+```text
+Phase 1/5 · Design
+Phase 2/5 · Development
+Phase 2.5/5 · Code Review
+Phase 3/5 · Testing
+Phase 4/5 · Documentation
+```
+
+**Per-phase completion line (example):**
+
+```text
+Design completed in 45.2s
+```
+
+**Final summary (example):**
+
+```text
+Pipeline completed in 3m 12s
+Artifacts: ./output/session-abc123/
+Dashboard: http://localhost:8080
+```
 
 ---
 

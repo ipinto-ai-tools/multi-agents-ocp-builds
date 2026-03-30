@@ -521,7 +521,7 @@ def _get_generation_request(output_format: str) -> str:
     """
     base_request = (
         "Based on the above context, generate comprehensive documentation including:\n"
-        "1. PR Summary - concise pull request description\n"
+        "1. ## PR Summary - concise pull request description (use exactly this ## header)\n"
         "2. Release Notes - user-facing changelog entry\n"
         "3. Documentation Changes - specific doc updates needed\n"
         "4. Upgrade Notes - version-specific upgrade guidance\n"
@@ -578,6 +578,7 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
     # Initialize output structure
     output = {
         "pr_summary": "",
+        "pr_description": "",
         "release_notes": "",
         "docs_changes": {},
         "upgrade_notes": "",
@@ -591,7 +592,29 @@ def _parse_docs_response(response_text: str, output_format: str) -> Dict[str, An
     sections = _split_into_sections(response_text)
 
     # Extract each section
-    output["pr_summary"] = sections.get("pr summary", "").strip()
+    pr_summary = (
+        sections.get("pr summary")
+        or sections.get("pull request summary")
+        or sections.get("pr description")
+        or sections.get("pull request description")
+        or sections.get("summary")
+        or ""
+    ).strip()
+    output["pr_summary"] = pr_summary
+
+    pr_description = (
+        sections.get("pr description")
+        or sections.get("pull request description")
+        or sections.get("pr")
+        or ""
+    ).strip()
+    if len(pr_description) < 100:
+        import logging
+        logging.getLogger(__name__).warning(
+            "pr_description is very short (%d chars) — check docs agent prompt", len(pr_description)
+        )
+    output["pr_description"] = pr_description
+
     output["release_notes"] = (sections.get("release notes") or sections.get("release note") or "").strip()
     output["upgrade_notes"] = (sections.get("upgrade notes") or sections.get("upgrade note") or "").strip()
     output["known_limitations"] = (sections.get("known limitations") or sections.get("known limitation") or "").strip()
@@ -630,8 +653,8 @@ def _split_into_sections(text: str) -> Dict[str, str]:
     current_content = []
 
     for line in text.split("\n"):
-        # Check if line is a section header (## Header only, not ###)
-        if line.startswith("##") and not line.startswith("###"):
+        # Check if line is a section header (# or ## but not ### or deeper)
+        if line.startswith("#") and not line.startswith("###"):
             # Save previous section
             if current_section:
                 sections[current_section] = "\n".join(current_content)

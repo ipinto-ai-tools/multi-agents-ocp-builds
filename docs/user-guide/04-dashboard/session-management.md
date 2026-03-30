@@ -8,12 +8,49 @@ Each call to `orchestrate()` creates one session in the dashboard database. Sess
 
 A session progresses through these phases:
 
-```
-planning → executing → done
-                    → error  (on failure)
+```text
+planning → executing → done ──→ archived ──→ deleted
+                    → error ──→ archived ──→ deleted
 ```
 
-Active sessions (any phase other than `done` or `error`) are never touched by cleanup operations.
+- **Active** sessions (`planning`, `executing`) are never touched by cleanup operations or archive/delete actions.
+- **Completed** or **failed** sessions can be archived from the UI or removed by API-based cleanup.
+- **Archived** sessions are hidden from the default dashboard view and excluded from status card counts. They can be permanently deleted.
+
+### Dual Timestamps
+
+Each session card in the UI shows two timestamps:
+
+- **Started** — when the first heartbeat for the session was received. This is the wall-clock time the workflow began.
+- **Last updated** — time elapsed since the most recent heartbeat. This value refreshes every 3 seconds while the dashboard is open.
+
+Use the gap between these two values to identify stuck sessions. If "Last updated" has not advanced for several minutes while the session is still in an active phase, the agent has likely hung or lost connectivity. See [Troubleshooting](#troubleshooting) for steps to investigate.
+
+---
+
+## Managing Sessions in the UI
+
+The React dashboard provides a two-step archive-then-delete workflow so that completed runs are hidden from day-to-day view without being immediately destroyed.
+
+### Archive a Completed Run
+
+Runs with a **Completed** or **Failed** status display an **Archive** button in the Actions column. Clicking it moves the run to the `archived` state. Archived runs are immediately hidden from the session list and are no longer counted in the summary status cards (Running, Waiting, Failed, Completed).
+
+### Show or Hide Archived Runs
+
+A **Show archived** / **Hide archived** toggle link sits above the runs table. Clicking it toggles visibility of all archived runs in the current view. When archived runs are visible they appear alongside active runs and can be filtered normally.
+
+### Delete an Archived Run
+
+Archived runs display a red **Delete** button. Clicking it opens a browser confirmation dialog:
+
+> Permanently delete this run? This cannot be undone.
+
+Confirming the dialog permanently removes the session, all associated heartbeat records, and the pipeline log file from disk.
+
+### Status Card Counts
+
+The four summary cards at the top of the dashboard (Running, Waiting, Failed, Completed) are computed from whichever sessions are currently loaded. By default, archived sessions are excluded from the API response, so they do not contribute to any card count. Archiving a failed run, for example, removes it from view and decreases the Failed count by one. Toggling **Show archived** re-fetches all sessions including archived ones, so their original status is reflected in the counts again.
 
 ---
 
@@ -219,4 +256,4 @@ result = db.cleanup_old_sessions(max_age_hours=48)
 
 ---
 
-[← Previous: Dashboard Overview](overview.md) | [Next: Authentication Overview →](../05-authentication/overview.md)
+[← Previous: Dashboard Overview](overview.md) | [Next: Authentication Overview →](../05-authentication/authentication.md)

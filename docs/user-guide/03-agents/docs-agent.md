@@ -15,6 +15,7 @@ The prompt instructs the agent to:
 
 - Only document what has been implemented and tested — never speculate
 - Produce a PR Summary (what changed, why, testing, rollout)
+- Always produce a full `## PR Description` section with a minimum of 300 words — this section is mandatory and must appear in every response
 - Generate release notes with category, title, description, and migration notes
 - Write Jobs-to-be-Done (JTBD) documentation organized around user outcomes
 - Produce SHIP format documents (Solution, Highlight, Impact, Plan) for stakeholder communication
@@ -70,6 +71,7 @@ To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/a
 {
     # Core documentation (all formats)
     "pr_summary": str,               # Pull request description
+    "pr_description": str,           # Full PR description (mandatory, 300-word minimum)
     "release_notes": str,            # User-facing changelog entry
     "docs_changes": dict[str, str],  # doc file path → change description
     "upgrade_notes": str,            # Migration guidance for existing users
@@ -170,6 +172,8 @@ When `enable_rag=True` and `repo_path` is set in the context, the agent searches
 
 **Graceful fallback:** If RAG fails (missing repo_path, search error, etc.), documentation generation continues normally with a warning logged.
 
+**Configuration:** The `repo_path` is auto-populated from `repos.yaml` or environment variables. Configure multiple repositories for broader documentation context. See [Repository Paths](../01-getting-started/configuration.md#repository-paths).
+
 ---
 
 ## Input Files
@@ -235,8 +239,12 @@ result = run_docs(context=context, enable_rag=False)
 | Input file does not exist | File is skipped, generation continues |
 | RAG search failure | Warning logged, generation continues |
 | Missing required context keys | Raises `RuntimeError: Missing required context keys` |
+| `pr_description` key absent in parsed response | Parser retries with fallback keys: `pr description`, `pull request description`, `pr` (in that order) |
+| Extracted `pr_description` is under 100 characters | Warning logged indicating a likely parsing failure; check the raw model response for a malformed or missing `## PR Description` section |
 
 **Required context keys:** `design_analysis`, `code_changes`, `test_results`
+
+**`pr_description` parsing notes:** The agent prompt enforces a mandatory `## PR Description` section with a 300-word minimum. The parser first looks for a `pr_description` key in the structured response; if that key is absent it falls back to `pr description`, then `pull request description`, then `pr`. A warning is logged when the final extracted value is shorter than 100 characters, which typically indicates the section was missing or malformed in the model response.
 
 ---
 

@@ -9,8 +9,8 @@ This document maps every major function call in the system, showing who calls wh
 The system has two entry points depending on how you invoke it:
 
 | Entry point | File | When used |
-|-------------|------|-----------|
-| `orchestrate()` | `scripts/orchestrate.py` | CLI invocation by a user or CI job. Runs each phase sequentially, calls validators between phases, and supports manual approval gates. |
+| --- | --- | --- |
+| `orchestrate()` | `scripts/orchestrate.py` | CLI invocation by a user or CI job. Runs each phase sequentially, calls validators between phases, and supports manual approval gates. Accepts `--output-dir <path>` to save all pipeline artifacts (JSON state, per-phase markdown files) to a local directory. |
 | `build_workflow()` | `agents/graph.py` | LangGraph pipeline invocation. Builds a `StateGraph` where nodes are the five agents and routing is driven by `state["current_phase"]`. Used when you want LangGraph to manage state and edges rather than imperative Python. |
 
 Both paths call the same five agent functions (`run_design`, `run_development`, `run_code_review`, `run_testing`, `run_docs`) and emit heartbeats to the dashboard after each phase.
@@ -133,6 +133,8 @@ orchestrate(title, description, repo_path, issue_type)
 - `validate_phase()` runs after each agent returns. If validation fails, `orchestrate()` raises an exception and halts the pipeline rather than passing bad data downstream.
 - `emit_heartbeat()` is called at least once per phase. The development agent calls it twice — once before the API call (to signal the phase has started) and once after (to signal completion with token counts).
 - `detect_patterns_in_description()` in the testing phase scans the issue description for keywords (build strategy names, source types) and injects matching Ginkgo v2 templates into the prompt.
+- Each phase prints a numbered header to the terminal when it starts (e.g., `Phase 1/5 · Design`, `Phase 2.5/5 · Code Review`) and prints its elapsed duration when it completes (e.g., `Design completed in 45.2s`).
+- After all phases finish, a final summary is printed containing the total pipeline duration, the path to saved output artifacts, and the dashboard URL. Pass `--output-dir <path>` to control where artifacts are written; without this flag, artifacts are not saved to disk.
 
 ---
 

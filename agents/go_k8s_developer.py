@@ -24,6 +24,7 @@ from config.agent_prompts import DEVELOPMENT_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
 from tools.prompt_guard import sanitize_external_input
+from tools.repo_search import RepoSearch
 from utils.file_logger import get_logger, get_session_logger
 
 # Initialize logger
@@ -265,6 +266,68 @@ def _validate_context(context: Dict[str, Any]) -> None:
             raise ValueError(f"Field '{field}' must be a list")
 
 
+def _gather_repo_context(repo_path: str, context: Dict[str, Any]) -> str:
+    """Gather relevant code context from the repository for code generation.
+
+    Args:
+        repo_path: Path to the repository
+        context: Agent context with impacted_components and design info
+
+    Returns:
+        Formatted string with relevant repository context
+    """
+    try:
+        searcher = RepoSearch(repo_path)
+    except Exception as e:
+        logger.warning(f"Could not initialize repo search: {e}")
+        return ""
+
+    sections = []
+    impacted = context.get("impacted_components", [])
+
+    # Search for Go type definitions relevant to impacted components
+    type_files = searcher.search_files("**/*_types.go")
+    if type_files:
+        sections.append("### API Type Files")
+        for f in type_files[:10]:
+            sections.append(f"- `{f.file_path}`")
+
+    # Search for controller files
+    controller_files = searcher.search_files("**/controller/**/*.go")
+    if controller_files:
+        sections.append("\n### Controller Files")
+        for f in controller_files[:10]:
+            sections.append(f"- `{f.file_path}`")
+
+    # Search for relevant content based on impacted components
+    for component in impacted[:5]:
+        # Clean component name for search
+        search_term = component.replace("_", " ").split("(")[0].strip()
+        if len(search_term) < 3:
+            continue
+        results = searcher.search_content(search_term, file_pattern="*.go")
+        if results:
+            sections.append(f"\n### References to '{search_term}'")
+            for r in results[:5]:
+                line_info = f":{r.line_number}" if r.line_number else ""
+                sections.append(f"- `{r.file_path}{line_info}`")
+
+    # Search for Go package structure
+    try:
+        packages = searcher.analyze_go_packages("pkg")
+        if packages:
+            sections.append("\n### Package Structure (pkg/)")
+            for pkg in packages[:15]:
+                sections.append(f"- `{pkg.path}` ({len(pkg.files)} files)")
+    except Exception as e:
+        logger.debug(f"Package structure analysis skipped: {e}")
+
+    if not sections:
+        return ""
+
+    return "\n## Repository Context\n\nThe following files and structure were found in the target repository:\n\n" + "\n".join(sections) + "\n"
+
+
 def _build_development_prompt(
     context: Dict[str, Any],
     repo_path: Optional[str] = None
@@ -340,6 +403,10 @@ def _build_development_prompt(
     if repo_path:
         prompt_parts.append(f"\n## Repository Path\n")
         prompt_parts.append(f"{repo_path}\n")
+        # Gather actual repo context for better code generation
+        repo_context = _gather_repo_context(repo_path, context)
+        if repo_context:
+            prompt_parts.append(repo_context)
 
     # Inject review feedback for auto-fix iterations
     review_feedback = _build_review_feedback_section(context)
