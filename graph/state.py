@@ -64,6 +64,7 @@ class AgentState(TypedDict, total=False):
 
     # Repository context
     repo_path: str
+    repo_paths: list[str]
     target_branch: str
 
     # Jira integration

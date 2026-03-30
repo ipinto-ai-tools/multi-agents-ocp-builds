@@ -39,6 +39,7 @@ def design_node(state: AgentState) -> Dict[str, Any]:
             title=state["issue_title"],
             description=state["issue_description"],
             repo_path=state.get("repo_path"),
+            # TODO: pass repo_paths for multi-repo analysis
         )
 
         # Update state with design outputs
@@ -85,7 +86,7 @@ def develop_node(state: AgentState) -> Dict[str, Any]:
     """
     try:
         # Run development agent
-        development_output = run_development(state)
+        development_output = run_development(state, repo_path=state.get("repo_path"))
 
         # Update state with development outputs
         updated_state = {
