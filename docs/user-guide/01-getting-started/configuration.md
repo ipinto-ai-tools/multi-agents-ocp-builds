@@ -30,7 +30,7 @@ ANTHROPIC_VERTEX_PROJECT_ID=my-gcp-project
 CLOUD_ML_REGION=us-east5
 ```
 
-See [Vertex AI Setup](../05-authentication/vertex-ai.md) for authentication instructions.
+See [Vertex AI Setup](../05-authentication/authentication.md) for authentication instructions.
 
 ### Claude Model
 

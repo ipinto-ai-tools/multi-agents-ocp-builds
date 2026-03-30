@@ -23,7 +23,7 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 | Page | Description |
 |------|-------------|
 | [Installation](01-getting-started/installation.md) | System requirements and install steps |
-| [Quick Start](01-getting-started/quick-start.md) | Complete setup guide covering all integrations (Jira, GitHub, Qodo, Vertex AI, repo paths) |
+| [Quick Start](01-getting-started/quick-start.md) | Dashboard-first setup: install, configure credentials, and run your first pipeline |
 | [Configuration](01-getting-started/configuration.md) | Environment variables and `.env` setup |
 
 ### Section 2 - Core Concepts & SDLC Pipeline
@@ -65,6 +65,7 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 | [Logging](06-advanced/logging.md) | Log files, levels, and session logs |
 | [Output Validation](06-advanced/output-validation.md) | Per-phase validation and manual approval |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
+| [Code Flow](06-advanced/code-flow.md) | Function call mapping across the pipeline |
 
 ### Section 7 - Security
 
@@ -75,24 +76,31 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 | [Log & Output Sanitizer](07-security/output-sanitizer.md)                   | Layer 3: egress protection — scrubs sensitive data from logs and outputs     |
 | [claude-hooks PostToolUse Integration](07-security/claude-hooks.md)         | Layer 4: host-level defense via Claude Code hooks                            |
 
-### Section 7 - Examples
+### Section 8 - Examples
 
 | Page | Description |
 | ---- | ----------- |
 | [Examples](07-examples/README.md) | Runnable scripts for testing agents, auth, logging, and the dashboard API |
 
-### Section 8 - Testing
+### Section 9 - Testing
 
 | Page                          | Description                                                                         |
 |-------------------------------|-------------------------------------------------------------------------------------|
 | [Testing](08-testing/README.md) | Test suite overview, dual-mode execution, fixtures, markers, and writing new tests |
 
-### Section 9 - Integrations
+### Section 10 - Integrations
 
 | Page                                                               | Description                                                                       |
 |--------------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | [Jira & Rovo](09-integrations/jira-rovo.md)                        | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup                  |
 | [Publishing Artifacts (`publish.py`)](09-integrations/publish.md)  | Push generated code, docs, and summaries to GitHub or Jira                        |
+
+### Section 11 - Reference
+
+| Page | Description |
+|------|-------------|
+| [CLI Reference](10-reference/cli.md) | All CLI commands, options, and usage examples |
+| [API Reference](10-reference/api.md) | REST API endpoints, heartbeat protocol, database schema |
 
 ---
 
@@ -114,6 +122,8 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 | Use a Jira ticket as workflow input | [Jira & Rovo Integration](09-integrations/jira-rovo.md) |
 | Publish code/docs to GitHub or Jira | [Publishing Artifacts](09-integrations/publish.md) |
 | Review generated code automatically | [Code Review Agent](03-agents/code-review-agent.md) |
+| Use the CLI for scripting | [CLI Reference](10-reference/cli.md) |
+| Use the REST API directly | [API Reference](10-reference/api.md) |
 
 ---
 
@@ -122,7 +132,7 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 | Item | Value |
 |------|-------|
 | Default model | `claude-sonnet-4-6` |
-| Python requirement | 3.11 or higher |
+| Python requirement | 3.12 or higher |
 | Auth method | Google Vertex AI (Application Default Credentials) |
 | Dashboard port | 8080 (local only) |
 | Dry run support | Yes - no credentials needed |

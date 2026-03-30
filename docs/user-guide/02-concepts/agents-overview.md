@@ -191,9 +191,9 @@ For full parameter documentation, see the [Docs Agent](../03-agents/docs-agent.m
 
 ## Publish
 
-After all four phases complete, `publish.py` pushes the generated code to a GitHub branch and posts results back to Jira.
+After all five phases complete, `publish.py` pushes the generated code to a GitHub branch and posts results back to Jira.
 
-See the [Publish](../04-publishing/publish.md) page for configuration and usage.
+See the [Publish](../09-integrations/publish.md) page for configuration and usage.
 
 ---
 

@@ -10,7 +10,7 @@ Set up the Multi-Agent OCP Builds system on your local machine.
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Python | 3.11 or higher | Required for type hints and performance |
+| Python | 3.12 or higher | Required for type hints and performance |
 | Git | 2.0 or higher | For repository operations |
 | uv | Latest | Recommended Python package installer |
 | Google Cloud CLI | Latest | Required for Vertex AI authentication |
@@ -31,7 +31,7 @@ uv --version
 
 ```bash
 python --version
-# Expected: Python 3.11.x or higher
+# Expected: Python 3.12.x or higher
 ```
 
 ---
@@ -115,7 +115,7 @@ OK docs agent
 
 - [Quick Start](quick-start.md) - Run your first workflow
 - [Configuration](configuration.md) - Full environment variable reference
-- [Vertex AI Setup](../05-authentication/vertex-ai.md) - Detailed authentication guide
+- [Vertex AI Setup](../05-authentication/authentication.md) - Detailed authentication guide
 
 ---
 
