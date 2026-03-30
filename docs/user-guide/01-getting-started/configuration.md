@@ -43,17 +43,37 @@ See [Vertex AI Setup](../05-authentication/vertex-ai.md) for authentication inst
 
 ### Repository Paths
 
-These paths are optional but enable agents to analyze actual Shipwright source code for more accurate component impact analysis.
+Repository paths let agents analyze actual source code for more accurate component impact analysis, code generation, and documentation. The system auto-detects each repository's project type (Go/Kubernetes, generic Go) and uses appropriate search patterns.
+
+**Preferred: `repos.yaml`** — configure multiple repositories in a single file:
+
+```bash
+cp repos.yaml.example repos.yaml
+# Edit repos.yaml to list your local repository clones
+```
+
+```yaml
+# repos.yaml
+repos:
+  - path: /home/user/git/shipwright-io/build
+  - path: /home/user/git/shipwright-io/operator
+  - path: /home/user/git/redhat-openshift-builds/operator
+```
+
+See `repos.yaml.example` for a full template with all Shipwright and OpenShift Builds repositories.
+
+**Alternative: environment variables** — these paths are always appended after repos.yaml paths (duplicates removed). Can be used on their own when repos.yaml is not present:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SHIPWRIGHT_REPO_PATH` | (none) | Path to Shipwright Build repository |
-| `OPENSHIFT_BUILDS_REPO_PATH` | (none) | Path to OpenShift Builds repository |
+| `SHIPWRIGHT_REPO_PATH` | (none) | Path to a primary repository clone |
+| `OPENSHIFT_BUILDS_REPO_PATH` | (none) | Path to a secondary repository clone |
 
-```bash
-SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
-OPENSHIFT_BUILDS_REPO_PATH=/home/user/git/openshift-builds
-```
+**Priority order:** CLI `--repo-path` argument > `repos.yaml` entries > environment variables. Paths from all sources are merged (duplicates removed).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_REPO_ANALYSIS` | `true` | Set to `false` to disable all repository analysis |
 
 ### Dashboard
 
@@ -134,7 +154,6 @@ See [PII Redaction](../07-security/pii-redaction.md) for details on what is reda
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENABLE_REPO_ANALYSIS` | `true` | Enable repository code analysis |
 | `DESIGN_OUTPUT_FORMAT` | `markdown` | Design output format: `markdown` or `json` |
 | `MANUAL_APPROVAL` | `false` | Pause for user approval between agent phases |
 
@@ -148,6 +167,8 @@ ANTHROPIC_VERTEX_PROJECT_ID=my-gcp-project
 CLOUD_ML_REGION=us-east5
 
 # Repository context (optional but recommended)
+# Preferred: use repos.yaml for multi-repo — see repos.yaml.example
+# Fallback: single repo via env var
 SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
 
 # Model settings
@@ -176,6 +197,7 @@ MANUAL_APPROVAL=false
 ## Security Practices
 
 - Never commit `.env` to version control. It is already listed in `.gitignore`.
+- Never commit `repos.yaml` to version control — it contains local filesystem paths and is listed in `.gitignore`.
 - Set restrictive file permissions: `chmod 600 .env`
 - Rotate gcloud credentials periodically with `gcloud auth application-default login`
 - Do not set `ANTHROPIC_API_KEY` in `.env` — the system uses Vertex AI, not direct API keys

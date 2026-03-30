@@ -35,6 +35,7 @@ The agent reads from a context dictionary, which is populated from `AgentState` 
 | `impacted_components` | list[str] | No | Components affected |
 | `acceptance_criteria` | list[str] | No | Testable criteria |
 | `risks` | list[str] | No | Risks from design phase |
+| `repo_path` | str | No | Path to a repository for code context (auto-populated from `repos.yaml` or env vars) |
 
 ---
 
@@ -77,6 +78,27 @@ All generated code follows these rules:
 - **Proper error handling** - Errors are wrapped with context using `fmt.Errorf("...: %w", err)`
 - **Context propagation** - `context.Context` passed through the full call chain
 - **Table-driven tests** - Mock-based unit tests with multiple scenarios
+
+---
+
+## Repository Context
+
+When `repo_path` is provided, the Development Agent searches the repository to ground its code generation in the actual codebase. The system auto-detects the project type (Go/Kubernetes or generic Go) and uses appropriate search patterns.
+
+### What the agent searches for
+
+- **API types** — Existing struct definitions relevant to impacted components
+- **Controllers** — Current reconciliation logic and patterns used in the codebase
+- **Component references** — How impacted components are used across the repository
+- **Package structure** — Go module layout to match the project's conventions
+
+This context is injected into the prompt so that generated code follows the repository's existing patterns, imports, and naming conventions rather than using generic boilerplate.
+
+### Configuration
+
+Configure repository paths via `repos.yaml` (preferred) or environment variables. See [Repository Paths](../01-getting-started/configuration.md#repository-paths).
+
+If the repository is unavailable, the agent generates code based on the design document and Shipwright component metadata only.
 
 ---
 

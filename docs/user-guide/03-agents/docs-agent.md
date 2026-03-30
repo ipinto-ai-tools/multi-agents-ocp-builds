@@ -172,6 +172,8 @@ When `enable_rag=True` and `repo_path` is set in the context, the agent searches
 
 **Graceful fallback:** If RAG fails (missing repo_path, search error, etc.), documentation generation continues normally with a warning logged.
 
+**Configuration:** The `repo_path` is auto-populated from `repos.yaml` or environment variables. Configure multiple repositories for broader documentation context. See [Repository Paths](../01-getting-started/configuration.md#repository-paths).
+
 ---
 
 ## Input Files
