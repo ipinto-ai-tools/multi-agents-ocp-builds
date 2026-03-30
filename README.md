@@ -1,4 +1,4 @@
-# Feature SDLC Automation for Shipwright / OpenShift Builds
+# FlowPilot: Feature SDLC Automation for Shipwright / OpenShift Builds
 
 AI-powered pipeline that automates the full feature development lifecycle — from Jira ticket to production-ready Go code, tests, and documentation.
 
