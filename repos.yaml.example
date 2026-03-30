@@ -20,10 +20,27 @@
 #   - Set ENABLE_REPO_ANALYSIS=false in .env to disable all repo analysis
 # ============================================================================
 
+# ============================================================================
+# Example: Uncomment and update paths to match your local clones
+# ============================================================================
+#
+# Expected structure — each entry is a map with a 'path' key:
+#
+#   repos:
+#     - path: /absolute/path/to/first-repo
+#     - path: /absolute/path/to/second-repo
+#
+# ============================================================================
+
+
 repos:
   # --------------------------------------------------------------------------
   # Upstream — Shipwright (https://github.com/shipwright-io)
   # --------------------------------------------------------------------------
+  # Clone:
+  #   git clone https://github.com/shipwright-io/build.git /home/user/git/shipwright-io/build
+  #   git clone https://github.com/shipwright-io/operator.git /home/user/git/shipwright-io/operator
+  #
   # - path: /home/user/git/shipwright-io/build
   # - path: /home/user/git/shipwright-io/operator
   # - path: /home/user/git/shipwright-io/triggers
@@ -32,6 +49,9 @@ repos:
   # --------------------------------------------------------------------------
   # Downstream — OpenShift Builds (https://github.com/redhat-openshift-builds)
   # --------------------------------------------------------------------------
+  # Clone:
+  #   git clone https://github.com/redhat-openshift-builds/operator.git /home/user/git/redhat-openshift-builds/operator
+  #
   # - path: /home/user/git/redhat-openshift-builds/operator
   # - path: /home/user/git/redhat-openshift-builds/shipwright-io-build
   # - path: /home/user/git/redhat-openshift-builds/catalog
