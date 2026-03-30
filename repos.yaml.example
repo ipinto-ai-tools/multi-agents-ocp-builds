@@ -1,0 +1,66 @@
+# ============================================================================
+# Repository Configuration for Agent Analysis
+# ============================================================================
+# List all local repository clones you want agents to analyze.
+# Each entry needs an absolute path to a cloned Git repository.
+#
+# The system auto-detects project type (Go/Kubernetes, generic Go, etc.)
+# and uses appropriate search patterns for each repo.
+#
+# Usage:
+#   1. Clone the repos you want to analyze
+#   2. Copy this file: cp repos.yaml.example repos.yaml
+#   3. Update the paths below to your local clones
+#   4. Ensure ENABLE_REPO_ANALYSIS=true in .env (default)
+#
+# Notes:
+#   - Paths must be absolute (not relative)
+#   - Non-existent paths are skipped with a warning
+#   - repos.yaml paths are loaded first; env var paths are appended (duplicates removed)
+#   - Set ENABLE_REPO_ANALYSIS=false in .env to disable all repo analysis
+# ============================================================================
+
+# ============================================================================
+# Example: Uncomment and update paths to match your local clones
+# ============================================================================
+#
+# Expected structure — each entry is a map with a 'path' key:
+#
+#   repos:
+#     - path: /absolute/path/to/first-repo
+#     - path: /absolute/path/to/second-repo
+#
+# ============================================================================
+
+repos:
+  # --------------------------------------------------------------------------
+  # Upstream — Shipwright (https://github.com/shipwright-io)
+  # --------------------------------------------------------------------------
+  # Clone:
+  #   git clone https://github.com/shipwright-io/build.git /home/user/git/shipwright-io/build
+  #   git clone https://github.com/shipwright-io/operator.git /home/user/git/shipwright-io/operator
+  #
+  # - path: /home/user/git/shipwright-io/build
+  # - path: /home/user/git/shipwright-io/operator
+  # - path: /home/user/git/shipwright-io/triggers
+  # - path: /home/user/git/shipwright-io/cli
+
+  # --------------------------------------------------------------------------
+  # Downstream — OpenShift Builds (https://github.com/redhat-openshift-builds)
+  # --------------------------------------------------------------------------
+  # Clone:
+  #   git clone https://github.com/redhat-openshift-builds/operator.git /home/user/git/redhat-openshift-builds/operator
+  #
+  # - path: /home/user/git/redhat-openshift-builds/operator
+  # - path: /home/user/git/redhat-openshift-builds/shipwright-io-build
+  # - path: /home/user/git/redhat-openshift-builds/catalog
+  # - path: /home/user/git/redhat-openshift-builds/release
+  # - path: /home/user/git/redhat-openshift-builds/test
+  # - path: /home/user/git/redhat-openshift-builds/telemetry
+  # - path: /home/user/git/redhat-openshift-builds/strategy-catalog
+  # - path: /home/user/git/redhat-openshift-builds/samples
+
+  # --------------------------------------------------------------------------
+  # Custom repos — add any Git repository you want agents to analyze
+  # --------------------------------------------------------------------------
+  # - path: /home/user/git/my-org/my-repo
