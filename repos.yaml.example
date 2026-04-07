@@ -24,11 +24,20 @@
 # Example: Uncomment and update paths to match your local clones
 # ============================================================================
 #
-# Expected structure — each entry is a map with a 'path' key:
+# Full example with all optional fields:
 #
 #   repos:
-#     - path: /absolute/path/to/first-repo
-#     - path: /absolute/path/to/second-repo
+#     - path: /home/user/git/shipwright-io/build
+#       language: go
+#       commands:
+#         build: go build ./...
+#         lint: golangci-lint run
+#         test: go test ./...
+#
+# Minimal example (path only — same as current format):
+#
+#   repos:
+#     - path: /home/user/git/my-repo
 #
 # ============================================================================
 

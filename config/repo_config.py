@@ -3,6 +3,9 @@ import os
 from pathlib import Path
 
 import yaml
+from pydantic import ValidationError
+
+from config.repo_schema import RepoConfig
 
 logger = logging.getLogger(__name__)
 
@@ -16,36 +19,46 @@ def _resolve_project_root(project_root: str | None) -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def _load_yaml_paths(yaml_path: Path) -> list[str]:
+def _load_raw_yaml(yaml_path: Path) -> dict | None:
+    """Load and return raw YAML data, or ``None`` on failure."""
     if not yaml_path.is_file():
         logger.debug("repos.yaml not found at %s, skipping", yaml_path)
-        return []
+        return None
 
     try:
         with open(yaml_path) as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError as exc:
         logger.warning("Failed to parse %s: %s", yaml_path, exc)
-        return []
+        return None
 
-    if not isinstance(data, dict) or "repos" not in data:
-        logger.warning("repos.yaml missing top-level 'repos' key")
-        return []
+    if not isinstance(data, dict):
+        logger.warning("repos.yaml root must be a mapping, got %s", type(data).__name__)
+        return None
 
-    repos = data["repos"]
-    if not repos:
-        return []
-    if not isinstance(repos, list):
-        logger.warning("repos.yaml 'repos' must be a list, got %s", type(repos).__name__)
-        return []
+    return data
 
-    paths: list[str] = []
-    for entry in repos:
-        if isinstance(entry, dict) and "path" in entry:
-            paths.append(str(entry["path"]))
-        else:
-            logger.warning("Skipping malformed repos.yaml entry: %s", entry)
-    return paths
+
+def load_repo_config(yaml_path: Path) -> RepoConfig:
+    """Parse *yaml_path* into a validated :class:`RepoConfig`.
+
+    Returns an empty ``RepoConfig()`` when the file is missing, unparseable,
+    or fails schema validation -- the caller never has to handle ``None``.
+    """
+    raw = _load_raw_yaml(yaml_path)
+    if raw is None:
+        return RepoConfig()
+
+    try:
+        return RepoConfig.model_validate(raw)
+    except ValidationError as exc:
+        logger.warning("repos.yaml schema validation failed: %s", exc)
+        return RepoConfig()
+
+
+def _load_yaml_paths(yaml_path: Path) -> list[str]:
+    config = load_repo_config(yaml_path)
+    return [entry.path for entry in config.repos]
 
 
 def _env_var_paths() -> list[str]:
