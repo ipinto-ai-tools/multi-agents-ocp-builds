@@ -3,6 +3,9 @@ anthropic[vertex]>=0.40.0  # Include Vertex AI support for Google Cloud
 langgraph>=0.2.0
 langchain-core>=0.3.0
 
+# Data validation / stage output contracts
+pydantic>=2.0
+
 # Environment and configuration
 python-dotenv>=1.0.0
 

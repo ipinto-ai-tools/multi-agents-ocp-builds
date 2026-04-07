@@ -212,3 +212,66 @@ def validate_phase(phase: str, state: dict) -> ValidationResult:
             summary={"note": "No validator for this phase"},
         )
     return validator(state)
+
+
+def validate_stage_output(phase: str, data: dict) -> ValidationResult:
+    """Validate stage output against its Pydantic contract.
+
+    This provides a stricter, schema-based validation path that complements
+    the existing ``validate_phase`` function.  Both can be used side-by-side;
+    this function uses the Pydantic models from ``models.stage_outputs`` for
+    type-safe contract enforcement.
+
+    Args:
+        phase: Pipeline phase name (e.g. "design", "develop", "testing",
+               "docs", "code_review").
+        data:  Dict of stage outputs to validate.
+
+    Returns:
+        A ``ValidationResult`` indicating whether the data conforms to the
+        stage's Pydantic contract.
+    """
+    from pydantic import ValidationError as PydanticValidationError
+
+    from models.stage_outputs import (
+        DesignOutput,
+        DevelopOutput,
+        DocsOutput,
+        ReviewOutput,
+        TestingOutput,
+    )
+
+    CONTRACTS = {
+        "design": DesignOutput,
+        "develop": DevelopOutput,
+        "testing": TestingOutput,
+        "docs": DocsOutput,
+        "code_review": ReviewOutput,
+    }
+
+    model_class = CONTRACTS.get(phase)
+    if not model_class:
+        return ValidationResult(
+            phase=phase,
+            passed=True,
+            summary={"note": "No contract for this phase"},
+        )
+
+    try:
+        model_class.model_validate(data)
+        return ValidationResult(
+            phase=phase,
+            passed=True,
+            summary={"validation": "contract passed"},
+        )
+    except PydanticValidationError as e:
+        issues = [
+            f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}"
+            for err in e.errors()
+        ]
+        return ValidationResult(
+            phase=phase,
+            passed=False,
+            issues=issues,
+            summary={"validation": "contract failed"},
+        )
