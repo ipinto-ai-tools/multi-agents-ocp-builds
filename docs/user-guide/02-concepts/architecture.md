@@ -2,20 +2,20 @@
 
 ## Feature SDLC Pipeline
 
-The system automates the complete feature software development lifecycle (SDLC) — from a Jira ticket or issue description through to deployable artifacts — without manual handoffs between stages.
+FlowPilot is an SDLC orchestration layer that drives a feature from Jira ticket or issue description through to deployable artifacts — without manual handoffs between stages. Claude serves as the execution engine for every stage; FlowPilot supervises the workflow, validates outputs, and manages state transitions.
 
-Each run of `scripts/orchestrate.py` executes a fixed sequence of SDLC phases:
+Each run of `scripts/orchestrate.py` executes a fixed sequence of SDLC stages:
 
 ```
 Requirements → Design → Development → Code Review → Testing → Documentation → Publish
 ```
 
-The first phase (Requirements) is provided by the caller as an issue title and description. The remaining phases are carried out by specialized AI agents orchestrated by LangGraph. The final Publish step writes artifacts to disk via `publish.py`.
+The first stage (Requirements) is provided by the caller as an issue title and description. The remaining stages are carried out by stage runners — each powered by Claude — coordinated by the workflow orchestrator (currently implemented using LangGraph). The final Publish step writes artifacts to disk via `publish.py`.
 
-### SDLC Phase Overview
+### SDLC Stage Overview
 
-| Phase | SDLC Stage | Agent | Duration (typical) |
-| ----- | ---------- | ----- | ------------------ |
+| Phase | SDLC Stage | Stage Runner | Duration (typical) |
+| ----- | ---------- | ------------ | ------------------ |
 | 1 | Design & Architecture | Design Agent | ~90s |
 | 2 | Development | Development Agent | ~3min |
 | 2.5 | Code Review | Code Review Agent | ~45s (+ retry loop) |
@@ -35,7 +35,7 @@ The first phase (Requirements) is provided by the caller as an issue title and d
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      LangGraph Orchestrator                         │
+│                      Workflow Orchestrator                           │
 │                      (agents/graph.py)                              │
 │                                                                     │
 │  ┌──────────┐  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌──────┐  │
@@ -60,7 +60,7 @@ The first phase (Requirements) is provided by the caller as an issue title and d
 
 ## Pipeline Implementation
 
-The orchestrator (`agents/graph.py`) implements the SDLC phase sequence as a LangGraph `StateGraph` with five sequential nodes. Each node calls its agent, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which SDLC phase runs next.
+The orchestrator (`agents/graph.py`) implements the SDLC stage sequence as a `StateGraph` (currently implemented using LangGraph) with five sequential stage nodes. Each node runs its stage, updates the shared `AgentState`, and emits a heartbeat to the dashboard. The `should_continue` router function reads `current_phase` from state to decide which SDLC stage runs next.
 
 ```
 design_node → develop_node → code_review_node → testing_node → docs_node → END
@@ -82,7 +82,7 @@ init → design_complete → develop_complete → review_complete → testing_co
                                           error
 ```
 
-When an agent raises an unhandled exception, the node sets `current_phase = "error"`, emits an error heartbeat, and the conditional router sends the workflow to `END`.
+When a stage runner raises an unhandled exception, the node sets `current_phase = "error"`, emits an error heartbeat, and the conditional router sends the workflow to `END`.
 
 ### Key Orchestrator Function
 
@@ -99,9 +99,9 @@ The orchestrator:
 
 ---
 
-## Agents at a Glance
+## Stage Runners at a Glance
 
-| Agent | File | Input | Output |
+| Stage | File | Input | Output |
 |-------|------|-------|--------|
 | Design | `agents/design_agent.py` | Issue title, description, optional repo path | Design document, component list, risks, acceptance criteria, implementation plan |
 | Development | `agents/go_k8s_developer.py` | Design outputs from state | Go code files, test files, PR description |
@@ -113,7 +113,7 @@ The orchestrator:
 
 ## Data Flow
 
-Each node returns a partial state dictionary. LangGraph merges it into the accumulated state so every subsequent agent automatically sees all prior outputs.
+Each node returns a partial state dictionary. The orchestrator merges it into the accumulated state so every subsequent stage automatically sees all prior outputs.
 
 ```
 orchestrate() creates initial state
@@ -162,14 +162,14 @@ Final state returned to caller
 
 ## Output Validation Gates
 
-After each agent completes, its outputs are validated before the next phase begins.
-This prevents silent cascading failures where an agent returns empty data and
-subsequent agents produce garbage outputs.
+After each stage completes, its outputs are validated before the next stage begins.
+This prevents silent cascading failures where a stage returns empty data and
+subsequent stages produce garbage outputs.
 
 **Validation flow:**
 
 ```text
-Agent completes
+Stage completes
      ↓
 validate_phase(phase, state)
      ↓
@@ -177,7 +177,7 @@ validate_phase(phase, state)
 PASS    FAIL
   ↓      ↓
 Next   Stop workflow with
-Phase  clear error message
+Stage  clear error message
 ```
 
 **Validation rules per phase:**
@@ -204,7 +204,7 @@ result = validate_phase("design", state)
 # result.summary  → dict       (key metrics, e.g. "Code files generated: 3")
 ```
 
-**Extending validation:** To add a validator for a new agent phase, add a
+**Extending validation:** To add a validator for a new stage, add a
 `validate_<phase>_output(state)` function in `agents/validators.py` and register
 it in the `VALIDATORS` dict. The orchestrator picks it up automatically via
 `validate_phase()`.
@@ -219,7 +219,7 @@ configuration, and manual approval mode.
 
 ### PII Redaction
 
-All data fetched from external sources (Jira tickets, GitHub PRs) is redacted before it enters the agent pipeline. Redaction happens inside the fetch functions themselves — `JiraClient.fetch_ticket()` and `GitHubClient.fetch_pr()` — so PII never appears in workflow state, agent prompts, or dashboard heartbeats.
+All data fetched from external sources (Jira tickets, GitHub PRs) is redacted before it enters the pipeline. Redaction happens inside the fetch functions themselves — `JiraClient.fetch_ticket()` and `GitHubClient.fetch_pr()` — so PII never appears in workflow state, agent prompts, or dashboard heartbeats.
 
 **What is redacted:**
 
@@ -234,9 +234,9 @@ See [PII Redaction](../07-security/pii-redaction.md) for the full reference.
 
 ### Prompt Injection Guard
 
-External free-text fields (issue titles, descriptions, PR bodies) are sanitized inside each agent before the text is embedded into a Claude prompt. The guard strips five categories of injection patterns: role overrides, system-escape sequences, jailbreak tokens, base64-encoded payloads, and delimiter abuse.
+External free-text fields (issue titles, descriptions, PR bodies) are sanitized inside each stage runner before the text is embedded into a Claude prompt. The guard strips five categories of injection patterns: role overrides, system-escape sequences, jailbreak tokens, base64-encoded payloads, and delimiter abuse.
 
-Sanitization runs at the agent layer — after PII redaction but before prompt assembly — so injected instructions in external content never reach the model.
+Sanitization runs at the stage-runner layer — after PII redaction but before prompt assembly — so injected instructions in external content never reach the model.
 
 **Audit logging:** When a pattern is matched, a `WARNING` log line records the category and source field only. The matched content is never logged.
 
@@ -306,13 +306,13 @@ Dashboard: http://localhost:8080
 
 ### Dashboard
 
-The dashboard (`dashboard/backend.py`) is an optional FastAPI server with SQLite storage. Agents emit heartbeats via HTTP POST to `/api/heartbeat`. If the dashboard is unreachable, heartbeats fail silently so the workflow is not blocked.
+The dashboard (`dashboard/backend.py`) is an optional FastAPI server with SQLite storage. Stage runners emit heartbeats via HTTP POST to `/api/heartbeat`. If the dashboard is unreachable, heartbeats fail silently so the workflow is not blocked.
 
 See [Dashboard Overview](../04-dashboard/overview.md).
 
 ### Skills Layer
 
-The `skills/` package is a thin, uniform wrapper over the external integrations in `tools/`. Skills are called exclusively from entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) — agents in the pipeline do not call skills directly.
+The `skills/` package is a thin, uniform wrapper over the external integrations in `tools/`. Skills are called exclusively from entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) — stage runners in the pipeline do not call skills directly.
 
 **Key design properties:**
 
@@ -331,7 +331,7 @@ The `skills/` package is a thin, uniform wrapper over the external integrations 
 
 ### Repository Analysis Tools
 
-Optional tools in `tools/` that agents can use when a repository path is provided:
+Optional tools in `tools/` that stage runners can use when a repository path is provided:
 
 - `tools/repo_search.py` - Code search and Go package analysis
 - `tools/rag_search.py` - Documentation search with RAG for the docs agent
@@ -342,26 +342,26 @@ Optional tools in `tools/` that agents can use when a repository path is provide
 ### Configuration
 
 - `config/shipwright_components.py` - Shipwright Build component definitions (BuildRun, Build, BuildStrategy, webhooks), CRD types, build strategies, OpenShift integrations
-- `config/agent_prompts.py` - System prompts for each agent
+- `config/agent_prompts.py` - System prompts for each stage runner
 - `config/testing_config.py` - Ginkgo v2 test patterns and templates
 - `config/mock_responses.py` - Mock API responses for dry run mode
 - `config/redaction_config.py` - Public domain allowlist for PII redaction
 
-### Agent Prompts (`config/agent_prompts.py`)
+### Stage Prompts (`config/agent_prompts.py`)
 
-Each agent has a dedicated system prompt stored as a `Final[str]` constant in `config/agent_prompts.py`. The prompt defines the agent's role, responsibilities, output format, and guardrails.
+Each stage runner has a dedicated system prompt stored as a `Final[str]` constant in `config/agent_prompts.py`. The prompt defines the stage's role, responsibilities, output format, and guardrails.
 
 | Constant | Used by | Purpose |
 | -------- | ------- | ------- |
-| `DESIGN_AGENT_PROMPT` | `agents/design_agent.py` | Instructs the agent to produce design documents: problem statement, scope, impacted components, risks, acceptance criteria, implementation plan |
-| `DEVELOPMENT_AGENT_PROMPT` | `agents/go_k8s_developer.py` | Instructs the agent to generate idiomatic Go code, table-driven tests, and a PR description ending with "Generated by AI" |
+| `DESIGN_AGENT_PROMPT` | `agents/design_agent.py` | Instructs Claude to produce design documents: problem statement, scope, impacted components, risks, acceptance criteria, implementation plan |
+| `DEVELOPMENT_AGENT_PROMPT` | `agents/go_k8s_developer.py` | Instructs Claude to generate idiomatic Go code, table-driven tests, and a PR description ending with "Generated by AI" |
 | `CODE_REVIEW_AGENT_PROMPT` | `agents/code_review_agent.py` | Instructs Claude to review generated Go code using machine-parseable `[BLOCKING]`/`[WARNING]`/`[SUGGESTION]` format, ending with `VERDICT: PASS` or `VERDICT: FAIL` |
-| `TESTING_AGENT_PROMPT` | `agents/testing_agent.py` | Instructs the agent to generate Ginkgo v2 test suites with DDT patterns, Gomega assertions, and Shipwright test helpers |
-| `DOCS_AGENT_PROMPT` | `agents/docs_agent.py` | Instructs the agent to produce PR summaries, release notes, JTBD documentation, SHIP documents, and high-level design documents |
+| `TESTING_AGENT_PROMPT` | `agents/testing_agent.py` | Instructs Claude to generate Ginkgo v2 test suites with DDT patterns, Gomega assertions, and Shipwright test helpers |
+| `DOCS_AGENT_PROMPT` | `agents/docs_agent.py` | Instructs Claude to produce PR summaries, release notes, JTBD documentation, SHIP documents, and high-level design documents |
 
-**How agents load their prompt:**
+**How stage runners load their prompt:**
 
-Each agent imports its constant at the top of the module and passes it as the `system` parameter of the Claude API call:
+Each stage runner imports its constant at the top of the module and passes it as the `system` parameter of the Claude API call:
 
 ```python
 from config.agent_prompts import DESIGN_AGENT_PROMPT
@@ -375,7 +375,7 @@ response = client.messages.create(
 
 **Customizing prompts:**
 
-To adjust agent behavior, edit the relevant constant in `config/agent_prompts.py`. Common reasons to customize:
+To adjust stage behavior, edit the relevant constant in `config/agent_prompts.py`. Common reasons to customize:
 
 - Change the output format (e.g., switch from Markdown to JSON)
 - Add project-specific guardrails (e.g., enforce a naming convention)
@@ -390,7 +390,7 @@ Changes take effect immediately on the next run — no code changes required.
 
 ```text
 muilti-agents-ocp-builds/
-├── agents/          # Agent implementations, LangGraph graph, output validators
+├── agents/          # Stage runner implementations, workflow orchestrator, output validators
 ├── config/          # Prompts, auth, patterns, mock data
 ├── dashboard/       # FastAPI backend, enrichers, heartbeat, frontend
 ├── graph/           # AgentState schema (state.py)
