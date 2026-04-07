@@ -261,20 +261,21 @@ def test_malformed_yaml_returns_empty(tmp_path, monkeypatch, caplog):
 # 11. repos.yaml missing 'repos' key -> returns empty list
 # ---------------------------------------------------------------------------
 
-def test_yaml_missing_repos_key(tmp_path, monkeypatch, caplog):
-    """A repos.yaml without the top-level 'repos' key yields an empty list
-    and a warning."""
+def test_yaml_missing_repos_key(tmp_path, monkeypatch):
+    """A repos.yaml without the top-level 'repos' key yields an empty list.
+
+    With Pydantic validation the ``repos`` field defaults to ``[]``, so no
+    warning is emitted -- the result is simply empty.
+    """
     monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
     monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
     monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
 
     _write_repos_yaml(tmp_path, {"paths": ["/some/path"]})
 
-    with caplog.at_level(logging.WARNING, logger="config.repo_config"):
-        result = load_repo_paths(project_root=str(tmp_path))
+    result = load_repo_paths(project_root=str(tmp_path))
 
     assert result == []
-    assert any("missing" in msg.lower() for msg in caplog.messages)
 
 
 def test_yaml_repos_key_with_empty_list(tmp_path, monkeypatch):
@@ -315,7 +316,7 @@ def test_yaml_repos_key_with_none_value(tmp_path, monkeypatch):
 
 def test_yaml_entry_without_path_key(tmp_path, monkeypatch, caplog):
     """When an entry in the repos list doesn't have a ``path`` key, it
-    should be skipped with a warning."""
+    should be skipped with a warning (Pydantic validation error)."""
     monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
     monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
     monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
@@ -326,4 +327,4 @@ def test_yaml_entry_without_path_key(tmp_path, monkeypatch, caplog):
         result = load_repo_paths(project_root=str(tmp_path))
 
     assert result == []
-    assert any("malformed" in msg.lower() for msg in caplog.messages)
+    assert any("validation failed" in msg.lower() for msg in caplog.messages)
