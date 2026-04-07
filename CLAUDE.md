@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-agent AI system that automates design analysis and documentation generation for OpenShift/Shipwright Build projects. Uses Claude AI agents orchestrated by LangGraph in a sequential pipeline: Design → Development → Testing → Documentation.
+SDLC orchestration layer that automates the full feature development lifecycle for OpenShift/Shipwright Build projects. Uses Claude as the execution engine for stage-based workflows: Design → Development → Code Review → Testing → Documentation.
 
 ## Commands
 
@@ -36,9 +36,9 @@ uv run python scripts/test_agents.py --agent design --dry-run
 
 ## Architecture
 
-### LangGraph Workflow Pipeline (`agents/graph.py`)
+### Workflow Orchestrator (`agents/graph.py`)
 
-The orchestrator builds a `StateGraph` with four sequential nodes connected by conditional edges. Each node calls its agent, updates shared state, and emits a heartbeat to the dashboard. The `should_continue` function routes based on `current_phase` in state (e.g., `design_complete` → `develop`, `develop_complete` → `testing`). On error, the workflow terminates early via the `END` edge.
+The orchestrator builds a `StateGraph` (currently implemented using LangGraph) with five sequential stage nodes connected by conditional edges. Each node runs its stage, updates shared state, and emits a heartbeat to the dashboard. The `should_continue` function routes based on `current_phase` in state (e.g., `design_complete` → `develop`, `develop_complete` → `testing`). On error, the workflow terminates early via the `END` edge.
 
 ```
 design_node → develop_node → code_review_node → testing_node → docs_node → END
@@ -48,11 +48,11 @@ design_node → develop_node → code_review_node → testing_node → docs_node
 
 ### Shared State (`graph/state.py`)
 
-`AgentState` is a `TypedDict(total=False)` containing all fields shared across agents — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), control flow (session_id, current_phase, approval_status), and LangGraph messages with `add_messages` annotation.
+`AgentState` is a `TypedDict(total=False)` containing all fields shared across stages — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), control flow (session_id, current_phase, approval_status), and LangGraph messages with `add_messages` annotation.
 
-### Agent Pattern
+### Stage Pattern
 
-All five agents follow the same pattern:
+All five stage runners (currently named "agents" in code) follow the same pattern:
 1. Validate context/inputs
 2. Get Claude client via `config/auth_config.get_anthropic_client()`
 3. Build a prompt using system prompt from `config/agent_prompts.py` + user context
@@ -60,7 +60,7 @@ All five agents follow the same pattern:
 5. Parse the Markdown-structured response into typed dict outputs
 6. Emit heartbeat to dashboard
 
-| Agent | Entry Point | Key Input | Key Output |
+| Stage | Entry Point | Key Input | Key Output |
 |-------|------------|-----------|------------|
 | Design | `agents/design_agent.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
 | Development | `agents/go_k8s_developer.run_development()` | AgentState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
@@ -70,16 +70,16 @@ All five agents follow the same pattern:
 
 ### Authentication (`config/auth_config.py`)
 
-Uses Google Vertex AI (`ANTHROPIC_VERTEX_PROJECT_ID`) for authentication. All agents use `get_anthropic_client()` which returns an `AnthropicVertex` client.
+Uses Google Vertex AI (`ANTHROPIC_VERTEX_PROJECT_ID`) for authentication. All stage runners use `get_anthropic_client()` which returns an `AnthropicVertex` client.
 
 ### Dashboard (`dashboard/`)
 
-FastAPI backend (`backend.py`) with SQLite storage at `/tmp/claude/dashboard.db`. Agents emit heartbeats via HTTP POST to `localhost:8080/api/heartbeat` using the `emit_heartbeat()` convenience function from `dashboard/heartbeat.py`. The `enrichers.py` module enriches raw heartbeat data before storage. Frontend is a single `dashboard/frontend/index.html`.
+FastAPI backend (`backend.py`) with SQLite storage at `/tmp/claude/dashboard.db`. Stage runners emit heartbeats via HTTP POST to `localhost:8080/api/heartbeat` using the `emit_heartbeat()` convenience function from `dashboard/heartbeat.py`. The `enrichers.py` module enriches raw heartbeat data before storage. Frontend is a single `dashboard/frontend/index.html`.
 
 ### Domain Configuration (`config/`)
 
 - `shipwright_components.py`: Shipwright Build component definitions (BuildRun, Build, BuildStrategy, webhooks), CRD types, build strategies, OpenShift integrations
-- `agent_prompts.py`: System prompts for each agent
+- `agent_prompts.py`: System prompts for each stage runner
 - `testing_config.py`: Ginkgo v2 test patterns and templates, pattern detection for build strategies/source types
 - `mock_responses.py`: Mock API responses for dry-run mode
 

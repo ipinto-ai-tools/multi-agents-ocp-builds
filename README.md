@@ -1,12 +1,12 @@
 # FlowPilot: Feature SDLC Automation for Shipwright / OpenShift Builds
 
-AI-powered pipeline that automates the full feature development lifecycle — from Jira ticket to production-ready Go code, tests, and documentation.
+SDLC orchestration layer that drives a feature from Jira ticket to production-ready Go code, tests, and documentation — using Claude as the execution engine for every stage.
 
 ---
 
 ## What It Does
 
-You provide a Jira ticket (or a plain feature description). The system runs five AI agents through each phase of the software development lifecycle and delivers a complete set of artifacts: architecture design documents, production Go code, code review findings with an auto-fix loop, Ginkgo v2 test files, and PR-ready documentation. Each phase validates its outputs before passing state to the next agent, so failures surface immediately rather than propagating silently through the pipeline.
+You provide a Jira ticket (or a plain feature description). FlowPilot orchestrates five SDLC stages — each powered by Claude — and delivers a complete set of artifacts: architecture design documents, production Go code, code review findings with an auto-fix loop, Ginkgo v2 test files, and PR-ready documentation. Each stage validates its outputs before passing state to the next, so failures surface immediately rather than propagating silently through the pipeline.
 
 ---
 
@@ -28,7 +28,7 @@ You provide a Jira ticket (or a plain feature description). The system runs five
          Output: /output-dir with code/, tests/, design/, docs/
 ```
 
-The code review phase includes an auto-fix loop. Blocking findings route the pipeline back to the development agent for a retry, up to `MAX_REVIEW_ITERATIONS`:
+The code review stage includes an auto-fix loop. Blocking findings route the pipeline back to the development stage for a retry, up to `MAX_REVIEW_ITERATIONS`:
 
 ```text
 Development → Code Review ──PASS──→ Testing
@@ -42,7 +42,7 @@ Development → Code Review ──PASS──→ Testing
 
 ## SDLC Phase Details
 
-| Phase              | Agent               | Key Inputs                            | Key Outputs                                                                                 |
+| Phase              | Stage Runner        | Key Inputs                            | Key Outputs                                                                                 |
 | ------------------ | ------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 1 · Design         | Design Agent        | Jira ticket, repo paths               | Architecture analysis, impacted components, risks, acceptance criteria, implementation plan |
 | 2 · Development    | Development Agent   | Design analysis, implementation plan  | Go source files, PR description, API types                                                  |
@@ -55,7 +55,7 @@ Development → Code Review ──PASS──→ Testing
 
 ## Repository Support
 
-Configure repository paths so agents can analyze actual Go types, CRDs, and controllers from source. Use `repos.yaml` for multi-repo setups:
+Configure repository paths so stage runners can analyze actual Go types, CRDs, and controllers from source. Use `repos.yaml` for multi-repo setups:
 
 ```bash
 cp repos.yaml.example repos.yaml  # edit with your local clone paths
@@ -77,7 +77,7 @@ cp .env.example .env  # fill in credentials
 uv run python scripts/run_dashboard.py  # http://localhost:8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080) and click **New Run**. Enter a Jira ticket ID (e.g. `BUILD-1707`) or a feature description, then click **Run Feature**. The pipeline runs all five phases and shows progress in real time.
+Open [http://localhost:8080](http://localhost:8080) and click **New Run**. Enter a Jira ticket ID (e.g. `BUILD-1707`) or a feature description, then click **Run Feature**. The pipeline orchestrates all five stages and shows progress in real time.
 
 For CLI and automation usage, see the [CLI Reference](docs/user-guide/10-reference/cli.md).
 
@@ -114,7 +114,7 @@ output/BUILD-1707/
 | [Quick Start](docs/user-guide/01-getting-started/quick-start.md) | Dashboard-first setup: install, configure credentials, run |
 | [Dashboard](docs/user-guide/04-dashboard/overview.md) | Web UI pages, real-time monitoring, session management |
 | [Architecture](docs/user-guide/02-concepts/architecture.md) | Pipeline design, state management, security layers |
-| [Agents](docs/user-guide/03-agents/design-agent.md) | Per-agent reference |
+| [Stage Runners](docs/user-guide/03-agents/design-agent.md) | Per-stage reference |
 | [CLI Reference](docs/user-guide/10-reference/cli.md) | All CLI commands for scripting and automation |
 | [API Reference](docs/user-guide/10-reference/api.md) | REST API endpoints, heartbeat protocol, database schema |
 | [Authentication](docs/user-guide/05-authentication/authentication.md) | Vertex AI setup |

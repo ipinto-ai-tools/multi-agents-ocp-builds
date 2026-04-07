@@ -1,8 +1,8 @@
-# SDLC Agents
+# SDLC Pipeline Stages
 
-Each agent in the pipeline represents a distinct phase of the Feature Software Development Lifecycle (SDLC). A Jira ticket enters the system and flows sequentially through design, development, review, testing, and documentation before being published to GitHub and Jira.
+Each stage in the pipeline represents a distinct phase of the Feature Software Development Lifecycle (SDLC). A Jira ticket enters the system and flows sequentially through design, development, review, testing, and documentation before being published to GitHub and Jira. FlowPilot orchestrates the workflow; Claude serves as the execution engine for every stage.
 
-Agents do not call each other directly. They communicate through the shared `AgentState` dictionary managed by LangGraph. When an agent finishes, it returns a partial state update. LangGraph merges it into the full state, making all new fields immediately available to the next agent.
+Stages do not call each other directly. They communicate through the shared `AgentState` dictionary managed by the workflow orchestrator (currently implemented using LangGraph). When a stage completes, it returns a partial state update. The orchestrator merges it into the full state, making all new fields immediately available to the next stage.
 
 ---
 
@@ -104,9 +104,9 @@ For full parameter documentation, see the [Development Agent](../03-agents/devel
 
 **File:** `agents/code_review_agent.py`
 
-The Code Review Agent reviews generated Go code for quality, security, and correctness before it reaches the Testing Agent. It uses Claude (the same model as other agents — no extra installation needed) with an optional Qodo CLI integration via `QODO_CLI_PATH`.
+The Code Review Agent reviews generated Go code for quality, security, and correctness before it reaches the Testing stage. It uses Claude (the same model as other stages — no extra installation needed) with an optional Qodo CLI integration via `QODO_CLI_PATH`.
 
-**Auto-fix loop:** When blocking issues are found, the graph routes back to the Development Agent with the review findings injected into its prompt. The Development Agent fixes the issues and regenerates code. This loop repeats up to `MAX_REVIEW_ITERATIONS` times (default: 3). After max iterations, the pipeline continues to Testing regardless.
+**Auto-fix loop:** When blocking issues are found, the orchestrator routes back to the Development Agent with the review findings injected into its prompt. The Development Agent fixes the issues and regenerates code. This loop repeats up to `MAX_REVIEW_ITERATIONS` times (default: 3). After max iterations, the pipeline continues to Testing regardless.
 
 **Review domains:**
 
@@ -120,7 +120,7 @@ The Code Review Agent reviews generated Go code for quality, security, and corre
 
 | Tag | Effect |
 | --- | ------ |
-| `[BLOCKING]` | Triggers auto-fix loop back to Development Agent |
+| `[BLOCKING]` | Triggers auto-fix loop back to Development stage |
 | `[WARNING]` | Logged in summary, non-blocking |
 | `[SUGGESTION]` | Logged in summary, non-blocking |
 
@@ -135,7 +135,7 @@ The Code Review Agent reviews generated Go code for quality, security, and corre
 
 **Feature flag:** Set `QODO_REVIEW_ENABLED=false` to skip the review phase entirely (backward compatible).
 
-> **Note:** Unlike other phases, code review failures do not stop the workflow. Instead, they trigger the auto-fix loop back to the Development Agent. The validation result for this phase is always `passed=True`; review failures are surfaced as warnings in the phase summary.
+> **Note:** Unlike other stages, code review failures do not stop the workflow. Instead, they trigger the auto-fix loop back to the Development stage. The validation result for this stage is always `passed=True`; review failures are surfaced as warnings in the stage summary.
 
 For full parameter documentation, see the [Code Review Agent](../03-agents/code-review-agent.md) page.
 
@@ -174,7 +174,7 @@ For full parameter documentation, see the [Testing Agent](../03-agents/testing-a
 
 **File:** `agents/docs_agent.py`
 
-The Documentation Agent generates all documentation artifacts from the combined outputs of the previous four agents. It supports multiple output formats and can use RAG to pull in relevant existing documentation and code examples from the repository.
+The Documentation Agent generates all documentation artifacts from the combined outputs of the previous four stages. It supports multiple output formats and can use RAG to pull in relevant existing documentation and code examples from the repository.
 
 **Output formats:**
 
@@ -191,45 +191,45 @@ For full parameter documentation, see the [Docs Agent](../03-agents/docs-agent.m
 
 ## Publish
 
-After all five phases complete, `publish.py` pushes the generated code to a GitHub branch and posts results back to Jira.
+After all five stages complete, `publish.py` pushes the generated code to a GitHub branch and posts results back to Jira.
 
 See the [Publish](../09-integrations/publish.md) page for configuration and usage.
 
 ---
 
-## How Agents Connect
+## How Stages Connect
 
 ```text
-Design Agent writes → design_analysis, impacted_components, risks, acceptance_criteria
+Design stage writes → design_analysis, impacted_components, risks, acceptance_criteria
                              ↓
-Development Agent reads those fields, writes → code_files, test_files, pr_description
+Development stage reads those fields, writes → code_files, test_files, pr_description
                              ↓
-Code Review Agent reads code_files + design fields, writes → review_passed, review_findings
+Code Review stage reads code_files + design fields, writes → review_passed, review_findings
                     │                                        review_summary, review_iteration
                     │ (review_passed=False + iteration ≤ max)
-                    └──────────────────────────────────────────→ back to Development Agent
+                    └──────────────────────────────────────────→ back to Development stage
                     │                                            (with findings injected)
                     │ (review_passed=True OR iteration > max)
                     ↓
-Testing Agent reads design fields, writes → test_plan, unit_tests, integration_tests, e2e_tests
+Testing stage reads design fields, writes → test_plan, unit_tests, integration_tests, e2e_tests
                              ↓
-Docs Agent reads everything, writes → pr_summary, release_notes, ship_document, jtbd_documentation
+Docs stage reads everything, writes → pr_summary, release_notes, ship_document, jtbd_documentation
 ```
 
-The Testing Agent always has access to the original design analysis and the development agent's reviewed outputs. The Documentation Agent sees the complete picture from all four prior phases.
+The Testing stage always has access to the original design analysis and the development stage's reviewed outputs. The Documentation stage sees the complete picture from all four prior stages.
 
 ---
 
-## Validation Between Phases
+## Validation Between Stages
 
-After each agent completes, the orchestrator:
+After each stage completes, the orchestrator:
 
 1. **Validates outputs** — checks required fields are non-empty using `agents/validators.py`
-2. **Prints a phase summary** — shows key metrics and any warnings
+2. **Prints a stage summary** — shows key metrics and any warnings
 3. **Stops on failure** — if required fields are missing, the workflow stops immediately
-4. **Asks for approval** (if `MANUAL_APPROVAL=true`) — prompts `[Y/n]` before the next phase
+4. **Asks for approval** (if `MANUAL_APPROVAL=true`) — prompts `[Y/n]` before the next stage
 
-This ensures bad data from one agent never silently flows into the next agent.
+This ensures bad data from one stage never silently flows into the next stage.
 
 ---
 
