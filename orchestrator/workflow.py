@@ -1,0 +1,266 @@
+"""Thin sequential stage runner replacing the LangGraph StateGraph orchestrator.
+
+Executes the pipeline: Design -> Develop -> Code Review (with retry loop) -> Testing -> Docs.
+Each stage merges its result into shared state, emits a heartbeat, and validates output
+before proceeding to the next stage.
+"""
+
+from __future__ import annotations
+
+import os
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+
+# Maximum code-review retry iterations (develop -> review loop).
+_DEFAULT_MAX_REVIEW_ITERATIONS = 2
+
+
+def _get_max_review_iterations() -> int:
+    """Return the configured maximum review iterations."""
+    return int(os.getenv("MAX_REVIEW_ITERATIONS", str(_DEFAULT_MAX_REVIEW_ITERATIONS)))
+
+
+def _prompt_approval(phase: str, next_phase: str) -> bool:
+    """Prompt the user for manual approval between stages.
+
+    Args:
+        phase: Name of the just-completed phase.
+        next_phase: Name of the upcoming phase.
+
+    Returns:
+        True if the user approves (or presses Enter), False otherwise.
+    """
+    print(f"\n  Completed: {phase.upper()}")
+    print(f"  Next phase: {next_phase.upper()}")
+    try:
+        response = input(f"\n  Continue to {next_phase}? [Y/n]: ").strip().lower()
+        return response not in ("n", "no")
+    except (EOFError, KeyboardInterrupt):
+        print("\n  Interrupted.")
+        return False
+
+
+class WorkflowOrchestrator:
+    """Sequential stage runner for the multi-agent pipeline.
+
+    Args:
+        session_id: Unique session identifier for dashboard tracking.
+        repo_path: Optional path to the repository for code analysis.
+        output_dir: Optional directory for saving test artifacts.
+    """
+
+    def __init__(
+        self,
+        session_id: str,
+        repo_path: Optional[str] = None,
+        output_dir: Optional[Path] = None,
+    ) -> None:
+        self.session_id = session_id
+        self.repo_path = repo_path
+        self.output_dir = output_dir
+        self._manual_approval = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
+
+    # -- internal helpers -----------------------------------------------------
+
+    def _emit_heartbeat(self, agent: str, state: Dict[str, Any]) -> bool:
+        """Emit a heartbeat to the dashboard.  Non-blocking on failure."""
+        try:
+            from dashboard.heartbeat import emit_heartbeat
+            return emit_heartbeat(agent, state)
+        except Exception:
+            return False
+
+    def _validate(self, phase: str, state: Dict[str, Any]) -> bool:
+        """Run the phase validator.  Returns True when validation passes."""
+        from agents.validators import validate_phase
+        result = validate_phase(phase, state)
+        return result.passed
+
+    def _check_approval(self, phase: str, next_phase: str) -> bool:
+        """If manual approval is enabled, prompt the user."""
+        if not self._manual_approval:
+            return True
+        return _prompt_approval(phase, next_phase)
+
+    # -- stage runners (deferred imports to avoid circular deps) ---------------
+
+    def _run_design(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        from agents.design_agent import run_design
+        return run_design(
+            title=state["issue_title"],
+            description=state["issue_description"],
+            repo_path=state.get("repo_path"),
+        )
+
+    def _run_develop(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        from agents.go_k8s_developer import run_development
+        return run_development(state, repo_path=state.get("repo_path"))
+
+    def _run_code_review(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        from agents.code_review_agent import run_code_review
+        return run_code_review(state)
+
+    def _run_testing(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        from agents.testing_agent import run_testing
+        return run_testing(state, output_dir=self.output_dir)
+
+    def _run_docs(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        from agents.docs_agent import run_docs
+        return run_docs(state)
+
+    # -- main entry point -----------------------------------------------------
+
+    def run(
+        self,
+        title: str,
+        description: str,
+        issue_type: str = "feature",
+    ) -> Dict[str, Any]:
+        """Execute the full sequential pipeline.
+
+        Args:
+            title: Issue / feature title.
+            description: Issue / feature description.
+            issue_type: One of ``"feature"``, ``"bug"``, ``"refactor"``.
+
+        Returns:
+            Final accumulated state dict.  ``current_phase`` will be
+            ``"done"`` on success, ``"error"`` on failure.
+        """
+        state: Dict[str, Any] = {
+            "session_id": self.session_id,
+            "issue_title": title,
+            "issue_description": description,
+            "issue_type": issue_type,
+            "repo_path": self.repo_path or "",
+            "current_phase": "init",
+        }
+
+        self._emit_heartbeat("orchestrator", state)
+
+        # -- Stage 1: Design --------------------------------------------------
+        try:
+            result = self._run_design(state)
+            state.update(result)
+            state["current_phase"] = "design_complete"
+            self._emit_heartbeat("design", state)
+        except Exception as e:
+            state["current_phase"] = "error"
+            state["error"] = f"Design stage failed: {e}"
+            self._emit_heartbeat("design", state)
+            return state
+
+        if not self._validate("design", state):
+            state["current_phase"] = "error"
+            state["error"] = "Design validation failed"
+            self._emit_heartbeat("design", state)
+            return state
+
+        if not self._check_approval("design", "develop"):
+            return state
+
+        # -- Stage 2: Development ----------------------------------------------
+        try:
+            result = self._run_develop(state)
+            state.update(result)
+            state["current_phase"] = "develop_complete"
+            self._emit_heartbeat("develop", state)
+        except Exception as e:
+            state["current_phase"] = "error"
+            state["error"] = f"Development stage failed: {e}"
+            self._emit_heartbeat("develop", state)
+            return state
+
+        if not self._validate("develop", state):
+            state["current_phase"] = "error"
+            state["error"] = "Development validation failed"
+            self._emit_heartbeat("develop", state)
+            return state
+
+        if not self._check_approval("develop", "code_review"):
+            return state
+
+        # -- Stage 2.5: Code Review (with auto-fix loop) -----------------------
+        max_iterations = _get_max_review_iterations()
+        review_iteration = 0
+
+        while review_iteration < max_iterations:
+            review_iteration += 1
+
+            try:
+                result = self._run_code_review(state)
+                state.update(result)
+                state["current_phase"] = "review_complete"
+                self._emit_heartbeat("code_review", state)
+            except Exception as e:
+                state["current_phase"] = "error"
+                state["error"] = f"Code review stage failed: {e}"
+                self._emit_heartbeat("code_review", state)
+                return state
+
+            self._validate("code_review", state)
+
+            review_passed = state.get("review_passed", True)
+            if review_passed:
+                break
+
+            # Review failed -- re-run development with findings if iterations remain
+            if review_iteration < max_iterations:
+                try:
+                    result = self._run_develop(state)
+                    state.update(result)
+                    state["current_phase"] = "develop_complete"
+                    self._emit_heartbeat("develop", state)
+                except Exception as e:
+                    state["current_phase"] = "error"
+                    state["error"] = f"Development retry stage failed: {e}"
+                    self._emit_heartbeat("develop", state)
+                    return state
+
+                self._validate("develop", state)
+
+        if not self._check_approval("code_review", "testing"):
+            return state
+
+        # -- Stage 3: Testing --------------------------------------------------
+        try:
+            result = self._run_testing(state)
+            state.update(result)
+            state["current_phase"] = "testing_complete"
+            self._emit_heartbeat("testing", state)
+        except Exception as e:
+            state["current_phase"] = "error"
+            state["error"] = f"Testing stage failed: {e}"
+            self._emit_heartbeat("testing", state)
+            return state
+
+        if not self._validate("testing", state):
+            state["current_phase"] = "error"
+            state["error"] = "Testing validation failed"
+            self._emit_heartbeat("testing", state)
+            return state
+
+        if not self._check_approval("testing", "docs"):
+            return state
+
+        # -- Stage 4: Documentation --------------------------------------------
+        try:
+            result = self._run_docs(state)
+            state.update(result)
+            state["current_phase"] = "done"
+            self._emit_heartbeat("docs", state)
+        except Exception as e:
+            state["current_phase"] = "error"
+            state["error"] = f"Docs stage failed: {e}"
+            self._emit_heartbeat("docs", state)
+            return state
+
+        if not self._validate("docs", state):
+            state["current_phase"] = "error"
+            state["error"] = "Docs validation failed"
+            self._emit_heartbeat("docs", state)
+            return state
+
+        return state

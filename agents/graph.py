@@ -1,4 +1,8 @@
-"""LangGraph orchestrator for multi-agent workflow.
+"""DEPRECATED: This module is replaced by orchestrator/workflow.py.
+Kept temporarily for reference during migration. Will be removed in Phase 4 (Task 10).
+
+Original description:
+LangGraph orchestrator for multi-agent workflow.
 
 This module implements the main orchestration workflow using LangGraph to coordinate
 the Design, Development, Testing, and Documentation agents in a stateful workflow.
