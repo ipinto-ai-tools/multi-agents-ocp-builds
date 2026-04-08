@@ -63,6 +63,29 @@ class WorkflowOrchestrator:
         self.repo_path = repo_path
         self.output_dir = output_dir
         self._manual_approval = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
+        self._repo_commands = self._load_repo_commands()
+
+    def _load_repo_commands(self) -> Optional[Dict[str, str]]:
+        """Load commands from repos.yaml for the configured repo_path."""
+        if not self.repo_path:
+            return None
+        try:
+            from config.repo_config import load_repo_config
+
+            project_root = Path(__file__).resolve().parent.parent
+            yaml_path = project_root / "repos.yaml"
+            if not yaml_path.exists():
+                return None
+
+            config = load_repo_config(yaml_path)
+            for repo in config.repos:
+                if repo.path == self.repo_path:
+                    return repo.commands.model_dump(exclude_none=True)
+            return None
+        except Exception as e:
+            from utils.file_logger import get_logger
+            get_logger(__name__).warning("Failed to load repo commands: %s", e)
+            return None
 
     # -- internal helpers -----------------------------------------------------
 
@@ -107,7 +130,8 @@ class WorkflowOrchestrator:
         1. Run development stage
         2. Run review gate
         3. If review fails and iterations remain, re-run develop with findings
-        4. Return combined state updates
+        4. After review passes, run post-develop command gates (build/lint)
+        5. Return combined state updates
 
         Args:
             state: Current workflow state (mutated in-place).
@@ -116,7 +140,7 @@ class WorkflowOrchestrator:
             The mutated *state* dict.  On error ``state["current_phase"]``
             is set to ``"error"``.
         """
-        from orchestrator.gates import run_review_gate
+        from orchestrator.gates import run_post_develop_gates, run_review_gate
 
         # --- initial development run ---
         try:
@@ -173,6 +197,13 @@ class WorkflowOrchestrator:
                     return state
 
                 self._validate("develop", state)
+
+        # --- post-develop command gates (build / lint) ---
+        gate_results = run_post_develop_gates(self.repo_path, self._repo_commands)
+        state["develop_gate_results"] = [
+            {"gate": g.gate_name, "passed": g.passed, "output": g.output, "error": g.error}
+            for g in gate_results
+        ]
 
         return state
 
@@ -261,6 +292,15 @@ class WorkflowOrchestrator:
             state["error"] = "Testing validation failed"
             self._emit_heartbeat("testing", state)
             return state
+
+        # -- Post-test command gates (test) ------------------------------------
+        from orchestrator.gates import run_post_test_gates
+
+        test_gate_results = run_post_test_gates(self.repo_path, self._repo_commands)
+        state["test_gate_results"] = [
+            {"gate": g.gate_name, "passed": g.passed, "output": g.output, "error": g.error}
+            for g in test_gate_results
+        ]
 
         if not self._check_approval("testing", "docs"):
             return state
