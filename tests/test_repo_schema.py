@@ -9,7 +9,14 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from config.repo_schema import RepoCommands, RepoConfig, RepoEntry
+from config.repo_schema import (
+    ApprovalConfig,
+    PromptOverrides,
+    RepoCommands,
+    RepoConfig,
+    RepoEntry,
+    VALID_STAGES,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -239,3 +246,205 @@ class TestLoadRepoConfig:
         paths = load_repo_paths(project_root=str(tmp_path))
         assert len(paths) == 1
         assert paths[0] == str(repo_dir.resolve())
+
+
+# ---------------------------------------------------------------------------
+# Stages
+# ---------------------------------------------------------------------------
+
+
+class TestStages:
+    """Stage ordering configuration tests."""
+
+    def test_default_stages(self) -> None:
+        config = RepoConfig()
+        assert config.stages == ["design", "develop", "testing", "docs"]
+
+    def test_default_stages_match_constant(self) -> None:
+        config = RepoConfig()
+        assert config.stages == VALID_STAGES
+
+    def test_custom_stage_order(self) -> None:
+        config = RepoConfig(stages=["design", "develop", "docs"])
+        assert config.stages == ["design", "develop", "docs"]
+
+    def test_invalid_stage_name(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid stage"):
+            RepoConfig(stages=["design", "invalid_stage"])
+
+    def test_duplicate_stages(self) -> None:
+        with pytest.raises(ValidationError, match="Duplicate stages"):
+            RepoConfig(stages=["design", "design", "develop"])
+
+    def test_empty_stages(self) -> None:
+        config = RepoConfig(stages=[])
+        assert config.stages == []
+
+    def test_single_stage(self) -> None:
+        config = RepoConfig(stages=["docs"])
+        assert config.stages == ["docs"]
+
+    def test_reversed_order(self) -> None:
+        config = RepoConfig(stages=["docs", "testing", "develop", "design"])
+        assert config.stages == ["docs", "testing", "develop", "design"]
+
+
+# ---------------------------------------------------------------------------
+# ApprovalConfig
+# ---------------------------------------------------------------------------
+
+
+class TestApprovalConfig:
+    """Approval requirements tests."""
+
+    def test_default_approvals(self) -> None:
+        config = RepoConfig()
+        assert config.approvals.required_stages == []
+        assert config.approvals.auto_approve is False
+
+    def test_required_stages(self) -> None:
+        config = RepoConfig(approvals={"required_stages": ["develop", "testing"]})
+        assert config.approvals.required_stages == ["develop", "testing"]
+
+    def test_auto_approve(self) -> None:
+        config = RepoConfig(approvals={"auto_approve": True})
+        assert config.approvals.auto_approve is True
+
+    def test_invalid_approval_stage(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid stage name"):
+            RepoConfig(approvals={"required_stages": ["nonexistent"]})
+
+    def test_approval_config_standalone(self) -> None:
+        approval = ApprovalConfig(required_stages=["design"], auto_approve=True)
+        assert approval.required_stages == ["design"]
+        assert approval.auto_approve is True
+
+    def test_approval_config_empty(self) -> None:
+        approval = ApprovalConfig()
+        assert approval.required_stages == []
+        assert approval.auto_approve is False
+
+
+# ---------------------------------------------------------------------------
+# PromptOverrides
+# ---------------------------------------------------------------------------
+
+
+class TestPromptOverrides:
+    """Prompt override tests."""
+
+    def test_default_prompts(self) -> None:
+        config = RepoConfig()
+        assert config.prompts.design is None
+        assert config.prompts.develop is None
+        assert config.prompts.test is None
+        assert config.prompts.docs is None
+
+    def test_custom_prompts(self) -> None:
+        config = RepoConfig(prompts={"design": "Custom design prompt"})
+        assert config.prompts.design == "Custom design prompt"
+        assert config.prompts.develop is None
+
+    def test_all_prompts(self) -> None:
+        config = RepoConfig(
+            prompts={
+                "design": "Design prompt",
+                "develop": "Develop prompt",
+                "test": "Test prompt",
+                "docs": "Docs prompt",
+            }
+        )
+        assert config.prompts.design == "Design prompt"
+        assert config.prompts.develop == "Develop prompt"
+        assert config.prompts.test == "Test prompt"
+        assert config.prompts.docs == "Docs prompt"
+
+    def test_prompt_overrides_standalone(self) -> None:
+        overrides = PromptOverrides(design="Custom", test="Also custom")
+        assert overrides.design == "Custom"
+        assert overrides.test == "Also custom"
+        assert overrides.develop is None
+        assert overrides.docs is None
+
+
+# ---------------------------------------------------------------------------
+# Full YAML round-trip via load_repo_config
+# ---------------------------------------------------------------------------
+
+
+class TestFullConfigYaml:
+    """End-to-end YAML parsing with new schema fields."""
+
+    def test_full_config_from_yaml(self, tmp_path: Path) -> None:
+        from config.repo_config import load_repo_config
+
+        yaml_content = dedent("""\
+            repos:
+              - path: /tmp/test-repo
+            stages:
+              - design
+              - develop
+            approvals:
+              required_stages:
+                - develop
+              auto_approve: false
+            prompts:
+              design: "Custom design prompt"
+        """)
+        yaml_file = tmp_path / "repos.yaml"
+        yaml_file.write_text(yaml_content)
+
+        config = load_repo_config(yaml_file)
+        assert len(config.repos) == 1
+        assert config.stages == ["design", "develop"]
+        assert config.approvals.required_stages == ["develop"]
+        assert config.approvals.auto_approve is False
+        assert config.prompts.design == "Custom design prompt"
+
+    def test_yaml_with_only_repos_keeps_defaults(self, tmp_path: Path) -> None:
+        from config.repo_config import load_repo_config
+
+        yaml_content = dedent("""\
+            repos:
+              - path: /tmp/test-repo
+        """)
+        yaml_file = tmp_path / "repos.yaml"
+        yaml_file.write_text(yaml_content)
+
+        config = load_repo_config(yaml_file)
+        assert config.stages == VALID_STAGES
+        assert config.approvals.required_stages == []
+        assert config.approvals.auto_approve is False
+        assert config.prompts.design is None
+
+    def test_yaml_invalid_stage_returns_empty(self, tmp_path: Path) -> None:
+        from config.repo_config import load_repo_config
+
+        yaml_content = dedent("""\
+            repos:
+              - path: /tmp/test-repo
+            stages:
+              - design
+              - bogus
+        """)
+        yaml_file = tmp_path / "repos.yaml"
+        yaml_file.write_text(yaml_content)
+
+        config = load_repo_config(yaml_file)
+        # Validation failure falls back to empty config
+        assert config.repos == []
+
+    def test_yaml_auto_approve_only(self, tmp_path: Path) -> None:
+        from config.repo_config import load_repo_config
+
+        yaml_content = dedent("""\
+            repos: []
+            approvals:
+              auto_approve: true
+        """)
+        yaml_file = tmp_path / "repos.yaml"
+        yaml_file.write_text(yaml_content)
+
+        config = load_repo_config(yaml_file)
+        assert config.approvals.auto_approve is True
+        assert config.approvals.required_stages == []

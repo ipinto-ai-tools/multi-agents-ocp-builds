@@ -74,3 +74,47 @@ repos:
   # Custom repos — add any Git repository you want agents to analyze
   # --------------------------------------------------------------------------
   # - path: /home/user/git/my-org/my-repo
+
+
+# ============================================================================
+# Stage Configuration
+# ============================================================================
+# Ordered list of enabled stages (default: all four).
+# Remove a stage to skip it entirely; reorder to change execution sequence.
+#
+# stages:
+#   - design
+#   - develop
+#   - testing
+#   - docs
+#
+# Skip testing stage:
+# stages:
+#   - design
+#   - develop
+#   - docs
+
+
+# ============================================================================
+# Approval Requirements
+# ============================================================================
+# Control which stages pause for manual approval before proceeding.
+#
+# approvals:
+#   required_stages:        # Stages that pause for manual approval
+#     - develop
+#     - testing
+#   auto_approve: false     # Set true to skip all approval prompts
+
+
+# ============================================================================
+# Prompt Overrides
+# ============================================================================
+# Replace default system prompts for individual stages.
+# Only the stages you specify are overridden; others keep their defaults.
+#
+# prompts:
+#   design: "You are a security-focused design analyst..."
+#   develop: "You are a Python developer. Generate Django code..."
+#   test: "Generate pytest tests with 90% coverage target..."
+#   docs: "Generate documentation in AsciiDoc format..."
