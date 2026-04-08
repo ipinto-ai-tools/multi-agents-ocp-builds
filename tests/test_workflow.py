@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -88,7 +88,7 @@ def _docs_result() -> dict:
 
 _DESIGN_PATCH = "orchestrator.workflow.WorkflowOrchestrator._run_design"
 _DEVELOP_PATCH = "orchestrator.workflow.WorkflowOrchestrator._run_develop"
-_REVIEW_PATCH = "orchestrator.workflow.WorkflowOrchestrator._run_code_review"
+_REVIEW_GATE_PATCH = "orchestrator.gates.run_review_gate"
 _TESTING_PATCH = "orchestrator.workflow.WorkflowOrchestrator._run_testing"
 _DOCS_PATCH = "orchestrator.workflow.WorkflowOrchestrator._run_docs"
 _HEARTBEAT_PATCH = "orchestrator.workflow.WorkflowOrchestrator._emit_heartbeat"
@@ -104,20 +104,20 @@ def _run_kwargs() -> dict:
 # ---------------------------------------------------------------------------
 
 class TestSequentialExecution:
-    """Full pipeline runs all stages in order when everything succeeds."""
+    """Full pipeline runs all 4 stages in order when everything succeeds."""
 
     @patch(_HEARTBEAT_PATCH, return_value=True)
     @patch(_VALIDATE_PATCH, return_value=True)
     @patch(_DOCS_PATCH)
     @patch(_TESTING_PATCH)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_all_stages_run_sequentially(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_docs: MagicMock,
         mock_validate: MagicMock,
@@ -126,7 +126,7 @@ class TestSequentialExecution:
     ) -> None:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
-        mock_review.return_value = _review_pass_result()
+        mock_review_gate.return_value = _review_pass_result()
         mock_testing.return_value = _testing_result()
         mock_docs.return_value = _docs_result()
 
@@ -136,26 +136,27 @@ class TestSequentialExecution:
         mock_design.assert_called_once()
         # develop called once (no retry needed)
         mock_develop.assert_called_once()
-        mock_review.assert_called_once()
+        # review gate called once (passed first time)
+        mock_review_gate.assert_called_once()
         mock_testing.assert_called_once()
         mock_docs.assert_called_once()
 
 
-class TestReviewAutoFixRetry:
-    """Code review failure triggers develop -> review retry loop."""
+class TestReviewGateRetry:
+    """Review gate failure triggers develop -> review retry loop."""
 
     @patch(_HEARTBEAT_PATCH, return_value=True)
     @patch(_VALIDATE_PATCH, return_value=True)
     @patch(_DOCS_PATCH)
     @patch(_TESTING_PATCH)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_review_fail_then_pass(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_docs: MagicMock,
         mock_validate: MagicMock,
@@ -165,7 +166,7 @@ class TestReviewAutoFixRetry:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
         # First review fails, second passes
-        mock_review.side_effect = [_review_fail_result(1), _review_pass_result()]
+        mock_review_gate.side_effect = [_review_fail_result(1), _review_pass_result()]
         mock_testing.return_value = _testing_result()
         mock_docs.return_value = _docs_result()
 
@@ -174,7 +175,7 @@ class TestReviewAutoFixRetry:
         assert state["current_phase"] == "done"
         # develop: 1 initial + 1 retry = 2
         assert mock_develop.call_count == 2
-        assert mock_review.call_count == 2
+        assert mock_review_gate.call_count == 2
 
 
 class TestMaxReviewIterations:
@@ -184,14 +185,14 @@ class TestMaxReviewIterations:
     @patch(_VALIDATE_PATCH, return_value=True)
     @patch(_DOCS_PATCH)
     @patch(_TESTING_PATCH)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_max_iterations_reached(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_docs: MagicMock,
         mock_validate: MagicMock,
@@ -201,7 +202,7 @@ class TestMaxReviewIterations:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
         # All reviews fail
-        mock_review.return_value = _review_fail_result()
+        mock_review_gate.return_value = _review_fail_result()
         mock_testing.return_value = _testing_result()
         mock_docs.return_value = _docs_result()
 
@@ -212,8 +213,8 @@ class TestMaxReviewIterations:
         assert state["current_phase"] == "done"
         # develop: 1 initial + 1 retry = 2
         assert mock_develop.call_count == 2
-        # review called twice (max iterations = 2)
-        assert mock_review.call_count == 2
+        # review gate called twice (max iterations = 2)
+        assert mock_review_gate.call_count == 2
         mock_testing.assert_called_once()
 
 
@@ -254,14 +255,14 @@ class TestStageFailure:
     @patch(_HEARTBEAT_PATCH, return_value=True)
     @patch(_VALIDATE_PATCH, return_value=True)
     @patch(_TESTING_PATCH, side_effect=RuntimeError("test crash"))
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_testing_failure_stops_workflow(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_validate: MagicMock,
         mock_heartbeat: MagicMock,
@@ -269,7 +270,7 @@ class TestStageFailure:
     ) -> None:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
-        mock_review.return_value = _review_pass_result()
+        mock_review_gate.return_value = _review_pass_result()
         state = orchestrator.run(**_run_kwargs())
         assert state["current_phase"] == "error"
         assert "Testing stage failed" in state["error"]
@@ -287,10 +288,6 @@ class TestValidationFailure:
         orchestrator: WorkflowOrchestrator,
     ) -> None:
         mock_design.return_value = _design_result()
-
-        with patch(_VALIDATE_PATCH, side_effect=lambda self, phase, state: phase != "design"):
-            # Re-bind since we need the method mock to work correctly
-            pass
 
         # Simpler approach: patch _validate to return False for design
         with patch.object(orchestrator, "_validate", return_value=False):
@@ -324,14 +321,14 @@ class TestValidationFailure:
     @patch(_HEARTBEAT_PATCH, return_value=True)
     @patch(_DOCS_PATCH)
     @patch(_TESTING_PATCH)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_testing_validation_failure_stops_workflow(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_docs: MagicMock,
         mock_heartbeat: MagicMock,
@@ -339,7 +336,7 @@ class TestValidationFailure:
     ) -> None:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
-        mock_review.return_value = _review_pass_result()
+        mock_review_gate.return_value = _review_pass_result()
         mock_testing.return_value = _testing_result()
         mock_docs.return_value = _docs_result()
 
@@ -354,19 +351,19 @@ class TestValidationFailure:
 
 
 class TestHeartbeatEmission:
-    """Heartbeat is emitted after each stage."""
+    """Heartbeat is emitted after each stage and the review gate."""
 
     @patch(_VALIDATE_PATCH, return_value=True)
     @patch(_DOCS_PATCH)
     @patch(_TESTING_PATCH)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_heartbeat_emitted_for_each_stage(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_testing: MagicMock,
         mock_docs: MagicMock,
         mock_validate: MagicMock,
@@ -374,7 +371,7 @@ class TestHeartbeatEmission:
     ) -> None:
         mock_design.return_value = _design_result()
         mock_develop.return_value = _develop_result()
-        mock_review.return_value = _review_pass_result()
+        mock_review_gate.return_value = _review_pass_result()
         mock_testing.return_value = _testing_result()
         mock_docs.return_value = _docs_result()
 
@@ -388,7 +385,8 @@ class TestHeartbeatEmission:
         assert "orchestrator" in agents_called
         assert "design" in agents_called
         assert "develop" in agents_called
-        assert "code_review" in agents_called
+        # Review is now a gate, not a standalone stage
+        assert "review_gate" in agents_called
         assert "testing" in agents_called
         assert "docs" in agents_called
 
@@ -410,19 +408,19 @@ class TestHeartbeatEmission:
         assert "design" in agents_called
 
 
-class TestCodeReviewRetryDevelopFailure:
-    """Development retry failure during code review loop stops workflow."""
+class TestReviewGateRetryDevelopFailure:
+    """Development retry failure during review gate loop stops workflow."""
 
     @patch(_HEARTBEAT_PATCH, return_value=True)
     @patch(_VALIDATE_PATCH, return_value=True)
-    @patch(_REVIEW_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
     @patch(_DEVELOP_PATCH)
     @patch(_DESIGN_PATCH)
     def test_develop_retry_failure_stops_workflow(
         self,
         mock_design: MagicMock,
         mock_develop: MagicMock,
-        mock_review: MagicMock,
+        mock_review_gate: MagicMock,
         mock_validate: MagicMock,
         mock_heartbeat: MagicMock,
         orchestrator: WorkflowOrchestrator,
@@ -430,10 +428,36 @@ class TestCodeReviewRetryDevelopFailure:
         mock_design.return_value = _design_result()
         # First develop succeeds, retry fails
         mock_develop.side_effect = [_develop_result(), RuntimeError("retry crash")]
-        mock_review.return_value = _review_fail_result()
+        mock_review_gate.return_value = _review_fail_result()
 
         with patch.dict("os.environ", {"MAX_REVIEW_ITERATIONS": "2"}):
             state = orchestrator.run(**_run_kwargs())
 
         assert state["current_phase"] == "error"
         assert "Development retry stage failed" in state["error"]
+
+
+class TestReviewGateFailure:
+    """Review gate exception stops the workflow."""
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_REVIEW_GATE_PATCH, side_effect=RuntimeError("gate crash"))
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_review_gate_exception_stops_workflow(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        mock_design.return_value = _design_result()
+        mock_develop.return_value = _develop_result()
+
+        state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "error"
+        assert "Review gate failed" in state["error"]

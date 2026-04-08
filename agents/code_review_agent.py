@@ -1,11 +1,14 @@
-"""Code Review Agent with auto-fix loop support.
+"""Code review agent --- now called via orchestrator/gates.py review gate.
+
+This module is kept as the implementation behind the review quality gate.
+It is no longer a standalone SDLC stage.
 
 Uses Claude to review generated Go code for quality, security, and correctness.
 Optionally integrates with Qodo CLI when QODO_CLI_PATH is set.
 
 Auto-fix loop: when blocking issues are found, sets review_passed=False so
-the LangGraph router sends the workflow back to the Development Agent with
-review feedback injected into the prompt. Repeats up to MAX_REVIEW_ITERATIONS.
+the orchestrator re-runs the Development stage with review feedback injected
+into the prompt. Repeats up to MAX_REVIEW_ITERATIONS.
 
 Environment variables:
     QODO_REVIEW_ENABLED: Set to 'false' to skip review (default: 'true')
