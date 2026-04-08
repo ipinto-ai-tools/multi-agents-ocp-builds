@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional
 
 from config.agent_prompts import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from models.stage_outputs import DesignOutput
 from utils.file_logger import get_logger
 from config.shipwright_components import (
     get_component_info,
@@ -131,13 +132,24 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
     parsed_result = _parse_design_output(design_text)
     logger.info(f"Design analysis completed successfully. Found {len(parsed_result.get('impacted_components', []))} impacted components")
 
-    return {
+    result = {
         "design_analysis": design_text,
         "impacted_components": parsed_result.get("impacted_components", []),
         "risks": parsed_result.get("risks", []),
         "acceptance_criteria": parsed_result.get("acceptance_criteria", []),
         "implementation_plan": parsed_result.get("implementation_plan", []),
     }
+
+    # Validate with Pydantic model (non-blocking -- log warnings, don't fail)
+    # TODO: When claude_agent_sdk is available on PyPI, swap to SDK query()
+    # with output_format=DesignOutput for native structured output.
+    try:
+        DesignOutput.model_validate(result)
+        logger.debug("Design output passed Pydantic validation")
+    except Exception as e:
+        logger.warning(f"Design output Pydantic validation warning: {e}")
+
+    return result
 
 
 # Repository search patterns by project type
