@@ -79,13 +79,15 @@ def _fetch_jira_state(ticket_id: str, dry_run: bool) -> Dict[str, Any]:
         os.environ["DRY_RUN"] = "true"
         _dry_run_set = True
     try:
-        from skills import default_registry
-        jira_state = default_registry.get("fetch_jira_ticket").run({"ticket_id": ticket_id})
+        from integrations.jira import fetch_jira_ticket
+        from integrations.github import fetch_github_prs
+
+        jira_state = fetch_jira_ticket(ticket_id)
 
         # Enrich with GitHub PR data if URLs were found
         github_pr_urls = jira_state.get("github_pr_urls", [])
         if github_pr_urls:
-            github_pr_data_result = default_registry.get("fetch_github_prs").run({"pr_urls": github_pr_urls})
+            github_pr_data_result = fetch_github_prs(github_pr_urls)
             jira_state["github_pr_data"] = github_pr_data_result["pr_data"]
         else:
             jira_state["github_pr_data"] = []
