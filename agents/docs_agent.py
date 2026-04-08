@@ -20,6 +20,7 @@ from anthropic import APIError
 
 from config.agent_prompts import DOCS_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from models.stage_outputs import DocsOutput
 from tools.prompt_guard import sanitize_external_input
 from tools.rag_search import RAGSearch, RAGSearchError
 from utils.file_logger import get_logger, get_session_logger
@@ -161,6 +162,27 @@ def run_docs(
         # Parse structured output
         logger.debug("Parsing documentation response")
         docs_output = _parse_docs_response(response_text, output_format)
+
+        # Validate core fields with Pydantic model (non-blocking -- log warnings, don't fail).
+        # The full docs_output dict has extra fields (pr_description, input_files_analyzed,
+        # rag_enabled, output_format) not in DocsOutput.  We validate the contract-relevant subset.
+        # TODO: When claude_agent_sdk is available on PyPI, swap to SDK query()
+        # with output_format=DocsOutput for native structured output.
+        try:
+            validation_data = {
+                "pr_summary": docs_output.get("pr_summary", ""),
+                "release_notes": docs_output.get("release_notes", ""),
+                "docs_changes": docs_output.get("docs_changes", {}),
+                "upgrade_notes": docs_output.get("upgrade_notes", ""),
+                "known_limitations": docs_output.get("known_limitations", ""),
+                "jtbd_documentation": docs_output.get("jtbd_documentation", ""),
+                "ship_document": docs_output.get("ship_document", ""),
+                "high_level_design": docs_output.get("high_level_design", ""),
+            }
+            DocsOutput.model_validate(validation_data)
+            logger.debug("Docs output passed Pydantic validation")
+        except Exception as e:
+            logger.warning(f"Docs output Pydantic validation warning: {e}")
 
         # Add metadata about processing
         docs_output["input_files_analyzed"] = input_files or []

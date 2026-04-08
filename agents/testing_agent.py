@@ -16,6 +16,7 @@ import yaml
 
 from config.agent_prompts import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
+from models.stage_outputs import TestingOutput
 from tools.output_sanitizer import sanitize
 from tools.prompt_guard import sanitize_external_input
 from utils.file_logger import get_logger, get_session_logger
@@ -165,6 +166,25 @@ def run_testing(context: Dict[str, Any], output_dir: Optional[Path] = None) -> D
         "patterns_detected": patterns_detected,
         "raw_output": test_output,  # Include raw output for debugging
     }
+
+    # Validate core fields with Pydantic model (non-blocking -- log warnings, don't fail).
+    # The full result dict has extra fields (test_summary, patterns_detected, raw_output)
+    # not in TestingOutput.  We validate only the contract-relevant subset.
+    # TODO: When claude_agent_sdk is available on PyPI, swap to SDK query()
+    # with output_format=TestingOutput for native structured output.
+    try:
+        validation_data = {
+            "test_plan": result["test_plan"],
+            "test_specifications": result["test_specifications"],
+            "unit_tests": result["unit_tests"],
+            "integration_tests": result["integration_tests"],
+            "e2e_tests": result["e2e_tests"],
+            "coverage_analysis": result["coverage_analysis"],
+        }
+        TestingOutput.model_validate(validation_data)
+        logger.debug("Testing output passed Pydantic validation")
+    except Exception as e:
+        logger.warning(f"Testing output Pydantic validation warning: {e}")
 
     # Resolve output directory and write artifacts
     resolved_output_dir = output_dir if output_dir is not None else Path("/tmp/claude/testing-artifacts")

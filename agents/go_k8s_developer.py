@@ -23,6 +23,7 @@ except ImportError:
 from config.agent_prompts import DEVELOPMENT_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
+from models.stage_outputs import DevelopOutput
 from tools.prompt_guard import sanitize_external_input
 from tools.repo_search import RepoSearch
 from utils.file_logger import get_logger, get_session_logger
@@ -180,7 +181,7 @@ def run_development(
     logger.info(f"Development agent completed successfully. Generated {files_generated} files")
     session_logger.info(f"Development complete: {files_generated} files generated")
 
-    return {
+    result = {
         "code_files": parsed_result.get("code_files", []),
         "test_files": parsed_result.get("test_files", []),
         "code_changes": code_changes,
@@ -191,6 +192,32 @@ def run_development(
         "next_steps": parsed_result.get("next_steps", []),
         "raw_output": dev_output,  # Include raw output for debugging
     }
+
+    # Validate core fields with Pydantic model (non-blocking -- log warnings, don't fail).
+    # The full result dict has extra fields (code_changes, files_modified, next_steps,
+    # raw_output) and slight key differences (dependencies vs new_dependencies,
+    # security_notes as list vs str) compared to DevelopOutput.  We map the
+    # overlapping subset for contract validation.
+    # TODO: When claude_agent_sdk is available on PyPI, swap to SDK query()
+    # with output_format=DevelopOutput for native structured output.
+    try:
+        validation_data = {
+            "code_files": result["code_files"],
+            "test_files": result["test_files"],
+            "pr_description": result["pr_description"],
+            "security_notes": (
+                "\n".join(result["security_notes"])
+                if isinstance(result["security_notes"], list)
+                else result["security_notes"]
+            ),
+            "new_dependencies": result["dependencies"],
+        }
+        DevelopOutput.model_validate(validation_data)
+        logger.debug("Development output passed Pydantic validation")
+    except Exception as e:
+        logger.warning(f"Development output Pydantic validation warning: {e}")
+
+    return result
 
 
 def _synthesize_file_tracking(code_files: List[dict], test_files: List[dict]) -> tuple:
