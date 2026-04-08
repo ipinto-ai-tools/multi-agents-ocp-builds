@@ -1,16 +1,18 @@
 """Thin sequential stage runner replacing the LangGraph StateGraph orchestrator.
 
-Executes the pipeline: Design -> Develop -> Code Review (with retry loop) -> Testing -> Docs.
+Executes the pipeline: Design -> Develop (with review gate) -> Testing -> Docs.
 Each stage merges its result into shared state, emits a heartbeat, and validates output
 before proceeding to the next stage.
+
+Code Review is not a standalone stage; it runs as a quality gate after
+Develop via :func:`orchestrator.gates.run_review_gate`.
 """
 
 from __future__ import annotations
 
 import os
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 # Maximum code-review retry iterations (develop -> review loop).
@@ -98,9 +100,81 @@ class WorkflowOrchestrator:
         from agents.go_k8s_developer import run_development
         return run_development(state, repo_path=state.get("repo_path"))
 
-    def _run_code_review(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        from agents.code_review_agent import run_code_review
-        return run_code_review(state)
+    def _run_develop_with_review_gate(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Run development followed by the review quality gate.
+
+        Implements the develop + review-gate loop:
+        1. Run development stage
+        2. Run review gate
+        3. If review fails and iterations remain, re-run develop with findings
+        4. Return combined state updates
+
+        Args:
+            state: Current workflow state (mutated in-place).
+
+        Returns:
+            The mutated *state* dict.  On error ``state["current_phase"]``
+            is set to ``"error"``.
+        """
+        from orchestrator.gates import run_review_gate
+
+        # --- initial development run ---
+        try:
+            result = self._run_develop(state)
+            state.update(result)
+            state["current_phase"] = "develop_complete"
+            self._emit_heartbeat("develop", state)
+        except Exception as e:
+            state["current_phase"] = "error"
+            state["error"] = f"Development stage failed: {e}"
+            self._emit_heartbeat("develop", state)
+            return state
+
+        if not self._validate("develop", state):
+            state["current_phase"] = "error"
+            state["error"] = "Development validation failed"
+            self._emit_heartbeat("develop", state)
+            return state
+
+        # --- review gate with retry loop ---
+        max_iterations = _get_max_review_iterations()
+        review_iteration = 0
+
+        while review_iteration < max_iterations:
+            review_iteration += 1
+
+            try:
+                result = run_review_gate(state)
+                state.update(result)
+                state["current_phase"] = "review_complete"
+                self._emit_heartbeat("review_gate", state)
+            except Exception as e:
+                state["current_phase"] = "error"
+                state["error"] = f"Review gate failed: {e}"
+                self._emit_heartbeat("review_gate", state)
+                return state
+
+            self._validate("code_review", state)
+
+            if state.get("review_passed", True):
+                break
+
+            # Review failed -- re-run development with findings if iterations remain
+            if review_iteration < max_iterations:
+                try:
+                    result = self._run_develop(state)
+                    state.update(result)
+                    state["current_phase"] = "develop_complete"
+                    self._emit_heartbeat("develop", state)
+                except Exception as e:
+                    state["current_phase"] = "error"
+                    state["error"] = f"Development retry stage failed: {e}"
+                    self._emit_heartbeat("develop", state)
+                    return state
+
+                self._validate("develop", state)
+
+        return state
 
     def _run_testing(self, state: Dict[str, Any]) -> Dict[str, Any]:
         from agents.testing_agent import run_testing
@@ -161,67 +235,13 @@ class WorkflowOrchestrator:
         if not self._check_approval("design", "develop"):
             return state
 
-        # -- Stage 2: Development ----------------------------------------------
-        try:
-            result = self._run_develop(state)
-            state.update(result)
-            state["current_phase"] = "develop_complete"
-            self._emit_heartbeat("develop", state)
-        except Exception as e:
-            state["current_phase"] = "error"
-            state["error"] = f"Development stage failed: {e}"
-            self._emit_heartbeat("develop", state)
+        # -- Stage 2: Development (with review gate) ----------------------------
+        # _run_develop_with_review_gate mutates *state* in-place.
+        self._run_develop_with_review_gate(state)
+        if state.get("current_phase") == "error":
             return state
 
-        if not self._validate("develop", state):
-            state["current_phase"] = "error"
-            state["error"] = "Development validation failed"
-            self._emit_heartbeat("develop", state)
-            return state
-
-        if not self._check_approval("develop", "code_review"):
-            return state
-
-        # -- Stage 2.5: Code Review (with auto-fix loop) -----------------------
-        max_iterations = _get_max_review_iterations()
-        review_iteration = 0
-
-        while review_iteration < max_iterations:
-            review_iteration += 1
-
-            try:
-                result = self._run_code_review(state)
-                state.update(result)
-                state["current_phase"] = "review_complete"
-                self._emit_heartbeat("code_review", state)
-            except Exception as e:
-                state["current_phase"] = "error"
-                state["error"] = f"Code review stage failed: {e}"
-                self._emit_heartbeat("code_review", state)
-                return state
-
-            self._validate("code_review", state)
-
-            review_passed = state.get("review_passed", True)
-            if review_passed:
-                break
-
-            # Review failed -- re-run development with findings if iterations remain
-            if review_iteration < max_iterations:
-                try:
-                    result = self._run_develop(state)
-                    state.update(result)
-                    state["current_phase"] = "develop_complete"
-                    self._emit_heartbeat("develop", state)
-                except Exception as e:
-                    state["current_phase"] = "error"
-                    state["error"] = f"Development retry stage failed: {e}"
-                    self._emit_heartbeat("develop", state)
-                    return state
-
-                self._validate("develop", state)
-
-        if not self._check_approval("code_review", "testing"):
+        if not self._check_approval("develop", "testing"):
             return state
 
         # -- Stage 3: Testing --------------------------------------------------
