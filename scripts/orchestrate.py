@@ -255,8 +255,8 @@ def orchestrate(
                 os.environ["DRY_RUN"] = "true"
                 _dry_run_set_by_us = True
             try:
-                from skills import default_registry
-                jira_state = default_registry.get("fetch_jira_ticket").run({"ticket_id": jira_ticket})
+                from integrations.jira import fetch_jira_ticket as _fetch_jira
+                jira_state = _fetch_jira(jira_ticket)
 
                 state.update(jira_state)
                 title = state["issue_title"]
@@ -276,7 +276,8 @@ def orchestrate(
                 github_pr_urls = state.get("github_pr_urls", [])
                 if github_pr_urls:
                     try:
-                        github_pr_data_result = default_registry.get("fetch_github_prs").run({"pr_urls": github_pr_urls})
+                        from integrations.github import fetch_github_prs
+                        github_pr_data_result = fetch_github_prs(github_pr_urls)
                         github_pr_data = github_pr_data_result["pr_data"]
                         state["github_pr_data"] = github_pr_data
                         print(f"  GitHub PRs: {len(github_pr_data)} PR(s) fetched")
