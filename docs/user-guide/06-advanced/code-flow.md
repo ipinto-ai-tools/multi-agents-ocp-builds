@@ -11,7 +11,7 @@ The system has two entry points depending on how you invoke it:
 | Entry point | File | When used |
 | --- | --- | --- |
 | `orchestrate()` | `scripts/orchestrate.py` | CLI invocation by a user or CI job. Runs each phase sequentially, calls validators between phases, and supports manual approval gates. Accepts `--output-dir <path>` to save all pipeline artifacts (JSON state, per-phase markdown files) to a local directory. |
-| `build_workflow()` | `agents/graph.py` | LangGraph pipeline invocation. Builds a `StateGraph` where nodes are the five agents and routing is driven by `state["current_phase"]`. Used when you want LangGraph to manage state and edges rather than imperative Python. |
+| `WorkflowOrchestrator.run()` | `orchestrator/workflow.py` | Sequential pipeline runner. Executes stages in order with validation and review gates between them. |
 
 Both paths call the same five agent functions (`run_design`, `run_development`, `run_code_review`, `run_testing`, `run_docs`) and emit heartbeats to the dashboard after each phase.
 
@@ -45,7 +45,7 @@ orchestrate(title, description, repo_path, issue_type)
   │   dispatching. In dry-run mode _mock_response() is called instead of _execute().
   │
   ├─ Phase 1: Design
-  │   ├─ run_design() [agents/design_agent.py]
+  │   ├─ run_design() [stages/design.py]
   │   │   ├─ get_anthropic_client() [config/auth_config.py]
   │   │   ├─ _gather_repo_context()
   │   │   │   └─ RepoSearch() [tools/repo_search.py]
@@ -58,11 +58,11 @@ orchestrate(title, description, repo_path, issue_type)
   │   │   ├─ client.messages.create() → Claude API
   │   │   ├─ _parse_design_output()
   │   │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-  │   └─ validate_phase("design", state) [agents/validators.py]
+  │   └─ validate_phase("design", state) [stages/validators.py]
   │       └─ validate_design_output()
   │
   ├─ Phase 2: Development
-  │   ├─ run_development() [agents/go_k8s_developer.py]
+  │   ├─ run_development() [stages/develop.py]
   │   │   ├─ _validate_context()
   │   │   ├─ get_anthropic_client() [config/auth_config.py]
   │   │   ├─ emit_heartbeat() [dashboard/heartbeat.py]
@@ -76,22 +76,22 @@ orchestrate(title, description, repo_path, issue_type)
   │   │   │   └─ _extract_bullet_points()
   │   │   ├─ _synthesize_file_tracking()
   │   │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-  │   └─ validate_phase("develop", state) [agents/validators.py]
+  │   └─ validate_phase("develop", state) [stages/validators.py]
   │       └─ validate_develop_output()
   │
   ├─ Phase 2.5: Code Review
-  │   ├─ run_code_review() [agents/code_review_agent.py]
+  │   ├─ run_code_review() [stages/code_review.py]
   │   │   ├─ get_anthropic_client() [config/auth_config.py]
   │   │   ├─ _format_code_for_review()
   │   │   ├─ client.messages.create() → Claude API  (or _run_qodo_review() if QODO_CLI_PATH set)
   │   │   ├─ _parse_review_output()
   │   │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-  │   └─ validate_phase("code_review", state) [agents/validators.py]
+  │   └─ validate_phase("code_review", state) [stages/validators.py]
   │       └─ validate_review_output()
   │           └─ (never blocks — surfaces FAIL as warning, loop handled by graph router)
   │
   ├─ Phase 3: Testing
-  │   ├─ run_testing() [agents/testing_agent.py]
+  │   ├─ run_testing() [stages/test.py]
   │   │   ├─ _validate_context()
   │   │   ├─ get_anthropic_client() [config/auth_config.py]
   │   │   ├─ detect_patterns_in_description() [config/testing_config.py]
@@ -102,11 +102,11 @@ orchestrate(title, description, repo_path, issue_type)
   │   │       ├─ _extract_code_block()
   │   │       ├─ yaml.safe_load()
   │   │       └─ _extract_test_code()
-  │   └─ validate_phase("testing", state) [agents/validators.py]
+  │   └─ validate_phase("testing", state) [stages/validators.py]
   │       └─ validate_testing_output()
   │
   └─ Phase 4: Documentation
-      ├─ run_docs() [agents/docs_agent.py]
+      ├─ run_docs() [stages/docs.py]
       │   ├─ _validate_context()
       │   ├─ _fetch_rag_context()
       │   │   └─ RAGSearch() [tools/rag_search.py]
@@ -123,7 +123,7 @@ orchestrate(title, description, repo_path, issue_type)
       │   │   ├─ _split_into_sections()
       │   │   └─ _parse_docs_changes()
       │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      └─ validate_phase("docs", state) [agents/validators.py]
+      └─ validate_phase("docs", state) [stages/validators.py]
           └─ validate_docs_output()
 ```
 
@@ -138,47 +138,11 @@ orchestrate(title, description, repo_path, issue_type)
 
 ---
 
-## 3. LangGraph Pipeline (`agents/graph.py`)
+## 3. Workflow Orchestrator (`orchestrator/workflow.py`)
 
-`build_workflow()` constructs a compiled LangGraph `StateGraph`. Each node wraps one agent function and emits a heartbeat. The `should_continue` router reads `state["current_phase"]` after each node to decide what runs next.
+`WorkflowOrchestrator.run()` executes stages sequentially. Each stage function is called, its output merged into shared state, and validation runs before proceeding. The review gate runs as part of the develop-with-review loop.
 
-```
-build_workflow()
-  └─ StateGraph(AgentState)
-      ├─ design_node()
-      │   ├─ run_design() [agents/design_agent.py]
-      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      ├─ develop_node()
-      │   ├─ run_development() [agents/go_k8s_developer.py]
-      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      ├─ code_review_node()
-      │   ├─ run_code_review() [agents/code_review_agent.py]
-      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      ├─ testing_node()
-      │   ├─ run_testing() [agents/testing_agent.py]
-      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      ├─ docs_node()
-      │   ├─ run_docs() [agents/docs_agent.py]
-      │   └─ emit_heartbeat() [dashboard/heartbeat.py]
-      └─ should_continue() [router]
-          └─ reads state["current_phase"] → routes to next node or END
-```
-
-### Routing logic
-
-`should_continue()` maps phase values to the next node:
-
-| `current_phase` value | Next node |
-|-----------------------|-----------|
-| `design_complete` | `develop_node` |
-| `develop_complete` | `code_review_node` |
-| `review_complete` + `review_passed=True` or `review_iteration ≥ MAX_REVIEW_ITERATIONS` | `testing_node` |
-| `review_complete` + `review_passed=False` + `review_iteration < MAX_REVIEW_ITERATIONS` | `develop_node` (auto-fix loop) |
-| `testing_complete` | `docs_node` |
-| `docs_complete` | `END` |
-| any error value | `END` |
-
-Each node updates `state["current_phase"]` before returning, which is what `should_continue` reads on the next evaluation. State is stored in `graph/state.py` as `AgentState`, a `TypedDict(total=False)` with an `add_messages` annotation on the `messages` field.
+State is defined in `models/workflow_state.py` as `WorkflowState`, a plain `TypedDict(total=False)` with no framework dependencies.
 
 ---
 
@@ -244,7 +208,7 @@ Two functions cover the two logging patterns used in the codebase.
 ```
 get_logger(name)
   ├─ logging.getLogger(name)
-  ├─ RotatingFileHandler → logs/agents/<name>.log
+  ├─ RotatingFileHandler → logs/stages/<name>.log
   └─ StreamHandler → stdout
 
 get_session_logger(session_id, agent_name)
@@ -263,11 +227,10 @@ These modules are consumed by multiple callers across the codebase. When modifyi
 | Module | Exported symbol | Used by |
 |--------|----------------|---------|
 | `config/auth_config.py` | `get_anthropic_client()` | All 5 agents (`design_agent`, `go_k8s_developer`, `code_review_agent`, `testing_agent`, `docs_agent`) |
-| `dashboard/heartbeat.py` | `emit_heartbeat()` | All 5 agents + all 5 graph nodes in `agents/graph.py` |
-| `agents/validators.py` | `validate_phase()` | `scripts/orchestrate.py` (called after each phase) |
-| `config/agent_prompts.py` | System prompt constants | All 5 agents (injected as the `system` argument to `client.messages.create()`) |
-| `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 5 agents, `dashboard/backend.py`, `agents/graph.py` |
-| `skills/__init__.py` | `default_registry` | `scripts/orchestrate.py`, `scripts/test_agents.py` (entry points only — agents do not import from `skills/`) |
+| `dashboard/heartbeat.py` | `emit_heartbeat()` | All 5 stage runners + `orchestrator/workflow.py` |
+| `stages/validators.py` | `validate_phase()` | `orchestrator/workflow.py` (called after each phase) |
+| `prompts/*.py` | System prompt constants | All 5 stage runners (injected as the `system` argument to `client.messages.create()`) |
+| `utils/file_logger.py` | `get_logger()`, `get_session_logger()` | All 5 stage runners, `dashboard/backend.py`, `orchestrator/workflow.py` |
 | `tools/pii_redactor.py` | `redact_pii()`, `is_redaction_enabled()` | `tools/jira_client.py`, `tools/github_client.py` (called at the end of each fetch function) |
 
 ---

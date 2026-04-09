@@ -8,6 +8,7 @@ from models.stage_outputs import (
     ReviewOutput,
     TestingOutput,
 )
+from models.workflow_state import WorkflowState
 
 __all__ = [
     "CodeFile",
@@ -16,4 +17,5 @@ __all__ = [
     "DocsOutput",
     "ReviewOutput",
     "TestingOutput",
+    "WorkflowState",
 ]

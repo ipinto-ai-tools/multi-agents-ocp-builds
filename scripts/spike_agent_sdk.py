@@ -91,7 +91,7 @@ async def run_design_with_sdk(
 ) -> DesignOutput:
     """Run design analysis using the Claude Code Agent SDK.
 
-    This demonstrates the target migration pattern for agents/design_agent.py.
+    This demonstrates the target migration pattern for stages/design.py.
 
     Args:
         title: Issue title

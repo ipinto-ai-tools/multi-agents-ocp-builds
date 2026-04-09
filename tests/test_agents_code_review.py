@@ -6,7 +6,6 @@ Covers:
   and error-resilience scenarios
 - _format_code_for_review: unit tests for file formatting and truncation
 - validate_review_output (validators.py): passing, failing, and max-iterations cases
-- should_continue (graph.py): routing logic for develop_complete and review_complete phases
 - Mock responses: MOCK_CODE_REVIEW_PASS, MOCK_CODE_REVIEW_FAIL, and get_mock_response()
 
 All tests work without API credentials (no @pytest.mark.real_api used).
@@ -59,7 +58,7 @@ class TestParseReviewOutput:
 
     @pytest.fixture(autouse=True)
     def import_agent(self):
-        from agents.code_review_agent import _parse_review_output
+        from stages.code_review import _parse_review_output
         self._parse = _parse_review_output
 
     def test_parse_review_output_blocking_finding_parsed(self):
@@ -205,7 +204,7 @@ class TestFormatCodeForReview:
 
     @pytest.fixture(autouse=True)
     def import_func(self):
-        from agents.code_review_agent import _format_code_for_review
+        from stages.code_review import _format_code_for_review
         self._format = _format_code_for_review
 
     def test_format_empty_list_returns_empty_string(self):
@@ -298,7 +297,7 @@ class TestRunCodeReviewDisabled:
         """When QODO_REVIEW_ENABLED=false, review_passed must be True."""
         monkeypatch.setenv("QODO_REVIEW_ENABLED", "false")
         import importlib
-        import agents.code_review_agent as mod
+        import stages.code_review as mod
         importlib.reload(mod)
 
         result = mod.run_code_review(_make_state())
@@ -311,7 +310,7 @@ class TestRunCodeReviewDisabled:
         """When QODO_REVIEW_ENABLED=false, summary should mention 'skipped'."""
         monkeypatch.setenv("QODO_REVIEW_ENABLED", "false")
         import importlib
-        import agents.code_review_agent as mod
+        import stages.code_review as mod
         importlib.reload(mod)
 
         result = mod.run_code_review(_make_state())
@@ -324,7 +323,7 @@ class TestRunCodeReviewDisabled:
         """When QODO_REVIEW_ENABLED=false, review_iteration must NOT be incremented."""
         monkeypatch.setenv("QODO_REVIEW_ENABLED", "false")
         import importlib
-        import agents.code_review_agent as mod
+        import stages.code_review as mod
         importlib.reload(mod)
 
         state = _make_state(review_iteration=0)
@@ -338,7 +337,7 @@ class TestRunCodeReviewDisabled:
         """When QODO_REVIEW_ENABLED=false, review_findings must be an empty list."""
         monkeypatch.setenv("QODO_REVIEW_ENABLED", "false")
         import importlib
-        import agents.code_review_agent as mod
+        import stages.code_review as mod
         importlib.reload(mod)
 
         result = mod.run_code_review(_make_state())
@@ -356,31 +355,31 @@ class TestRunCodeReviewNoFiles:
 
     def test_no_code_files_returns_review_passed_true(self):
         """Empty code_files should short-circuit with review_passed=True."""
-        from agents.code_review_agent import run_code_review
+        from stages.code_review import run_code_review
         result = run_code_review(_make_state(code_files=[]))
         assert result["review_passed"] is True
 
     def test_no_code_files_summary_mentions_no_code(self):
         """Empty code_files should produce a summary mentioning 'No code files'."""
-        from agents.code_review_agent import run_code_review
+        from stages.code_review import run_code_review
         result = run_code_review(_make_state(code_files=[]))
         assert "no code" in result["review_summary"].lower() or "no code files" in result["review_summary"].lower()
 
     def test_no_code_files_does_not_increment_iteration(self):
         """Empty code_files should not increment review_iteration."""
-        from agents.code_review_agent import run_code_review
+        from stages.code_review import run_code_review
         result = run_code_review(_make_state(code_files=[], review_iteration=0))
         assert result["review_iteration"] == 0
 
     def test_no_code_files_returns_empty_findings(self):
         """Empty code_files should return an empty findings list."""
-        from agents.code_review_agent import run_code_review
+        from stages.code_review import run_code_review
         result = run_code_review(_make_state(code_files=[]))
         assert result["review_findings"] == []
 
     def test_no_code_files_key_missing_from_state_treated_as_empty(self):
         """State without 'code_files' key should behave the same as empty list."""
-        from agents.code_review_agent import run_code_review
+        from stages.code_review import run_code_review
         state = {k: v for k, v in _make_state().items() if k != "code_files"}
         result = run_code_review(state)
         assert result["review_passed"] is True
@@ -398,7 +397,7 @@ class TestRunCodeReviewDryRun:
         from config.mock_responses import MOCK_CODE_REVIEW_PASS
 
         with patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state())
 
         assert result["review_passed"] == MOCK_CODE_REVIEW_PASS["review_passed"]
@@ -410,7 +409,7 @@ class TestRunCodeReviewDryRun:
         monkeypatch.setenv("DRY_RUN", "true")
 
         with patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state(review_iteration=0))
 
         assert result["review_iteration"] == 1
@@ -421,7 +420,7 @@ class TestRunCodeReviewDryRun:
 
         with patch("dashboard.heartbeat.emit_heartbeat"), \
              patch("config.auth_config.get_anthropic_client") as mock_get_client:
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             run_code_review(_make_state())
             mock_get_client.assert_not_called()
 
@@ -429,8 +428,8 @@ class TestRunCodeReviewDryRun:
         """DRY_RUN=true should still emit heartbeats for dashboard visibility."""
         monkeypatch.setenv("DRY_RUN", "true")
 
-        with patch("agents.code_review_agent.emit_heartbeat") as mock_emit:
-            from agents.code_review_agent import run_code_review
+        with patch("stages.code_review.emit_heartbeat") as mock_emit:
+            from stages.code_review import run_code_review
             run_code_review(_make_state())
 
         assert mock_emit.call_count >= 1
@@ -447,9 +446,9 @@ class TestRunCodeReviewClaudeApi:
         state = _make_state(**(state_overrides or {}))
         mock_client = _make_mock_client(response_text)
 
-        with patch("agents.code_review_agent.get_anthropic_client", return_value=mock_client), \
+        with patch("stages.code_review.get_anthropic_client", return_value=mock_client), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             return run_code_review(state)
 
     def test_claude_blocking_finding_sets_review_passed_false(self, monkeypatch):
@@ -514,9 +513,9 @@ class TestRunCodeReviewErrorResilience:
         """When get_anthropic_client() raises, review_passed should be True (no pipeline block)."""
         monkeypatch.delenv("DRY_RUN", raising=False)
 
-        with patch("agents.code_review_agent.get_anthropic_client", side_effect=RuntimeError("auth failed")), \
+        with patch("stages.code_review.get_anthropic_client", side_effect=RuntimeError("auth failed")), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state())
 
         assert result["review_passed"] is True
@@ -525,9 +524,9 @@ class TestRunCodeReviewErrorResilience:
         """Even on error, review_iteration should be incremented by 1."""
         monkeypatch.delenv("DRY_RUN", raising=False)
 
-        with patch("agents.code_review_agent.get_anthropic_client", side_effect=ConnectionError("network")), \
+        with patch("stages.code_review.get_anthropic_client", side_effect=ConnectionError("network")), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state(review_iteration=0))
 
         assert result["review_iteration"] == 1
@@ -536,9 +535,9 @@ class TestRunCodeReviewErrorResilience:
         """On error, review_findings should be an empty list."""
         monkeypatch.delenv("DRY_RUN", raising=False)
 
-        with patch("agents.code_review_agent.get_anthropic_client", side_effect=Exception("boom")), \
+        with patch("stages.code_review.get_anthropic_client", side_effect=Exception("boom")), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state())
 
         assert result["review_findings"] == []
@@ -547,9 +546,9 @@ class TestRunCodeReviewErrorResilience:
         """On error, review_summary should indicate that an error occurred."""
         monkeypatch.delenv("DRY_RUN", raising=False)
 
-        with patch("agents.code_review_agent.get_anthropic_client", side_effect=ValueError("bad config")), \
+        with patch("stages.code_review.get_anthropic_client", side_effect=ValueError("bad config")), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state())
 
         summary = result["review_summary"].lower()
@@ -559,9 +558,9 @@ class TestRunCodeReviewErrorResilience:
         """Error path must still return all four required keys."""
         monkeypatch.delenv("DRY_RUN", raising=False)
 
-        with patch("agents.code_review_agent.get_anthropic_client", side_effect=Exception("fail")), \
+        with patch("stages.code_review.get_anthropic_client", side_effect=Exception("fail")), \
              patch("dashboard.heartbeat.emit_heartbeat"):
-            from agents.code_review_agent import run_code_review
+            from stages.code_review import run_code_review
             result = run_code_review(_make_state())
 
         for key in ("review_passed", "review_findings", "review_summary", "review_iteration"):
@@ -576,7 +575,7 @@ class TestValidateReviewOutput:
 
     @pytest.fixture(autouse=True)
     def import_validator(self):
-        from agents.validators import validate_review_output
+        from stages.validators import validate_review_output
         self._validate = validate_review_output
 
     def _make_review_state(self, **overrides: Any) -> dict:
@@ -687,91 +686,6 @@ class TestValidateReviewOutput:
         result = self._validate(state)
         max_warnings = [w for w in result.warnings if "max" in w.lower()]
         assert len(max_warnings) == 0
-
-
-# ── should_continue (graph routing) ──────────────────────────────────────────
-
-
-class TestShouldContinueRouting:
-    """Tests for the should_continue routing function in agents/graph.py."""
-
-    @pytest.fixture(autouse=True)
-    def import_router(self):
-        from agents.graph import should_continue
-        self._route = should_continue
-
-    def _make_routing_state(self, **fields: Any) -> dict:
-        base: dict[str, Any] = {
-            "current_phase": "init",
-            "review_passed": True,
-            "review_iteration": 0,
-        }
-        base.update(fields)
-        return base
-
-    def test_develop_complete_routes_to_code_review(self):
-        """develop_complete phase should route to 'code_review'."""
-        state = self._make_routing_state(current_phase="develop_complete")
-        assert self._route(state) == "code_review"
-
-    def test_review_complete_passed_routes_to_testing(self):
-        """review_complete with review_passed=True should route to 'testing'."""
-        state = self._make_routing_state(
-            current_phase="review_complete",
-            review_passed=True,
-            review_iteration=1,
-        )
-        assert self._route(state) == "testing"
-
-    def test_review_complete_failed_below_max_routes_to_develop(self, monkeypatch):
-        """review_complete + review_passed=False + iteration < max → 'develop' (auto-fix loop)."""
-        monkeypatch.setenv("MAX_REVIEW_ITERATIONS", "3")
-        state = self._make_routing_state(
-            current_phase="review_complete",
-            review_passed=False,
-            review_iteration=1,
-        )
-        assert self._route(state) == "develop"
-
-    def test_review_complete_failed_at_max_routes_to_testing(self, monkeypatch):
-        """review_complete + review_passed=False + iteration >= max → 'testing' (fallthrough)."""
-        monkeypatch.setenv("MAX_REVIEW_ITERATIONS", "3")
-        state = self._make_routing_state(
-            current_phase="review_complete",
-            review_passed=False,
-            review_iteration=3,
-        )
-        assert self._route(state) == "testing"
-
-    def test_review_complete_failed_above_max_routes_to_testing(self, monkeypatch):
-        """review_complete + review_passed=False + iteration > max → 'testing'."""
-        monkeypatch.setenv("MAX_REVIEW_ITERATIONS", "3")
-        state = self._make_routing_state(
-            current_phase="review_complete",
-            review_passed=False,
-            review_iteration=5,
-        )
-        assert self._route(state) == "testing"
-
-    def test_design_complete_routes_to_develop(self):
-        """design_complete phase should route to 'develop'."""
-        state = self._make_routing_state(current_phase="design_complete")
-        assert self._route(state) == "develop"
-
-    def test_testing_complete_routes_to_docs(self):
-        """testing_complete phase should route to 'docs'."""
-        state = self._make_routing_state(current_phase="testing_complete")
-        assert self._route(state) == "docs"
-
-    def test_unknown_phase_routes_to_end(self):
-        """Unknown or empty phase should route to 'end'."""
-        state = self._make_routing_state(current_phase="unknown_phase")
-        assert self._route(state) == "end"
-
-    def test_review_complete_default_passed_true_routes_to_testing(self):
-        """review_complete with no review_passed key defaults to True → 'testing'."""
-        state = {"current_phase": "review_complete", "review_iteration": 1}
-        assert self._route(state) == "testing"
 
 
 # ── Mock responses ────────────────────────────────────────────────────────────

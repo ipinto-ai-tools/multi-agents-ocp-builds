@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from anthropic import APIError
 
-from config.agent_prompts import DOCS_AGENT_PROMPT
+from prompts.docs import DOCS_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from models.stage_outputs import DocsOutput
 from tools.prompt_guard import sanitize_external_input

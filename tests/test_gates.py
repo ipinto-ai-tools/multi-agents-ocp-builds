@@ -18,7 +18,7 @@ from orchestrator.gates import (
 class TestRunReviewGate:
     """run_review_gate delegates to run_code_review."""
 
-    @patch("agents.code_review_agent.run_code_review")
+    @patch("stages.code_review.run_code_review")
     def test_delegates_to_run_code_review(self, mock_review: MagicMock) -> None:
         mock_review.return_value = {
             "review_passed": True,
@@ -41,7 +41,7 @@ class TestRunReviewGate:
         assert result["review_findings"] == []
         assert result["review_iteration"] == 1
 
-    @patch("agents.code_review_agent.run_code_review")
+    @patch("stages.code_review.run_code_review")
     def test_returns_failure_from_review(self, mock_review: MagicMock) -> None:
         mock_review.return_value = {
             "review_passed": False,
@@ -60,7 +60,7 @@ class TestRunReviewGate:
         assert result["review_passed"] is False
         assert len(result["review_findings"]) == 1
 
-    @patch("agents.code_review_agent.run_code_review")
+    @patch("stages.code_review.run_code_review")
     def test_propagates_exception(self, mock_review: MagicMock) -> None:
         mock_review.side_effect = RuntimeError("API down")
 
@@ -69,7 +69,7 @@ class TestRunReviewGate:
         with pytest.raises(RuntimeError, match="API down"):
             run_review_gate(state)
 
-    @patch("agents.code_review_agent.run_code_review")
+    @patch("stages.code_review.run_code_review")
     def test_passes_full_state_through(self, mock_review: MagicMock) -> None:
         """Ensure the gate passes the entire state dict, not a subset."""
         mock_review.return_value = {

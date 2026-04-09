@@ -138,7 +138,7 @@ INFO redact_pii(jira:SHIP-123): replaced 2 personal name fields, 3 text redactio
 INFO PII redacted from jira:SHIP-123.description: {'ip': 1, 'email': 0, 'phone': 0, 'hostname': 2}
 ```
 
-These log lines appear in the agent log files under `logs/agents/`. They let you verify what was redacted without exposing the original values.
+These log lines appear in the agent log files under `logs/stages/`. They let you verify what was redacted without exposing the original values.
 
 ---
 

@@ -6,8 +6,8 @@ go_k8s_developer has been resolved.
 """
 
 from typing import Any, Dict
-from agents.design_agent import _parse_design_output
-from agents.go_k8s_developer import _validate_context, _build_development_prompt
+from stages.design import _parse_design_output
+from stages.develop import _validate_context, _build_development_prompt
 
 
 def verify_type_consistency():
@@ -86,10 +86,10 @@ def verify_type_consistency():
 
     print("\n3. Type Consistency Check")
     print("-" * 80)
-    print("✓ graph/state.py: implementation_plan is list[str]")
-    print("✓ design_agent.py: returns implementation_plan as list[str]")
-    print("✓ go_k8s_developer.py: accepts implementation_plan as list[str]")
-    print("✓ go_k8s_developer.py: converts list to formatted string in prompt")
+    print("✓ models/workflow_state.py: implementation_plan is list[str]")
+    print("✓ stages/design.py: returns implementation_plan as list[str]")
+    print("✓ stages/develop.py: accepts implementation_plan as list[str]")
+    print("✓ stages/develop.py: converts list to formatted string in prompt")
 
     print("\n" + "=" * 80)
     print("RESULT: All type consistency checks PASSED")

@@ -134,7 +134,7 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 **Goal:** Prove the Claude Code Agent SDK can replace the custom Anthropic client by migrating one stage.
 
 **Changes:**
-- Replace `AnthropicVertex` client in `agents/design_agent.py` with Agent SDK call
+- Replace `AnthropicVertex` client in `stages/design.py` with Agent SDK call
 - Define design-specific tools as Agent SDK tool definitions
 - Remove LangGraph node wrapper for design
 - Validate: structured output works, heartbeats still emit, dashboard still tracks
@@ -145,7 +145,7 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 - Dashboard shows heartbeats from the new implementation
 - No regression in output quality
 
-**Files affected:** `agents/design_agent.py`, `config/auth_config.py` (may become unused)
+**Files affected:** `stages/design.py`, `config/auth_config.py` (may become unused)
 
 ---
 
@@ -177,7 +177,7 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 - Validate outputs against schema between stages
 - Replace `AgentState` TypedDict with dataclass or Pydantic models
 
-**Files affected:** `graph/state.py`, `agents/validators.py`, new `models/stage_outputs.py`
+**Files affected:** `models/workflow_state.py`, `stages/validators.py`, new `models/stage_outputs.py`
 
 ---
 
@@ -187,7 +187,7 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 
 **Changes:**
 - Remove `langgraph` from `requirements.txt`
-- Replace `StateGraph` in `agents/graph.py` with a simple stage sequencer:
+- Replace `StateGraph` with a simple stage sequencer in `orchestrator/workflow.py`:
   - Stage ordering (configurable via repo.yaml)
   - Retry logic (configurable max retries)
   - Pause/approval points (`MANUAL_APPROVAL`)
@@ -195,7 +195,7 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 - Keep heartbeat emissions to dashboard
 - Pass structured outputs between stages (from Task 4)
 
-**Files affected:** `agents/graph.py` → `orchestrator/workflow.py`, `requirements.txt`
+**Files affected:** `orchestrator/workflow.py`, `requirements.txt`
 
 **Depends on:** Task 4 (structured outputs)
 
@@ -206,9 +206,9 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 **Goal:** All four stages use Agent SDK instead of custom Anthropic client.
 
 **Changes:**
-- Migrate `agents/go_k8s_developer.py` (Development)
-- Migrate `agents/testing_agent.py` (Testing)
-- Migrate `agents/docs_agent.py` (Documentation)
+- Migrate `stages/develop.py` (Development)
+- Migrate `stages/test.py` (Testing)
+- Migrate `stages/docs.py` (Documentation)
 - Each stage: prompt template + tool definitions + output schema
 - Remove all direct `client.messages.create()` calls
 - Remove `config/auth_config.py` if no longer needed
@@ -222,13 +222,13 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 **Goal:** Eliminate the skills abstraction; use Agent SDK tools or thin wrappers.
 
 **Changes:**
-- Remove `skills/` directory and skill registry (`skills/base.py`)
+- Remove `skills/` directory and skill registry (already done)
 - Move Jira integration → `integrations/jira.py`
 - Move GitHub integration → `integrations/github.py`
 - Define as Agent SDK tools where the agent needs to call them
 - Keep as direct function calls where the orchestrator calls them (e.g., fetching Jira ticket at startup)
 
-**Files affected:** `skills/`, new `integrations/`
+**Files affected:** new `integrations/`
 
 **Depends on:** Task 6 (stages migrated)
 
@@ -239,12 +239,12 @@ The current codebase has strong product pieces (dashboard, sessions, repo-aware 
 **Goal:** Simplify the SDLC flow by making review a gate, not a stage.
 
 **Changes:**
-- Move `agents/code_review_agent.py` logic into a gate/validator
+- Move `stages/code_review.py` logic into a gate/validator
 - Keep the auto-fix retry loop: Develop → review gate → retry if blocking findings
 - Remove Code Review from the stage sequence visible to users
 - The SDLC flow becomes: Design → Develop (with review gate) → Test → Docs
 
-**Files affected:** `agents/code_review_agent.py` → `orchestrator/gates.py`
+**Files affected:** `stages/code_review.py`, `orchestrator/gates.py`
 
 **Depends on:** Task 5 (new orchestrator)
 
@@ -279,10 +279,12 @@ orchestrator/
   transitions.py        # stage transition rules
 
 stages/
-  design.py             # was agents/design_agent.py
-  develop.py            # was agents/go_k8s_developer.py
-  test.py               # was agents/testing_agent.py
-  docs.py               # was agents/docs_agent.py
+  design.py             # stage runner (was agents/design_agent.py)
+  develop.py            # stage runner (was agents/go_k8s_developer.py)
+  test.py               # stage runner (was agents/testing_agent.py)
+  docs.py               # stage runner (was agents/docs_agent.py)
+  code_review.py        # review logic (was agents/code_review_agent.py)
+  validators.py         # output validators (was agents/validators.py)
 
 config/
   repo_schema.py        # repo.yaml schema + validation
@@ -290,10 +292,12 @@ config/
   defaults.py           # default configurations
 
 prompts/
-  design.md             # was in config/agent_prompts.py
-  develop.md
-  test.md
-  docs.md
+  design.py             # was in config/agent_prompts.py
+  develop.py
+  test.py
+  docs.py
+  code_review.py
+  _shared.py            # shared prompt sections
 
 models/
   stage_outputs.py      # structured output contracts

@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Optional
 
 import yaml
 
-from config.agent_prompts import TESTING_AGENT_PROMPT
+from prompts.test import TESTING_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from models.stage_outputs import TestingOutput
 from tools.output_sanitizer import sanitize

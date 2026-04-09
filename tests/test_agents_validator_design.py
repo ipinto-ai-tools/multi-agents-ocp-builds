@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from tests.auth_helper import HAS_ANTHROPIC_AUTH
 
-from agents.design_agent import (
+from stages.design import (
     run_design,
     DesignAgentError,
     _gather_repo_context,
@@ -124,7 +124,7 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -156,7 +156,7 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -177,8 +177,8 @@ class TestDesignAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
 
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
-            with patch("agents.design_agent.RepoSearch") as mock_repo_search:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
+            with patch("stages.design.RepoSearch") as mock_repo_search:
                 # Mock repository search results
                 mock_searcher = Mock()
                 mock_searcher.search_files.return_value = [
@@ -305,7 +305,7 @@ class TestHelperFunctions:
 
     def test_gather_repo_context_error_handling(self):
         """Test repository context gathering with errors."""
-        with patch("agents.design_agent.RepoSearch") as mock_repo_search:
+        with patch("stages.design.RepoSearch") as mock_repo_search:
             # Simulate repository search failure
             mock_repo_search.side_effect = Exception("Repository not found")
 
@@ -345,7 +345,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic analysis")]
 
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -360,7 +360,7 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_get_client.return_value = mock_client
@@ -371,7 +371,7 @@ class TestEdgeCases:
 
     def test_invalid_anthropic_client_initialization(self):
         """Test handling of client initialization errors."""
-        with patch("agents.design_agent.get_anthropic_client") as mock_get_client:
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
             mock_get_client.side_effect = Exception("Invalid API key")
 
             with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):

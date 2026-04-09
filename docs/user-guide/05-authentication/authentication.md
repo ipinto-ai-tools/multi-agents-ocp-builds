@@ -28,7 +28,7 @@ The client is shared across all pipeline phases:
 User Request (issue title + description)
     │
     ▼
-LangGraph Orchestrator (agents/graph.py)
+Workflow Orchestrator (orchestrator/workflow.py)
     │ Reads ANTHROPIC_VERTEX_PROJECT_ID
     │ Calls get_anthropic_client()
     ▼

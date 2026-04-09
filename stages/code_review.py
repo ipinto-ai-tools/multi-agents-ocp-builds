@@ -22,7 +22,7 @@ import os
 import shutil
 from typing import Any
 
-from config.agent_prompts import CODE_REVIEW_AGENT_PROMPT
+from prompts.code_review import CODE_REVIEW_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
 from tools.prompt_guard import sanitize_external_input

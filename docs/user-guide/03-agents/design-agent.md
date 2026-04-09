@@ -2,14 +2,14 @@
 
 The Design Agent analyzes a GitHub issue and produces a comprehensive design document for the Shipwright Build project. It identifies impacted components, assesses risks, and creates a step-by-step implementation plan.
 
-**File:** `agents/design_agent.py`
+**File:** `stages/design.py`
 **Entry point:** `run_design(title, description, repo_path)`
 
 ---
 
 ## System Prompt
 
-The Design Agent is driven by `DESIGN_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+The Design Agent is driven by `DESIGN_AGENT_PROMPT` defined in [`prompts/design.py`](../../../prompts/design.py).
 
 The prompt instructs the agent to:
 
@@ -18,7 +18,7 @@ The prompt instructs the agent to:
 - Evaluate compatibility, upgrade, security, and performance impact
 - Produce a structured Markdown design document with: Problem Statement, Scope, Impacted Components, Risks and Mitigation, Acceptance Criteria, Implementation Plan, Required Tests, Required Documentation Changes
 
-To customize Design Agent behavior, edit `DESIGN_AGENT_PROMPT` in `config/agent_prompts.py`.
+To customize Design Agent behavior, edit `DESIGN_AGENT_PROMPT` in `prompts/design.py`.
 
 ---
 

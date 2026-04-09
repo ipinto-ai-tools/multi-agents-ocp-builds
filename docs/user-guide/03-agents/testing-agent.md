@@ -2,14 +2,14 @@
 
 The Testing Agent generates comprehensive Ginkgo v2 test suites including unit, integration, and E2E tests. It detects Shipwright-specific patterns in the issue and design to produce targeted, context-aware tests.
 
-**File:** `agents/testing_agent.py`
+**File:** `stages/test.py`
 **Entry point:** `run_testing(context)`
 
 ---
 
 ## System Prompt
 
-The Testing Agent is driven by `TESTING_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+The Testing Agent is driven by `TESTING_AGENT_PROMPT` defined in [`prompts/test.py`](../../../prompts/test.py).
 
 The prompt instructs the agent to:
 
@@ -19,7 +19,7 @@ The prompt instructs the agent to:
 - Tag each test with a unique `[test_id:BUILD-NNN]` identifier
 - Produce unit, integration, and e2e test files as separate Go source files
 
-To customize Testing Agent behavior, edit `TESTING_AGENT_PROMPT` in `config/agent_prompts.py`.
+To customize Testing Agent behavior, edit `TESTING_AGENT_PROMPT` in `prompts/test.py`.
 
 ---
 

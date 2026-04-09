@@ -2,14 +2,14 @@
 
 The Documentation Agent generates all documentation artifacts from the combined outputs of the previous three agents. It supports multiple output formats and can use RAG (Retrieval-Augmented Generation) to incorporate relevant existing documentation and code examples from the repository.
 
-**File:** `agents/docs_agent.py`
+**File:** `stages/docs.py`
 **Entry point:** `run_docs(context, input_files, output_format, enable_rag)`
 
 ---
 
 ## System Prompt
 
-The Documentation Agent is driven by `DOCS_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+The Documentation Agent is driven by `DOCS_AGENT_PROMPT` defined in [`prompts/docs.py`](../../../prompts/docs.py).
 
 The prompt instructs the agent to:
 
@@ -21,7 +21,7 @@ The prompt instructs the agent to:
 - Produce SHIP format documents (Solution, Highlight, Impact, Plan) for stakeholder communication
 - Generate a High-Level Design document as implementation guidance
 
-To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `config/agent_prompts.py`.
+To customize Documentation Agent behavior, edit `DOCS_AGENT_PROMPT` in `prompts/docs.py`.
 
 ---
 
