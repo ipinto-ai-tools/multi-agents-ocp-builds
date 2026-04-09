@@ -63,29 +63,38 @@ class WorkflowOrchestrator:
         self.repo_path = repo_path
         self.output_dir = output_dir
         self._manual_approval = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
-        self._repo_commands = self._load_repo_commands()
+        self._repo_config = self._load_repo_config()
+        self._repo_commands = self._extract_repo_commands()
+        self._active_stages = self._repo_config.stages
 
-    def _load_repo_commands(self) -> Optional[Dict[str, str]]:
-        """Load commands from repos.yaml for the configured repo_path."""
-        if not self.repo_path:
-            return None
+    def _load_repo_config(self) -> "RepoConfig":  # noqa: F821
+        """Load the full RepoConfig from repos.yaml.
+
+        Returns an empty ``RepoConfig()`` when the file is missing or invalid,
+        preserving backward-compatible defaults (all stages, no approvals).
+        """
+        from config.repo_config import load_repo_config
+        from config.repo_schema import RepoConfig
+
+        project_root = Path(__file__).resolve().parent.parent
+        yaml_path = project_root / "repos.yaml"
+        if not yaml_path.exists():
+            return RepoConfig()
         try:
-            from config.repo_config import load_repo_config
-
-            project_root = Path(__file__).resolve().parent.parent
-            yaml_path = project_root / "repos.yaml"
-            if not yaml_path.exists():
-                return None
-
-            config = load_repo_config(yaml_path)
-            for repo in config.repos:
-                if repo.path == self.repo_path:
-                    return repo.commands.model_dump(exclude_none=True)
-            return None
+            return load_repo_config(yaml_path)
         except Exception as e:
             from utils.file_logger import get_logger
-            get_logger(__name__).warning("Failed to load repo commands: %s", e)
+            get_logger(__name__).warning("Failed to load repo config: %s", e)
+            return RepoConfig()
+
+    def _extract_repo_commands(self) -> Optional[Dict[str, str]]:
+        """Extract commands for the configured repo_path from the loaded config."""
+        if not self.repo_path:
             return None
+        for repo in self._repo_config.repos:
+            if repo.path == self.repo_path:
+                return repo.commands.model_dump(exclude_none=True)
+        return None
 
     # -- internal helpers -----------------------------------------------------
 
@@ -103,11 +112,38 @@ class WorkflowOrchestrator:
         result = validate_phase(phase, state)
         return result.passed
 
+    def _should_run_stage(self, stage: str) -> bool:
+        """Check if a stage should run based on repos.yaml configuration."""
+        return stage in self._active_stages
+
     def _check_approval(self, phase: str, next_phase: str) -> bool:
-        """If manual approval is enabled, prompt the user."""
-        if not self._manual_approval:
+        """Check if approval is needed based on repos.yaml or env var.
+
+        Approval is required when:
+        - ``approvals.auto_approve`` is ``False`` **and** the phase appears
+          in ``approvals.required_stages``, or
+        - The ``MANUAL_APPROVAL`` env var is set to ``true`` (backward compat).
+
+        Returns:
+            ``True`` if the user approves (or no approval needed),
+            ``False`` if the user declines.
+        """
+        approvals = self._repo_config.approvals
+
+        # auto_approve overrides everything
+        if approvals.auto_approve:
             return True
-        return _prompt_approval(phase, next_phase)
+
+        # Check if this phase requires approval (from repos.yaml)
+        needs_approval = phase in approvals.required_stages
+
+        # Also check env var for backward compatibility
+        if self._manual_approval:
+            needs_approval = True
+
+        if needs_approval:
+            return _prompt_approval(phase, next_phase)
+        return True
 
     # -- stage runners (deferred imports to avoid circular deps) ---------------
 
@@ -246,81 +282,98 @@ class WorkflowOrchestrator:
         self._emit_heartbeat("orchestrator", state)
 
         # -- Stage 1: Design --------------------------------------------------
-        try:
-            result = self._run_design(state)
-            state.update(result)
-            state["current_phase"] = "design_complete"
-            self._emit_heartbeat("design", state)
-        except Exception as e:
-            state["current_phase"] = "error"
-            state["error"] = f"Design stage failed: {e}"
-            self._emit_heartbeat("design", state)
-            return state
+        if self._should_run_stage("design"):
+            try:
+                result = self._run_design(state)
+                state.update(result)
+                state["current_phase"] = "design_complete"
+                self._emit_heartbeat("design", state)
+            except Exception as e:
+                state["current_phase"] = "error"
+                state["error"] = f"Design stage failed: {e}"
+                self._emit_heartbeat("design", state)
+                return state
 
-        if not self._validate("design", state):
-            state["current_phase"] = "error"
-            state["error"] = "Design validation failed"
-            self._emit_heartbeat("design", state)
-            return state
+            if not self._validate("design", state):
+                state["current_phase"] = "error"
+                state["error"] = "Design validation failed"
+                self._emit_heartbeat("design", state)
+                return state
 
-        if not self._check_approval("design", "develop"):
-            return state
+            if not self._check_approval("design", "develop"):
+                return state
+        else:
+            self._emit_heartbeat("design", {**state, "skipped": True})
 
         # -- Stage 2: Development (with review gate) ----------------------------
-        # _run_develop_with_review_gate mutates *state* in-place.
-        self._run_develop_with_review_gate(state)
-        if state.get("current_phase") == "error":
-            return state
+        if self._should_run_stage("develop"):
+            # _run_develop_with_review_gate mutates *state* in-place.
+            self._run_develop_with_review_gate(state)
+            if state.get("current_phase") == "error":
+                return state
 
-        if not self._check_approval("develop", "testing"):
-            return state
+            if not self._check_approval("develop", "testing"):
+                return state
+        else:
+            self._emit_heartbeat("develop", {**state, "skipped": True})
 
         # -- Stage 3: Testing --------------------------------------------------
-        try:
-            result = self._run_testing(state)
-            state.update(result)
-            state["current_phase"] = "testing_complete"
-            self._emit_heartbeat("testing", state)
-        except Exception as e:
-            state["current_phase"] = "error"
-            state["error"] = f"Testing stage failed: {e}"
-            self._emit_heartbeat("testing", state)
-            return state
+        if self._should_run_stage("testing"):
+            try:
+                result = self._run_testing(state)
+                state.update(result)
+                state["current_phase"] = "testing_complete"
+                self._emit_heartbeat("testing", state)
+            except Exception as e:
+                state["current_phase"] = "error"
+                state["error"] = f"Testing stage failed: {e}"
+                self._emit_heartbeat("testing", state)
+                return state
 
-        if not self._validate("testing", state):
-            state["current_phase"] = "error"
-            state["error"] = "Testing validation failed"
-            self._emit_heartbeat("testing", state)
-            return state
+            if not self._validate("testing", state):
+                state["current_phase"] = "error"
+                state["error"] = "Testing validation failed"
+                self._emit_heartbeat("testing", state)
+                return state
 
-        # -- Post-test command gates (test) ------------------------------------
-        from orchestrator.gates import run_post_test_gates
+            # -- Post-test command gates (test) --------------------------------
+            from orchestrator.gates import run_post_test_gates
 
-        test_gate_results = run_post_test_gates(self.repo_path, self._repo_commands)
-        state["test_gate_results"] = [
-            {"gate": g.gate_name, "passed": g.passed, "output": g.output, "error": g.error}
-            for g in test_gate_results
-        ]
+            test_gate_results = run_post_test_gates(self.repo_path, self._repo_commands)
+            state["test_gate_results"] = [
+                {"gate": g.gate_name, "passed": g.passed, "output": g.output, "error": g.error}
+                for g in test_gate_results
+            ]
 
-        if not self._check_approval("testing", "docs"):
-            return state
+            if not self._check_approval("testing", "docs"):
+                return state
+        else:
+            self._emit_heartbeat("testing", {**state, "skipped": True})
 
         # -- Stage 4: Documentation --------------------------------------------
-        try:
-            result = self._run_docs(state)
-            state.update(result)
-            state["current_phase"] = "done"
-            self._emit_heartbeat("docs", state)
-        except Exception as e:
-            state["current_phase"] = "error"
-            state["error"] = f"Docs stage failed: {e}"
-            self._emit_heartbeat("docs", state)
-            return state
+        if self._should_run_stage("docs"):
+            try:
+                result = self._run_docs(state)
+                state.update(result)
+                state["current_phase"] = "done"
+                self._emit_heartbeat("docs", state)
+            except Exception as e:
+                state["current_phase"] = "error"
+                state["error"] = f"Docs stage failed: {e}"
+                self._emit_heartbeat("docs", state)
+                return state
 
-        if not self._validate("docs", state):
-            state["current_phase"] = "error"
-            state["error"] = "Docs validation failed"
-            self._emit_heartbeat("docs", state)
-            return state
+            if not self._validate("docs", state):
+                state["current_phase"] = "error"
+                state["error"] = "Docs validation failed"
+                self._emit_heartbeat("docs", state)
+                return state
+        else:
+            self._emit_heartbeat("docs", {**state, "skipped": True})
+
+        # If we haven't reached "done" via the docs stage (e.g. docs was skipped),
+        # mark the workflow as complete now.
+        if state["current_phase"] != "done":
+            state["current_phase"] = "done"
 
         return state
