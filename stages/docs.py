@@ -46,12 +46,21 @@ def run_docs(
 
     Args:
         context: Dictionary containing outputs from previous agents with keys:
+            Required:
             - design_analysis: str - Design document from design agent
-            - implementation_plan: str - Implementation plan
-            - code_changes: dict - File paths to changes
+            Optional (from develop stage):
+            - code_changes: dict - File paths to changes (legacy key)
+            - code_files: list[dict] - List of dicts with path/content (preferred key)
             - files_modified: list - List of modified files
-            - test_results: dict - Test execution results
+            Optional (from testing stage):
+            - test_results: dict - Test execution results (legacy key)
+            - unit_tests: dict - Unit test outputs
+            - integration_tests: dict - Integration test outputs
+            - e2e_tests: dict - End-to-end test outputs
+            - coverage_analysis: str - Coverage analysis summary
             - test_summary: str - Summary of test results
+            Optional (general):
+            - implementation_plan: str - Implementation plan
             - issue_title: str - Original issue title
             - issue_description: str - Original issue description
             - issue_type: str - Type of issue (bug, feature, etc.)
@@ -84,7 +93,7 @@ def run_docs(
     session_logger.info(f"Docs agent started - format: {output_format}, RAG: {enable_rag}")
 
     # Validate required context
-    required_keys = ["design_analysis", "code_changes", "test_results"]
+    required_keys = ["design_analysis"]
     missing_keys = [key for key in required_keys if key not in context]
     if missing_keys:
         logger.error(f"Missing required context keys: {missing_keys}")
@@ -414,8 +423,18 @@ def _build_context_message(
         message_parts.append(f"## Acceptance Criteria\n{criteria}\n")
 
     # Development phase outputs
-    if "code_changes" in context:
-        files_changed = list(context["code_changes"].keys())
+    code_changes = context.get("code_changes", {})
+    if not code_changes:
+        # Build from code_files (list of dicts with path/content from develop stage)
+        code_files = context.get("code_files", [])
+        if isinstance(code_files, list):
+            code_changes = {
+                f["path"]: f.get("content", "")
+                for f in code_files
+                if isinstance(f, dict) and f.get("path")
+            }
+    if code_changes:
+        files_changed = list(code_changes.keys())
         message_parts.append(
             f"## Code Changes\n"
             f"Modified {len(files_changed)} file(s):\n"
@@ -425,9 +444,18 @@ def _build_context_message(
 
     # Test phase outputs
     test_results = context.get("test_results", {})
-    message_parts.append(
-        f"## Test Results\n{json.dumps(test_results, indent=2)}\n"
-    )
+    if not test_results:
+        # Construct from individual test output keys produced by testing stage
+        test_results = {
+            "unit_tests": list(context.get("unit_tests", {}).keys()),
+            "integration_tests": list(context.get("integration_tests", {}).keys()),
+            "e2e_tests": list(context.get("e2e_tests", {}).keys()),
+            "coverage_analysis": context.get("coverage_analysis", ""),
+        }
+    if any(test_results.values()):
+        message_parts.append(
+            f"## Test Results\n{json.dumps(test_results, indent=2)}\n"
+        )
 
     if "test_summary" in context:
         message_parts.append(f"## Test Summary\n{context['test_summary']}\n")

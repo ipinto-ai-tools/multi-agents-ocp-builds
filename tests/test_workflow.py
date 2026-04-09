@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from config.repo_schema import ApprovalConfig, RepoConfig
 from orchestrator.workflow import WorkflowOrchestrator
 
 
@@ -461,3 +462,335 @@ class TestReviewGateFailure:
 
         assert state["current_phase"] == "error"
         assert "Review gate failed" in state["error"]
+
+
+class TestStageSkipping:
+    """Stages not listed in repos.yaml ``stages`` are skipped."""
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_only_design_and_docs_stages(
+        self,
+        mock_design: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When stages=['design', 'docs'], develop and testing are skipped."""
+        orchestrator._active_stages = ["design", "docs"]
+        mock_design.return_value = _design_result()
+        mock_docs.return_value = _docs_result()
+
+        state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        mock_design.assert_called_once()
+        mock_docs.assert_called_once()
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_skipped_stages_emit_heartbeat(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """Skipped stages still emit a heartbeat with skipped=True."""
+        orchestrator._active_stages = ["design", "docs"]
+        mock_design.return_value = _design_result()
+        mock_docs.return_value = _docs_result()
+
+        orchestrator.run(**_run_kwargs())
+
+        # Collect heartbeat calls: (agent_name, state_dict)
+        hb_calls = [(c.args[0], c.args[1]) for c in mock_heartbeat.call_args_list]
+
+        # develop and testing should have heartbeats with skipped=True
+        develop_hb = [s for agent, s in hb_calls if agent == "develop"]
+        testing_hb = [s for agent, s in hb_calls if agent == "testing"]
+        assert len(develop_hb) == 1
+        assert develop_hb[0].get("skipped") is True
+        assert len(testing_hb) == 1
+        assert testing_hb[0].get("skipped") is True
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_skipped_stages_not_called(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """Skipped stage runners must not be called."""
+        orchestrator._active_stages = ["design", "docs"]
+        mock_design.return_value = _design_result()
+        mock_docs.return_value = _docs_result()
+
+        orchestrator.run(**_run_kwargs())
+
+        mock_develop.assert_not_called()
+        mock_review_gate.assert_not_called()
+        mock_testing.assert_not_called()
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    def test_all_stages_skipped_still_completes(
+        self,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When stages=[], the workflow completes with current_phase='done'."""
+        orchestrator._active_stages = []
+
+        state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    def test_only_develop_and_testing(
+        self,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When stages=['develop', 'testing'], design and docs are skipped."""
+        orchestrator._active_stages = ["develop", "testing"]
+        mock_develop.return_value = _develop_result()
+        mock_review_gate.return_value = _review_pass_result()
+        mock_testing.return_value = _testing_result()
+
+        state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        mock_develop.assert_called_once()
+        mock_testing.assert_called_once()
+
+
+class TestApprovalConfig:
+    """Approval behavior driven by repos.yaml approvals config."""
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_auto_approve_skips_prompt(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When auto_approve=True, no approval prompt is shown even with MANUAL_APPROVAL."""
+        orchestrator._repo_config = RepoConfig(
+            approvals=ApprovalConfig(auto_approve=True),
+        )
+        orchestrator._manual_approval = True  # should be overridden by auto_approve
+
+        mock_design.return_value = _design_result()
+        mock_develop.return_value = _develop_result()
+        mock_review_gate.return_value = _review_pass_result()
+        mock_testing.return_value = _testing_result()
+        mock_docs.return_value = _docs_result()
+
+        with patch("orchestrator.workflow._prompt_approval") as mock_prompt:
+            state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        mock_prompt.assert_not_called()
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_required_stages_prompts_for_listed_phases(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When required_stages=['design'], only design->develop transition prompts."""
+        orchestrator._repo_config = RepoConfig(
+            approvals=ApprovalConfig(required_stages=["design"]),
+        )
+        orchestrator._manual_approval = False
+
+        mock_design.return_value = _design_result()
+        mock_develop.return_value = _develop_result()
+        mock_review_gate.return_value = _review_pass_result()
+        mock_testing.return_value = _testing_result()
+        mock_docs.return_value = _docs_result()
+
+        with patch("orchestrator.workflow._prompt_approval", return_value=True) as mock_prompt:
+            state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        # Only design->develop should trigger a prompt
+        assert mock_prompt.call_count == 1
+        mock_prompt.assert_called_once_with("design", "develop")
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DESIGN_PATCH)
+    def test_required_stages_user_declines(
+        self,
+        mock_design: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When required_stages=['design'] and user declines, workflow stops."""
+        orchestrator._repo_config = RepoConfig(
+            approvals=ApprovalConfig(required_stages=["design"]),
+        )
+        orchestrator._manual_approval = False
+
+        mock_design.return_value = _design_result()
+
+        with patch("orchestrator.workflow._prompt_approval", return_value=False):
+            state = orchestrator.run(**_run_kwargs())
+
+        # Workflow stops after design since user declined
+        assert state["current_phase"] == "design_complete"
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_manual_approval_env_backward_compat(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """MANUAL_APPROVAL env var still triggers prompts (backward compat)."""
+        orchestrator._repo_config = RepoConfig(
+            approvals=ApprovalConfig(required_stages=[]),
+        )
+        orchestrator._manual_approval = True
+
+        mock_design.return_value = _design_result()
+        mock_develop.return_value = _develop_result()
+        mock_review_gate.return_value = _review_pass_result()
+        mock_testing.return_value = _testing_result()
+        mock_docs.return_value = _docs_result()
+
+        with patch("orchestrator.workflow._prompt_approval", return_value=True) as mock_prompt:
+            state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        # All three inter-stage transitions should prompt
+        assert mock_prompt.call_count == 3
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_no_approvals_no_prompt(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """Default config (no required_stages, no env var) never prompts."""
+        orchestrator._repo_config = RepoConfig()
+        orchestrator._manual_approval = False
+
+        mock_design.return_value = _design_result()
+        mock_develop.return_value = _develop_result()
+        mock_review_gate.return_value = _review_pass_result()
+        mock_testing.return_value = _testing_result()
+        mock_docs.return_value = _docs_result()
+
+        with patch("orchestrator.workflow._prompt_approval") as mock_prompt:
+            state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        mock_prompt.assert_not_called()
+
+
+class TestRepoConfigLoading:
+    """WorkflowOrchestrator correctly loads and uses RepoConfig."""
+
+    def test_default_active_stages(self, orchestrator: WorkflowOrchestrator) -> None:
+        """Without custom config, all four stages are active."""
+        assert orchestrator._active_stages == ["design", "develop", "testing", "docs"]
+
+    def test_should_run_stage_respects_active_stages(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_run_stage returns True only for stages in _active_stages."""
+        orchestrator._active_stages = ["design", "docs"]
+        assert orchestrator._should_run_stage("design") is True
+        assert orchestrator._should_run_stage("develop") is False
+        assert orchestrator._should_run_stage("testing") is False
+        assert orchestrator._should_run_stage("docs") is True
+
+    def test_repo_config_has_default_approvals(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """Default RepoConfig has empty required_stages and auto_approve=False."""
+        approvals = orchestrator._repo_config.approvals
+        assert approvals.required_stages == []
+        assert approvals.auto_approve is False
