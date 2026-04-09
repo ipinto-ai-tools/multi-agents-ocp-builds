@@ -12,7 +12,7 @@ import os
 import re
 from typing import Dict, Any, Optional
 
-from config.agent_prompts import DESIGN_AGENT_PROMPT
+from prompts.design import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from models.stage_outputs import DesignOutput
 from utils.file_logger import get_logger

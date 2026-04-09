@@ -76,7 +76,7 @@ The migrated Design stage must work with the existing LangGraph orchestrator:
 - `run_design()` keeps the same signature and return type (`Dict[str, Any]`)
 - Internally uses SDK but returns the same dict structure
 - Other stages (Develop, Test, Docs) remain unchanged
-- The orchestrator (`agents/graph.py`) calls `run_design()` as before
+- The orchestrator (`orchestrator/workflow.py`) calls `run_design()` as before
 
 ## Risks and Mitigations
 
@@ -98,5 +98,5 @@ The migrated Design stage must work with the existing LangGraph orchestrator:
 ## Next Steps
 
 - Task #106 already defines `DesignOutput` Pydantic model
-- When ready to migrate: replace `client.messages.create()` with `query()` in `agents/design_agent.py`
+- When ready to migrate: replace `client.messages.create()` with `query()` in `stages/design.py`
 - Update tests to mock `claude_agent_sdk.query` instead of `client.messages.create`

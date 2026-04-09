@@ -48,7 +48,7 @@ from utils.file_logger import get_logger
 
 logger = get_logger('design_agent')
 logger.info("Analysis complete")
-# → logs/agents/design_agent.log
+# → logs/stages/design.log
 ```
 
 #### Dashboard Logger

@@ -342,7 +342,7 @@ Agent-level logs are written under the `logs/` directory when logging is configu
 
 ```text
 logs/
-+-- agents/
++-- stages/
 |   +-- design_agent.log
 |   +-- go_k8s_developer.log
 |   +-- testing_agent.log

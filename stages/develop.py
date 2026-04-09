@@ -20,7 +20,7 @@ except ImportError:
         "anthropic library is required. Install with: uv pip install anthropic"
     )
 
-from config.agent_prompts import DEVELOPMENT_AGENT_PROMPT
+from prompts.develop import DEVELOPMENT_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
 from dashboard.heartbeat import emit_heartbeat
 from models.stage_outputs import DevelopOutput
@@ -781,7 +781,7 @@ def _build_review_feedback_section(context: Dict[str, Any]) -> str:
     Returns empty string on first iteration (no review yet).
     On subsequent iterations, formats findings as a mandatory fix list.
     This is the live implementation used by run_development; it is local to
-    this module and not shared with config/agent_prompts.py.
+    this module and not shared with prompts/develop.py.
 
     Args:
         context: AgentState dict, may contain review_findings and review_iteration.

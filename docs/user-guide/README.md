@@ -32,7 +32,7 @@ Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-
 |------|-------------|
 | [Architecture](02-concepts/architecture.md) | System overview and LangGraph pipeline |
 | [Agents Overview](02-concepts/agents-overview.md) | The five agents and how they connect |
-| [State Management](02-concepts/state-management.md) | AgentState, phase transitions, data flow |
+| [State Management](02-concepts/state-management.md) | WorkflowState, phase transitions, data flow |
 
 ### Section 3 - Agents
 

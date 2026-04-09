@@ -3,7 +3,7 @@
 Covers:
 - tools/output_sanitizer.py  (sanitize, sanitize_dict, SanitizingFilter, is_sanitizer_enabled)
 - Integration: heartbeat payload sanitization (dashboard/heartbeat.py)
-- Integration: file write sanitization (agents/testing_agent.py)
+- Integration: file write sanitization (stages/test.py)
 
 No real API calls are made.  All filesystem and HTTP interactions are mocked
 via unittest.mock.patch.  Environment variable overrides are applied with
@@ -603,7 +603,7 @@ class TestFileWriteIntegration:
 
     def test_write_test_plan_md_sanitizes_content(self, tmp_path):
         """_write_test_plan_md should sanitize PII in the generated content."""
-        from agents.testing_agent import _write_test_plan_md
+        from stages.test import _write_test_plan_md
 
         output = {
             "issue_title": "Add timeout support",
@@ -628,7 +628,7 @@ class TestFileWriteIntegration:
 
     def test_write_go_test_files_sanitizes_code(self, tmp_path):
         """_write_go_test_files should sanitize PII embedded in generated Go code."""
-        from agents.testing_agent import _write_go_test_files
+        from stages.test import _write_go_test_files
 
         go_code_with_pii = (
             "package mytest\n\n"
@@ -645,7 +645,7 @@ class TestFileWriteIntegration:
 
         _write_go_test_files(output, tmp_path)
 
-        dest = tmp_path / "go_tests" / "pkg" / "foo" / "foo_test.go"
+        dest = tmp_path / "tests" / "unit" / "pkg" / "foo" / "foo_test.go"
         assert dest.exists()
         content = dest.read_text(encoding="utf-8")
         assert "10.0.0.99" not in content
@@ -655,7 +655,7 @@ class TestFileWriteIntegration:
 
     def test_write_test_plan_md_clean_content_unchanged(self, tmp_path):
         """Content with no PII must not be altered."""
-        from agents.testing_agent import _write_test_plan_md
+        from stages.test import _write_test_plan_md
 
         output = {
             "issue_title": "Timeout feature",

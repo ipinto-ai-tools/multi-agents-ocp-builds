@@ -52,7 +52,7 @@ def run_review_gate(state: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Dict with review_passed, review_findings, review_summary, review_iteration
     """
-    from agents.code_review_agent import run_code_review
+    from stages.code_review import run_code_review
 
     return run_code_review(state)
 

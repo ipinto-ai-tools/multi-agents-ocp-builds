@@ -19,7 +19,7 @@ from models.stage_outputs import (
     ReviewOutput,
     TestingOutput,
 )
-from agents.validators import ValidationResult, validate_phase, validate_stage_output
+from stages.validators import ValidationResult, validate_phase, validate_stage_output
 
 
 # ---------------------------------------------------------------------------

@@ -2,14 +2,14 @@
 
 The Code Review Agent inspects generated Go code for security vulnerabilities, correctness issues, and Kubernetes/Shipwright standards compliance. It runs between the Development and Testing phases and can automatically route failing code back to the Development Agent for fixes.
 
-**File:** `agents/code_review_agent.py`
+**File:** `stages/code_review.py`
 **Entry point:** `run_code_review(state)`
 
 ---
 
 ## System Prompt
 
-The Code Review Agent is driven by `CODE_REVIEW_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+The Code Review Agent is driven by `CODE_REVIEW_AGENT_PROMPT` defined in [`prompts/code_review.py`](../../../prompts/code_review.py).
 
 The prompt instructs the agent to:
 
@@ -18,7 +18,7 @@ The prompt instructs the agent to:
 - Produce a structured findings list and a human-readable verdict
 - When Qodo CLI is available, delegate static analysis to it and supplement with Claude review
 
-To customize Code Review Agent behavior, edit `CODE_REVIEW_AGENT_PROMPT` in `config/agent_prompts.py`.
+To customize Code Review Agent behavior, edit `CODE_REVIEW_AGENT_PROMPT` in `prompts/code_review.py`.
 
 ---
 

@@ -6,7 +6,7 @@ The `AgentState` TypedDict is the single shared data structure that flows throug
 
 ## AgentState
 
-Defined in `graph/state.py`, `AgentState` is a `TypedDict(total=False)`, meaning all fields are optional at initialization. LangGraph merges each node's partial return dictionary into the running state.
+Defined in `models/workflow_state.py`, `WorkflowState` is a `TypedDict(total=False)`, meaning all fields are optional at initialization. The orchestrator merges each stage's partial return dictionary into the running state.
 
 ```python
 # Node returns only the fields it modifies

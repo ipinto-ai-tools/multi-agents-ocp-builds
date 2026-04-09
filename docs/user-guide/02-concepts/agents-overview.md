@@ -28,7 +28,7 @@ publish.py                   — push code to GitHub, post to Jira
 
 ## Phase 1: Design Agent
 
-**File:** `agents/design_agent.py`
+**File:** `stages/design.py`
 
 The Design Agent analyzes a GitHub issue and produces a comprehensive design document. It identifies which Shipwright components are affected, assesses risks, and creates a step-by-step implementation plan.
 
@@ -65,7 +65,7 @@ For full parameter documentation, see the [Design Agent](../03-agents/design-age
 
 ## Phase 2: Development Agent
 
-**File:** `agents/go_k8s_developer.py`
+**File:** `stages/develop.py`
 
 The Development Agent generates production-quality Go code for Kubernetes and OpenShift. All code follows strict standards: TLS 1.3 enforcement, no hardcoded secrets, Go doc comments on all exported symbols, and structured logging without sensitive data.
 
@@ -102,7 +102,7 @@ For full parameter documentation, see the [Development Agent](../03-agents/devel
 
 ## Phase 2.5: Code Review Agent
 
-**File:** `agents/code_review_agent.py`
+**File:** `stages/code_review.py`
 
 The Code Review Agent reviews generated Go code for quality, security, and correctness before it reaches the Testing stage. It uses Claude (the same model as other stages — no extra installation needed) with an optional Qodo CLI integration via `QODO_CLI_PATH`.
 
@@ -143,7 +143,7 @@ For full parameter documentation, see the [Code Review Agent](../03-agents/code-
 
 ## Phase 3: Testing Agent
 
-**File:** `agents/testing_agent.py`
+**File:** `stages/test.py`
 
 The Testing Agent generates comprehensive Ginkgo v2 test suites. It detects Shipwright-specific patterns in the issue description and design document (build strategies such as Kaniko or Buildpacks, source types such as Git or Bundle, output types, and security contexts) and generates targeted tests for each.
 
@@ -172,7 +172,7 @@ For full parameter documentation, see the [Testing Agent](../03-agents/testing-a
 
 ## Phase 4: Documentation Agent
 
-**File:** `agents/docs_agent.py`
+**File:** `stages/docs.py`
 
 The Documentation Agent generates all documentation artifacts from the combined outputs of the previous four stages. It supports multiple output formats and can use RAG to pull in relevant existing documentation and code examples from the repository.
 
@@ -224,7 +224,7 @@ The Testing stage always has access to the original design analysis and the deve
 
 After each stage completes, the orchestrator:
 
-1. **Validates outputs** — checks required fields are non-empty using `agents/validators.py`
+1. **Validates outputs** — checks required fields are non-empty using `stages/validators.py`
 2. **Prints a stage summary** — shows key metrics and any warnings
 3. **Stops on failure** — if required fields are missing, the workflow stops immediately
 4. **Asks for approval** (if `MANUAL_APPROVAL=true`) — prompts `[Y/n]` before the next stage

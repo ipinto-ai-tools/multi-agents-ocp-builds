@@ -25,7 +25,7 @@ uv run pytest tests/ -v
 uv run pytest tests/test_agents_validator_design.py -v
 
 # Run tests with coverage
-uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
+uv run pytest tests/ --cov=stages --cov=orchestrator --cov-report=html
 
 # Manual agent testing with dry-run (no API calls)
 uv run python scripts/test_agents.py --e2e --dry-run --debug
@@ -36,37 +36,37 @@ uv run python scripts/test_agents.py --agent design --dry-run
 
 ## Architecture
 
-### Workflow Orchestrator (`agents/graph.py`)
+### Workflow Orchestrator (`orchestrator/workflow.py`)
 
-The orchestrator builds a `StateGraph` (currently implemented using LangGraph) with five sequential stage nodes connected by conditional edges. Each node runs its stage, updates shared state, and emits a heartbeat to the dashboard. The `should_continue` function routes based on `current_phase` in state (e.g., `design_complete` → `develop`, `develop_complete` → `testing`). On error, the workflow terminates early via the `END` edge.
+The orchestrator runs stages sequentially. Each stage function is called, its output merged into shared state, and validation runs before proceeding. The review gate runs as part of the develop-with-review loop.
 
 ```
-design_node → develop_node → code_review_node → testing_node → docs_node → END
-                                  ↑         │ (fail + iter ≤ max)
-                                  └─────────┘ (auto-fix loop)
+Design → Development → Code Review (gate) → Testing → Docs
+                           ↑         │ (fail + iter ≤ max)
+                           └─────────┘ (auto-fix loop)
 ```
 
-### Shared State (`graph/state.py`)
+### Shared State (`models/workflow_state.py`)
 
-`AgentState` is a `TypedDict(total=False)` containing all fields shared across stages — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), control flow (session_id, current_phase, approval_status), and LangGraph messages with `add_messages` annotation.
+`WorkflowState` is a `TypedDict(total=False)` containing all fields shared across stages — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), and control flow (session_id, current_phase, approval_status).
 
 ### Stage Pattern
 
-All five stage runners (currently named "agents" in code) follow the same pattern:
+All five stage runners follow the same pattern:
 1. Validate context/inputs
 2. Get Claude client via `config/auth_config.get_anthropic_client()`
-3. Build a prompt using system prompt from `config/agent_prompts.py` + user context
+3. Build a prompt using system prompt from `prompts/` package + user context
 4. Call `client.messages.create()` with the configured model (`CLAUDE_MODEL` env var, default `claude-sonnet-4-6`)
 5. Parse the Markdown-structured response into typed dict outputs
 6. Emit heartbeat to dashboard
 
 | Stage | Entry Point | Key Input | Key Output |
 |-------|------------|-----------|------------|
-| Design | `agents/design_agent.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
-| Development | `agents/go_k8s_developer.run_development()` | AgentState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
-| Code Review | `agents/code_review_agent.run_code_review()` | AgentState dict (code_files from development) | review_passed, review_findings, review_summary, review_iteration |
-| Testing | `agents/testing_agent.run_testing()` | context dict (needs design_analysis, impacted_components, acceptance_criteria) | test_plan, unit/integration/e2e_tests, coverage_analysis |
-| Docs | `agents/docs_agent.run_docs()` | context dict + optional input_files, output_format, enable_rag | pr_summary, release_notes, docs_changes |
+| Design | `stages/design.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
+| Development | `stages/develop.run_development()` | WorkflowState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
+| Code Review | `stages/code_review.run_code_review()` | WorkflowState dict (code_files from development) | review_passed, review_findings, review_summary, review_iteration |
+| Testing | `stages/test.run_testing()` | context dict (needs design_analysis, impacted_components, acceptance_criteria) | test_plan, unit/integration/e2e_tests, coverage_analysis |
+| Docs | `stages/docs.run_docs()` | context dict + optional input_files, output_format, enable_rag | pr_summary, release_notes, docs_changes |
 
 ### Authentication (`config/auth_config.py`)
 
@@ -79,7 +79,7 @@ FastAPI backend (`backend.py`) with SQLite storage at `/tmp/claude/dashboard.db`
 ### Domain Configuration (`config/`)
 
 - `shipwright_components.py`: Shipwright Build component definitions (BuildRun, Build, BuildStrategy, webhooks), CRD types, build strategies, OpenShift integrations
-- `agent_prompts.py`: System prompts for each stage runner
+- `prompts/`: System prompts for each stage runner (split into per-stage modules)
 - `testing_config.py`: Ginkgo v2 test patterns and templates, pattern detection for build strategies/source types
 - `mock_responses.py`: Mock API responses for dry-run mode
 

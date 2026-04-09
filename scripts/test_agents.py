@@ -159,7 +159,7 @@ class AgentTester:
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=True)
             else:
                 logger.info("Calling real Design Agent")
-                from agents.design_agent import run_design
+                from stages.design import run_design
 
                 output = run_design(title=title, description=description)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
@@ -229,7 +229,7 @@ class AgentTester:
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=True)
             else:
                 logger.info("Calling real Testing Agent")
-                from agents.testing_agent import run_testing
+                from stages.test import run_testing
 
                 output = run_testing(context, output_dir=self.output_dir)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
@@ -331,7 +331,7 @@ class AgentTester:
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=True)
             else:
                 logger.info("Calling real Docs Agent")
-                from agents.docs_agent import run_docs
+                from stages.docs import run_docs
 
                 output = run_docs(context, output_format=output_format)
                 log_api_call(logger, "claude-sonnet-4", 8000, dry_run=False)
@@ -524,12 +524,12 @@ class AgentTester:
 
     def _write_test_plan_md(self, output: Dict[str, Any]) -> None:
         """Write test_plan.md. Delegates to testing_agent module function."""
-        from agents.testing_agent import _write_test_plan_md as _agent_write_test_plan_md
+        from stages.test import _write_test_plan_md as _agent_write_test_plan_md
         _agent_write_test_plan_md(output, self.output_dir)
 
     def _write_go_test_files(self, output: Dict[str, Any]) -> None:
         """Write Go test files. Delegates to testing_agent module function."""
-        from agents.testing_agent import _write_go_test_files as _agent_write_go_test_files
+        from stages.test import _write_go_test_files as _agent_write_go_test_files
         _agent_write_go_test_files(output, self.output_dir)
 
     def _save_artifact(self, filename: str, data: Any):

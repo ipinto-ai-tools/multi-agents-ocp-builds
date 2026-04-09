@@ -99,7 +99,7 @@ class WorkflowOrchestrator:
 
     def _validate(self, phase: str, state: Dict[str, Any]) -> bool:
         """Run the phase validator.  Returns True when validation passes."""
-        from agents.validators import validate_phase
+        from stages.validators import validate_phase
         result = validate_phase(phase, state)
         return result.passed
 
@@ -112,7 +112,7 @@ class WorkflowOrchestrator:
     # -- stage runners (deferred imports to avoid circular deps) ---------------
 
     def _run_design(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        from agents.design_agent import run_design
+        from stages.design import run_design
         return run_design(
             title=state["issue_title"],
             description=state["issue_description"],
@@ -120,7 +120,7 @@ class WorkflowOrchestrator:
         )
 
     def _run_develop(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        from agents.go_k8s_developer import run_development
+        from stages.develop import run_development
         return run_development(state, repo_path=state.get("repo_path"))
 
     def _run_develop_with_review_gate(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,11 +208,11 @@ class WorkflowOrchestrator:
         return state
 
     def _run_testing(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        from agents.testing_agent import run_testing
+        from stages.test import run_testing
         return run_testing(state, output_dir=self.output_dir)
 
     def _run_docs(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        from agents.docs_agent import run_docs
+        from stages.docs import run_docs
         return run_docs(state)
 
     # -- main entry point -----------------------------------------------------

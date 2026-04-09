@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from agents.docs_agent import (
+from stages.docs import (
     run_docs,
     _fetch_rag_context,
     _extract_api_names,
@@ -147,7 +147,7 @@ class TestEnhancedDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest summary\n\n## SHIP Document\nTest SHIP")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -168,7 +168,7 @@ class TestEnhancedDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest\n\n## JTBD Documentation\nTest JTBD")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -188,7 +188,7 @@ class TestEnhancedDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=sample_response_with_ship)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -223,7 +223,7 @@ type BuildRun struct {
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -255,7 +255,7 @@ type BuildRun struct {
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -282,7 +282,7 @@ type BuildRun struct {
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -536,7 +536,7 @@ class TestMetadata:
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -566,7 +566,7 @@ class TestErrorHandling:
         mock_response = Mock()
         mock_response.content = [Mock(text="## PR Summary\nTest")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client

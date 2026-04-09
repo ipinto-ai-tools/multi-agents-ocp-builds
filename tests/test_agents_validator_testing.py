@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from tests.auth_helper import HAS_ANTHROPIC_AUTH
 
-from agents.testing_agent import (
+from stages.test import (
     run_testing,
     TestingAgentError,
     _validate_context,
@@ -332,7 +332,7 @@ class TestTestingAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_TEST_OUTPUT)]
 
-        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.test.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -472,7 +472,7 @@ var _ = Describe("Test", func() {
 
     def test_split_into_sections_does_not_split_on_triple_hash(self):
         """### subsection headers must NOT create new top-level sections."""
-        from agents.testing_agent import _split_into_sections
+        from stages.test import _split_into_sections
         text = (
             "## Unit Tests\n"
             "\n"
@@ -493,7 +493,7 @@ var _ = Describe("Test", func() {
 
     def test_extract_test_code_go_comment_filename(self):
         """File path as Go comment on first line inside code block must be extracted."""
-        from agents.testing_agent import _extract_test_code
+        from stages.test import _extract_test_code
         section = (
             "### Signature Tests\n"
             "```go\n"
@@ -598,7 +598,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic test output")]
 
-        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.test.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -609,7 +609,7 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.test.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
@@ -620,7 +620,7 @@ class TestEdgeCases:
 
     def test_invalid_anthropic_client_initialization(self):
         """Test handling of client initialization errors."""
-        with patch("agents.testing_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.test.get_anthropic_client") as mock_anthropic:
             mock_anthropic.side_effect = Exception("Invalid API key")
 
             with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
@@ -642,11 +642,11 @@ class TestAgentTesterArtifacts:
         tester = self._make_tester(tmp_path)
         tester.test_testing_agent()
 
-        go_tests_dir = tmp_path / "go_tests"
-        assert go_tests_dir.exists(), "go_tests/ directory was not created"
+        tests_dir = tmp_path / "tests"
+        assert tests_dir.exists(), "tests/ directory was not created"
 
-        go_files = list(go_tests_dir.rglob("*.go"))
-        assert len(go_files) > 0, "No .go files were written under go_tests/"
+        go_files = list(tests_dir.rglob("*.go"))
+        assert len(go_files) > 0, "No .go files were written under tests/"
 
     def test_plan_md_written(self, tmp_path: Path):
         """After test_testing_agent() runs in mock mode, test_plan.md exists with expected sections."""
@@ -676,10 +676,10 @@ class TestAgentTesterArtifacts:
         }
         tester._write_go_test_files(output)
 
-        go_tests_dir = tmp_path / "go_tests"
-        assert not (go_tests_dir / "pkg/foo/foo_test.go").exists(), \
+        unit_dir = tmp_path / "tests" / "unit"
+        assert not (unit_dir / "pkg/foo/foo_test.go").exists(), \
             "Empty code file should not be written"
-        assert (go_tests_dir / "pkg/bar/bar_test.go").exists(), \
+        assert (unit_dir / "pkg/bar/bar_test.go").exists(), \
             "Non-empty code file should be written"
 
     def test_write_test_plan_md_content(self, tmp_path: Path):
@@ -718,7 +718,7 @@ class TestAgentTesterArtifacts:
         assert "Test everything carefully." in content
         assert "### Unit Tests (1 scenarios)" in content
         assert "**BUILD-001**" in content
-        assert "go_tests/pkg/api/api_test.go" in content
+        assert "tests/unit/pkg/api/api_test.go" in content
         assert "100% covered." in content
         assert "kaniko" in content
 
@@ -728,7 +728,7 @@ class TestParserRobustness:
 
     def test_parse_test_output_with_subsections(self):
         """_parse_test_output must find unit tests even when ## Unit Tests has ### subsections."""
-        from agents.testing_agent import _parse_test_output
+        from stages.test import _parse_test_output
         raw = (
             "## Test Plan\n"
             "Comprehensive test strategy.\n"

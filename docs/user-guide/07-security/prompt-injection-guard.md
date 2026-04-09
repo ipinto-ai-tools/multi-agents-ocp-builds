@@ -142,11 +142,11 @@ Do not set `PROMPT_GUARD_ENABLED=false` in any environment that processes real e
 | File | Purpose |
 |------|---------|
 | `tools/prompt_guard.py` | `sanitize_external_input(text, source)` — pattern matching, stripping, audit logging |
-| `agents/design_agent.py` | Sanitizes `title`, `description` |
-| `agents/go_k8s_developer.py` | Sanitizes issue and design fields |
-| `agents/testing_agent.py` | Sanitizes issue and design fields |
-| `agents/code_review_agent.py` | Sanitizes `design_analysis`, `acceptance_criteria` |
-| `agents/docs_agent.py` | Sanitizes issue fields and all GitHub PR metadata |
+| `stages/design.py` | Sanitizes `title`, `description` |
+| `stages/develop.py` | Sanitizes issue and design fields |
+| `stages/test.py` | Sanitizes issue and design fields |
+| `stages/code_review.py` | Sanitizes `design_analysis`, `acceptance_criteria` |
+| `stages/docs.py` | Sanitizes issue fields and all GitHub PR metadata |
 
 ---
 
