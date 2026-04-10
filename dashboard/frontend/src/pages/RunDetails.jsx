@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getSession, approveSession, pauseSession, streamLogs, deleteSession } from '../api/client'
+import { getSession, approveSession, pauseSession, resumeSession, streamLogs, deleteSession } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import PipelineProgress from '../components/PipelineProgress'
 
@@ -145,10 +145,16 @@ export default function RunDetails() {
               </button>
             </>
           )}
-          {status === 'running' && (
+          {status === 'running' && session?.latest_heartbeat?.phase !== 'paused' && (
             <button onClick={() => pauseSession(sessionId).then(loadSession)}
               className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
               Pause
+            </button>
+          )}
+          {status === 'running' && session?.latest_heartbeat?.phase === 'paused' && (
+            <button onClick={() => resumeSession(sessionId).then(loadSession)}
+              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+              Resume
             </button>
           )}
           {(currentPhase === 'done') && (

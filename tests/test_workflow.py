@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -794,3 +795,145 @@ class TestRepoConfigLoading:
         approvals = orchestrator._repo_config.approvals
         assert approvals.required_stages == []
         assert approvals.auto_approve is False
+
+
+class TestPauseSignal:
+    """Pause signal file blocks workflow until removed or timeout."""
+
+    @pytest.fixture(autouse=True)
+    def _signal_dir(self, tmp_path: Path) -> None:
+        """Redirect _SIGNAL_DIR to a temp directory and clean up after each test."""
+        self.signal_dir = tmp_path / "signals"
+        self.signal_dir.mkdir()
+
+    @pytest.fixture()
+    def paused_orchestrator(self) -> WorkflowOrchestrator:
+        """Return a WorkflowOrchestrator using the temp signal directory."""
+        orch = WorkflowOrchestrator(
+            session_id="pause-test",
+            repo_path="/tmp/fake-repo",
+        )
+        return orch
+
+    def _pause_file(self) -> Path:
+        return self.signal_dir / "pause-pause-test"
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    def test_no_pause_file_is_noop(
+        self,
+        mock_heartbeat: MagicMock,
+        paused_orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When no pause file exists, the method returns immediately without modifying state."""
+        state = {"current_phase": "design_complete", "session_id": "pause-test"}
+        original_state = state.copy()
+
+        with patch("orchestrator.workflow._SIGNAL_DIR", self.signal_dir):
+            paused_orchestrator._check_pause_signal(state)
+
+        assert state == original_state
+        mock_heartbeat.assert_not_called()
+
+    def test_pause_blocks_until_file_removed(
+        self,
+        paused_orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """Pause file blocks execution; heartbeats show 'paused' phase; previous phase restored."""
+        pause_file = self._pause_file()
+        pause_file.touch()
+        state = {"current_phase": "design_complete", "session_id": "pause-test"}
+
+        # Capture snapshots of state at each heartbeat call (state is mutated in place)
+        heartbeat_snapshots: list[tuple[str, dict]] = []
+
+        def capture_heartbeat(agent: str, st: dict) -> bool:
+            heartbeat_snapshots.append((agent, dict(st)))
+            return True
+
+        def remove_after_delay() -> None:
+            import time
+            time.sleep(0.3)
+            pause_file.unlink()
+
+        remover = threading.Thread(target=remove_after_delay)
+        remover.start()
+
+        with (
+            patch("orchestrator.workflow._SIGNAL_DIR", self.signal_dir),
+            patch("orchestrator.workflow._PAUSE_POLL_INTERVAL", 0.1),
+            patch.object(paused_orchestrator, "_emit_heartbeat", side_effect=capture_heartbeat),
+        ):
+            paused_orchestrator._check_pause_signal(state)
+
+        remover.join()
+
+        # Previous phase should be restored after resume
+        assert state["current_phase"] == "design_complete"
+        assert "paused_at_phase" not in state
+
+        # At least two heartbeats: one for entering paused, one for resuming
+        assert len(heartbeat_snapshots) >= 2
+
+        # First heartbeat should show paused phase
+        first_agent, first_hb_state = heartbeat_snapshots[0]
+        assert first_agent == "orchestrator"
+        assert first_hb_state["current_phase"] == "paused"
+        assert first_hb_state["paused_at_phase"] == "design_complete"
+
+        # Last heartbeat should show restored phase
+        last_agent, last_hb_state = heartbeat_snapshots[-1]
+        assert last_agent == "orchestrator"
+        assert last_hb_state["current_phase"] == "design_complete"
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    def test_pause_preserves_previous_phase(
+        self,
+        mock_heartbeat: MagicMock,
+        paused_orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """current_phase is restored to the exact value before pause after file removal."""
+        pause_file = self._pause_file()
+        pause_file.touch()
+        state = {"current_phase": "testing_complete", "session_id": "pause-test"}
+
+        def remove_after_delay() -> None:
+            import time
+            time.sleep(0.2)
+            pause_file.unlink()
+
+        remover = threading.Thread(target=remove_after_delay)
+        remover.start()
+
+        with (
+            patch("orchestrator.workflow._SIGNAL_DIR", self.signal_dir),
+            patch("orchestrator.workflow._PAUSE_POLL_INTERVAL", 0.1),
+        ):
+            paused_orchestrator._check_pause_signal(state)
+
+        remover.join()
+
+        assert state["current_phase"] == "testing_complete"
+        assert "paused_at_phase" not in state
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    def test_pause_timeout(
+        self,
+        mock_heartbeat: MagicMock,
+        paused_orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When timeout expires, current_phase becomes 'error' and pause file is removed."""
+        pause_file = self._pause_file()
+        pause_file.touch()
+        state = {"current_phase": "develop_complete", "session_id": "pause-test"}
+
+        with (
+            patch("orchestrator.workflow._SIGNAL_DIR", self.signal_dir),
+            patch("orchestrator.workflow._MAX_PAUSE_SECONDS", 2),
+            patch("orchestrator.workflow._PAUSE_POLL_INTERVAL", 0.1),
+        ):
+            paused_orchestrator._check_pause_signal(state)
+
+        assert state["current_phase"] == "error"
+        assert "Pause timeout" in state["error"]
+        # Pause file should be cleaned up on timeout
+        assert not pause_file.exists()

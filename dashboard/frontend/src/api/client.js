@@ -36,6 +36,12 @@ export async function pauseSession(sessionId) {
   return res.json()
 }
 
+export async function resumeSession(sessionId) {
+  const res = await fetch(`${BASE}/api/sessions/${sessionId}/resume`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function archiveSession(sessionId) {
   const res = await fetch(`${BASE}/api/sessions/${sessionId}/archive`, { method: 'PATCH' })
   if (!res.ok) throw new Error(await res.text())
