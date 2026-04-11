@@ -258,6 +258,7 @@ class WorkflowOrchestrator:
         title: str,
         description: str,
         issue_type: str = "feature",
+        extra_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Execute the full sequential pipeline.
 
@@ -265,6 +266,8 @@ class WorkflowOrchestrator:
             title: Issue / feature title.
             description: Issue / feature description.
             issue_type: One of ``"feature"``, ``"bug"``, ``"refactor"``.
+            extra_state: Optional additional fields to merge into the
+                initial pipeline state (e.g. Jira enrichment data).
 
         Returns:
             Final accumulated state dict.  ``current_phase`` will be
@@ -278,6 +281,12 @@ class WorkflowOrchestrator:
             "repo_path": self.repo_path or "",
             "current_phase": "init",
         }
+
+        if extra_state:
+            _protected = {"session_id", "issue_title", "issue_description",
+                          "issue_type", "repo_path", "current_phase"}
+            state.update({k: v for k, v in extra_state.items()
+                          if k not in _protected})
 
         self._emit_heartbeat("orchestrator", state)
 
