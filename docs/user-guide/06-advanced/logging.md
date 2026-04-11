@@ -42,11 +42,11 @@ When `LOG_FILE_PATH` is set, all log output goes to that file in addition to std
 
 ### Per-Agent Logs
 
-Each agent writes to its own log file under `logs/agents/`:
+Each stage runner writes to its own log file under `logs/stages/`:
 
 ```
 logs/
-├── agents/
+├── stages/
 │   ├── design_agent.log
 │   ├── go_k8s_developer.log
 │   ├── testing_agent.log
@@ -132,7 +132,10 @@ Set `LOG_FORMAT=json` for structured log output compatible with log aggregation 
 Set `LOG_LEVEL=DEBUG` in `.env`, then run:
 
 ```bash
-uv run python scripts/orchestrate.py --title "Test" --description "Debug run"
+uv run python scripts/orchestrate.py \
+  --title "Test" \
+  --description "Debug run" \
+  --output-dir ./output
 tail -f /tmp/muilti-agents-debug.log
 ```
 

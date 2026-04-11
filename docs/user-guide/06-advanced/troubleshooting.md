@@ -256,7 +256,10 @@ LOG_FILE_PATH=/tmp/muilti-agents-debug.log
 Then run and follow the log:
 
 ```bash
-uv run python scripts/orchestrate.py --title "Test" --description "Debug run"
+uv run python scripts/orchestrate.py \
+  --title "Test" \
+  --description "Debug run" \
+  --output-dir ./output
 tail -f /tmp/muilti-agents-debug.log
 ```
 

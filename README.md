@@ -1,124 +1,133 @@
-# Multi-Agent OCP Builds
+# FlowPilot: Feature SDLC Automation for Shipwright / OpenShift Builds
 
-AI-powered development orchestrator for Shipwright Build using Claude AI and LangGraph. This system automates the design, development, testing, and documentation workflow for OpenShift and Shipwright Build projects. You provide a feature request or bug report; the agent pipeline returns a design document, production Go code, Ginkgo v2 tests, and full documentation.
-
-![Multi-Agent OCP Build Orchestrator: Automated Workflow & Data Flow](docs/user-guide/assets/workflow-diagram.png)
+SDLC orchestration layer that drives a feature from Jira ticket to production-ready Go code, tests, and documentation — using Claude as the execution engine for every stage.
 
 ---
 
-## Documentation
+## What It Does
 
-Full documentation is available in the **[User Guide](docs/user-guide/README.md)**.
+You provide a Jira ticket (or a plain feature description). FlowPilot orchestrates five SDLC stages — each powered by Claude — and delivers a complete set of artifacts: architecture design documents, production Go code, code review findings with an auto-fix loop, Ginkgo v2 test files, and PR-ready documentation. Each stage validates its outputs before passing state to the next, so failures surface immediately rather than propagating silently through the pipeline.
 
-| Section | Description |
-|---------|-------------|
-| [Getting Started](docs/user-guide/01-getting-started/installation.md) | Installation, quick start, configuration |
-| [Core Concepts](docs/user-guide/02-concepts/architecture.md) | Architecture, agents, state management |
-| [Agents](docs/user-guide/03-agents/design-agent.md) | Design, Development, Testing, Docs agents |
-| [Dashboard](docs/user-guide/04-dashboard/overview.md) | Real-time monitoring |
-| [Authentication](docs/user-guide/05-authentication/overview.md) | Vertex AI and API key setup |
-| [Advanced](docs/user-guide/06-advanced/dry-run-mode.md) | Dry-run, logging, troubleshooting |
-| [Examples](docs/user-guide/07-examples/README.md) | Working examples |
-| [Testing](docs/user-guide/08-testing/README.md) | Test suite guide |
+---
+
+## The SDLC Flow
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Feature SDLC Pipeline                            │
+├──────────┬──────────┬─────────────┬──────────┬──────────────────────┤
+│  Phase 1 │  Phase 2 │   Phase 2.5 │  Phase 3 │       Phase 4        │
+│  DESIGN  │  DEVELOP │ CODE REVIEW │  TESTING │   DOCUMENTATION      │
+├──────────┼──────────┼─────────────┼──────────┼──────────────────────┤
+│ Arch     │ Go code  │ Blocking /  │ Unit     │ PR Summary           │
+│ analysis │ PR desc  │ Warning     │ Integr.  │ Release Notes        │
+│ Risks    │ API types│ findings    │ E2E      │ SHIP / JTBD docs     │
+│ Impl plan│ Tests    │ Auto-fix ↺  │ Ginkgo v2│                      │
+└──────────┴──────────┴─────────────┴──────────┴──────────────────────┘
+         Input: Jira Ticket or Feature Description
+         Output: /output-dir with code/, tests/, design/, docs/
+```
+
+The code review stage includes an auto-fix loop. Blocking findings route the pipeline back to the development stage for a retry, up to `MAX_REVIEW_ITERATIONS`:
+
+```text
+Development → Code Review ──PASS──→ Testing
+                   │
+                  FAIL (blocking findings)
+                   │
+                   └──→ Development (retry, max MAX_REVIEW_ITERATIONS)
+```
+
+---
+
+## SDLC Phase Details
+
+| Phase              | Stage Runner        | Key Inputs                            | Key Outputs                                                                                 |
+| ------------------ | ------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1 · Design         | Design Agent        | Jira ticket, repo paths               | Architecture analysis, impacted components, risks, acceptance criteria, implementation plan |
+| 2 · Development    | Development Agent   | Design analysis, implementation plan  | Go source files, PR description, API types                                                  |
+| 2.5 · Code Review  | Code Review Agent   | Generated code                        | BLOCKING/WARNING findings, pass/fail verdict, auto-fix loop                                 |
+| 3 · Testing        | Testing Agent       | Design + code                         | Unit, integration, e2e Ginkgo v2 test files, test plan                                     |
+| 4 · Documentation  | Documentation Agent | All phase outputs                     | PR summary, release notes, SHIP docs, JTBD docs                                             |
+| Publish            | publish.py          | Output directory                      | GitHub PR, Jira comments/attachments                                                        |
+
+---
+
+## Repository Support
+
+Configure repository paths so stage runners can analyze actual Go types, CRDs, and controllers from source. Use `repos.yaml` for multi-repo setups:
+
+```bash
+cp repos.yaml.example repos.yaml  # edit with your local clone paths
+```
+
+See [Configuration](docs/user-guide/01-getting-started/configuration.md#repository-paths) for details. Environment variables (`SHIPWRIGHT_REPO_PATH`, `OPENSHIFT_BUILDS_REPO_PATH`) are also supported for single-repo setups.
 
 ---
 
 ## Quick Start
 
-See [Getting Started](docs/user-guide/01-getting-started/installation.md) for full setup instructions.
-
-### Install
-
 ```bash
-git clone https://github.com/yourusername/muilti-agents-ocp-builds.git
-cd muilti-agents-ocp-builds
+# 1. Install
+git clone <repo> && cd muilti-agents-ocp-builds
 uv venv && uv pip install -r requirements.txt
-cp .env.example .env
-# Set ANTHROPIC_VERTEX_PROJECT_ID in .env
-gcloud auth application-default login
+cp .env.example .env  # fill in credentials
+
+# 2. Run the dashboard
+uv run python scripts/run_dashboard.py  # http://localhost:8080
 ```
 
-### Run the Orchestration Workflow
+Open [http://localhost:8080](http://localhost:8080) and click **New Run**. Enter a Jira ticket ID (e.g. `BUILD-1707`) or a feature description, then click **Run Feature**. The pipeline orchestrates all five stages and shows progress in real time.
 
-```bash
-uv run python scripts/orchestrate.py \
-  --title "Add timeout support to BuildRun" \
-  --description "Users need ability to specify build timeout to prevent hanging builds"
-```
+For CLI and automation usage, see the [CLI Reference](docs/user-guide/10-reference/cli.md).
 
-### Start the Real-Time Monitoring Dashboard
-
-```bash
-# Terminal 1 - Start dashboard (port 8080)
-uv run python scripts/run_dashboard.py
-
-# Terminal 2 - Run workflow
-uv run python scripts/orchestrate.py --title "Feature title" --description "Description"
-```
-
-### Run Tests
-
-```bash
-# All tests (no credentials needed - uses mock mode)
-uv run pytest tests/ -v
-
-# With coverage
-uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
-```
-
-### Run with Manual Approval
-
-```bash
-# Run with manual approval (pause between phases to review)
-MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
-  --title "Add timeout support to BuildRun API" \
-  --description "Users need to specify timeouts for build execution"
-```
-
-### Dry Run (No API Credentials Needed)
-
-```bash
-uv run python scripts/test_agents.py --e2e --dry-run --debug
-```
-
-> For more detail on any of these commands, see the [User Guide](docs/user-guide/README.md).
+See [Quick Start](docs/user-guide/01-getting-started/quick-start.md) for full credential setup (Vertex AI, Jira, GitHub).
 
 ---
 
-## Architecture
+## Output Structure
 
-The system runs five Claude AI agents in a sequential LangGraph pipeline:
-
+```text
+output/BUILD-1707/
+├── design/
+│   ├── design_analysis.md      # Architecture decisions, impacted components
+│   └── implementation_plan.md  # Step-by-step implementation guide
+├── code/                       # Production Go source files
+├── tests/
+│   ├── unit/                   # Ginkgo v2 unit tests
+│   ├── integration/            # Integration test files
+│   └── e2e/                    # End-to-end test files
+├── docs/
+│   ├── pr_description.md       # Ready-to-use GitHub PR description
+│   └── release_notes.md        # Release notes for the feature
+└── state.json                  # Full pipeline state snapshot
 ```
-Issue → Design Agent → Development Agent → Code Review Agent → Testing Agent → Docs Agent → Done
-                              ↑                    │ (fail: blocking issues found)
-                              └────────────────────┘ auto-fix loop (≤ MAX_REVIEW_ITER)
-```
 
-Each agent reads from the shared `AgentState` and writes its outputs back before the next agent begins. Each phase includes automatic output validation — the workflow stops immediately if required outputs are missing, rather than silently passing bad data forward. See [Architecture](docs/user-guide/02-concepts/architecture.md) for a full breakdown.
+---
+
+## Documentation
+
+[User Guide](docs/user-guide/README.md) — full reference
+
+| Section | Content |
+|---------|---------|
+| [Quick Start](docs/user-guide/01-getting-started/quick-start.md) | Dashboard-first setup: install, configure credentials, run |
+| [Dashboard](docs/user-guide/04-dashboard/overview.md) | Web UI pages, real-time monitoring, session management |
+| [Architecture](docs/user-guide/02-concepts/architecture.md) | Pipeline design, state management, security layers |
+| [Stage Runners](docs/user-guide/03-agents/design-agent.md) | Per-stage reference |
+| [CLI Reference](docs/user-guide/10-reference/cli.md) | All CLI commands for scripting and automation |
+| [API Reference](docs/user-guide/10-reference/api.md) | REST API endpoints, heartbeat protocol, database schema |
+| [Authentication](docs/user-guide/05-authentication/authentication.md) | Vertex AI setup |
+| [Publishing](docs/user-guide/09-integrations/publish.md) | Push to GitHub / Jira |
 
 ---
 
 ## Requirements
 
-| Requirement | Version |
-|-------------|---------|
-| Python | 3.11 or higher |
-| Authentication | Google Vertex AI (Application Default Credentials) |
-| Dashboard port | 8080 (local only) |
-| Dry run | Yes - no credentials needed |
-
----
-
-## Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `ANTHROPIC_VERTEX_PROJECT_ID` | GCP project ID for Vertex AI auth (required) |
-| `CLOUD_ML_REGION` | GCP region (default: `us-east5`) |
-| `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-6`) |
-| `DASHBOARD_ENABLED` | Enable heartbeats to dashboard (default: `true`) |
-| `SHIPWRIGHT_REPO_PATH` | Path to Shipwright Build repo for deeper analysis |
-| `MANUAL_APPROVAL` | Pause for user approval between phases (default: `false`) |
-
-See [Configuration](docs/user-guide/01-getting-started/configuration.md) for the full reference.
+| Requirement | Detail |
+|-------------|--------|
+| Python | 3.12+ |
+| Claude | Google Vertex AI (Application Default Credentials) |
+| Jira | API token for ticket fetching |
+| GitHub | PAT for PR enrichment and publishing |
+| Qodo | Optional — Claude is used as fallback if not installed |

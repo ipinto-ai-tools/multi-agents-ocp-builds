@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from tests.auth_helper import HAS_ANTHROPIC_AUTH
 
-from agents.docs_agent import (
+from stages.docs import (
     run_docs,
     _build_context_message,
     _parse_docs_response,
@@ -155,8 +155,8 @@ class TestDocsAgent:
     def test_docs_agent_missing_context(self):
         """Test that docs agent fails with missing required context."""
         incomplete_context = {
-            "design_analysis": "Some analysis",
-            # Missing code_changes and test_results
+            # Missing design_analysis (the only required key)
+            "code_changes": {"file.go": "changes"},
         }
 
         with pytest.raises(ValueError, match="Missing required context keys"):
@@ -223,7 +223,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -268,7 +268,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -295,7 +295,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -313,7 +313,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -333,7 +333,7 @@ class TestDocsAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -530,7 +530,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text="Basic docs")]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -547,7 +547,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -558,14 +558,14 @@ class TestEdgeCases:
                 # Should still generate docs
                 assert "pr_summary" in result
 
-                # Context message should show 0 files
+                # Context message should omit Code Changes section
                 call_args = mock_client.messages.create.call_args
                 context_msg = call_args.kwargs["messages"][0]["content"]
-                assert "Modified 0 file" in context_msg
+                assert "## Code Changes" not in context_msg
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_anthropic.return_value = mock_client
@@ -579,7 +579,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = []  # Empty content
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -620,7 +620,7 @@ class TestIntegration:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DOCS_RESPONSE)]
 
-        with patch("agents.docs_agent.get_anthropic_client") as mock_anthropic:
+        with patch("stages.docs.get_anthropic_client") as mock_anthropic:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_anthropic.return_value = mock_client
@@ -648,18 +648,16 @@ def minimal_context():
     """Fixture providing minimal valid context."""
     return {
         "design_analysis": "Basic design",
-        "code_changes": {"file.go": "changes"},
-        "test_results": {"unit": {"passed": 1}},
     }
 
 
 def test_required_context_validation(minimal_context):
     """Test that required context keys are validated."""
-    # Remove required key
+    # Remove the only required key
     incomplete = minimal_context.copy()
-    del incomplete["test_results"]
+    del incomplete["design_analysis"]
 
-    with pytest.raises(ValueError, match="test_results"):
+    with pytest.raises(ValueError, match="design_analysis"):
         run_docs(incomplete)
 
 

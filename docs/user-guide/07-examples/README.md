@@ -197,7 +197,7 @@ python examples/logger_demo.py
 
 | Demo | Description | Output location |
 |------|-------------|-----------------|
-| Basic agent logging | `INFO`, `WARNING`, `ERROR` for a named agent | `logs/agents/design_agent.log` |
+| Basic agent logging | `INFO`, `WARNING`, `ERROR` for a named agent | `logs/stages/design_agent.log` |
 | Dashboard component logging | Separate loggers for backend and frontend subcomponents | `logs/dashboard/dashboard.log` |
 | Session-specific logging | Loggers scoped to a session ID, one per phase | `logs/sessions/session_<id>_*.log` |
 | Log level control | All five levels; dynamic level change mid-run | `logs/test_component.log` |
@@ -209,8 +209,8 @@ python examples/logger_demo.py
 ```python
 from utils.file_logger import get_logger, get_session_logger, set_log_level
 
-# Basic logger - writes to logs/agents/<name>.log
-logger = get_logger("agents.my_agent")
+# Basic logger - writes to logs/stages/<name>.log
+logger = get_logger("stages.my_agent")
 logger.info("Starting analysis...")
 logger.warning("Unexpected response format")
 
@@ -219,7 +219,7 @@ session_logger = get_session_logger(session_id, "design")
 session_logger.info("Design phase started")
 
 # Change log level for a named logger at runtime
-set_log_level("agents.my_agent", logging.WARNING)
+set_log_level("stages.my_agent", logging.WARNING)
 
 # Console-only logger - no file written
 console_logger = get_logger("temp_component", file_output=False)
@@ -234,7 +234,7 @@ File Logger Demonstration
 
 === Basic Logger Demo ===
 
-✓ Logs written to: logs/agents/design_agent.log
+✓ Logs written to: logs/stages/design_agent.log
 
 === Dashboard Logger Demo ===
 
@@ -285,7 +285,7 @@ The dashboard backend must be running before you execute this script:
 
 ```bash
 # Terminal 1: Start the dashboard
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 ```
 
 ### How to Run
@@ -368,7 +368,7 @@ All API tests completed successfully!
 
 ## 5. Code Review Agent
 
-The Code Review Agent (`agents/code_review_agent.py`) runs automatically between Development and Testing in every E2E workflow. The examples below show how to observe, configure, and inspect its behavior without modifying any agent code.
+The Code Review Agent (`stages/code_review.py`) runs automatically between Development and Testing in every E2E workflow. The examples below show how to observe, configure, and inspect its behavior without modifying any agent code.
 
 ### When to Use
 
@@ -397,7 +397,8 @@ Set `QODO_REVIEW_ENABLED=false` to skip the Code Review phase entirely. The pipe
 ```bash
 QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
   --title "Feature title" \
-  --description "Description"
+  --description "Description" \
+  --output-dir ./output
 ```
 
 ### c) Tuning the Auto-fix Loop
@@ -413,7 +414,8 @@ QODO_REVIEW_ENABLED=false uv run python scripts/orchestrate.py \
 ```bash
 MAX_REVIEW_ITERATIONS=5 QODO_BLOCKING_THRESHOLD=medium uv run python scripts/orchestrate.py \
   --title "Add timeout support" \
-  --description "Users need configurable timeouts"
+  --description "Users need configurable timeouts" \
+  --output-dir ./output
 ```
 
 ### d) Optional Qodo CLI
@@ -423,7 +425,8 @@ Set `QODO_CLI_PATH` to the absolute path of the Qodo binary to use Qodo as the r
 ```bash
 QODO_CLI_PATH=/usr/local/bin/qodo uv run python scripts/orchestrate.py \
   --title "Add timeout support" \
-  --description "Description"
+  --description "Description" \
+  --output-dir ./output
 ```
 
 ### e) Reading Review Output from State
@@ -431,9 +434,9 @@ QODO_CLI_PATH=/usr/local/bin/qodo uv run python scripts/orchestrate.py \
 After `orchestrate()` returns, the review results are available directly on the state dict:
 
 ```python
-from agents.graph import orchestrate
+from orchestrator.workflow import WorkflowOrchestrator
 
-result = orchestrate(
+result = WorkflowOrchestrator().run(
     title="Add timeout support",
     description="Users need configurable timeouts"
 )

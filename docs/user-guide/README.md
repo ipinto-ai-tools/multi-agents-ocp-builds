@@ -1,9 +1,16 @@
-# Multi-Agent OCP Builds - User Guide
+# Feature SDLC Automation — User Guide
 
-AI-powered development orchestrator for Shipwright Build using Claude AI and LangGraph.
+End-to-end automation of the feature development lifecycle for Shipwright / OpenShift Builds projects.
 
 This system automates the design, development, testing, and documentation workflow for OpenShift and Shipwright Build projects. You provide a feature request or bug report; the agent pipeline returns a design document, production Go code, Ginkgo v2 tests, and full documentation.
 
+**SDLC flow:**
+
+```text
+Jira Ticket → Design → Development → Code Review → Testing → Documentation → Publish
+```
+
+Each phase is handled by a dedicated AI agent. Artifacts are saved to `--output-dir` and can be pushed to GitHub and Jira via `publish.py`.
 
 ![Multi-Agent OCP Build Orchestrator: Automated Workflow & Data Flow](assets/workflow-diagram-detailed.png)
 
@@ -16,16 +23,16 @@ This system automates the design, development, testing, and documentation workfl
 | Page | Description |
 |------|-------------|
 | [Installation](01-getting-started/installation.md) | System requirements and install steps |
-| [Quick Start](01-getting-started/quick-start.md) | Run your first workflow in minutes |
+| [Quick Start](01-getting-started/quick-start.md) | Dashboard-first setup: install, configure credentials, and run your first pipeline |
 | [Configuration](01-getting-started/configuration.md) | Environment variables and `.env` setup |
 
-### Section 2 - Core Concepts
+### Section 2 - Core Concepts & SDLC Pipeline
 
 | Page | Description |
 |------|-------------|
 | [Architecture](02-concepts/architecture.md) | System overview and LangGraph pipeline |
 | [Agents Overview](02-concepts/agents-overview.md) | The five agents and how they connect |
-| [State Management](02-concepts/state-management.md) | AgentState, phase transitions, data flow |
+| [State Management](02-concepts/state-management.md) | WorkflowState, phase transitions, data flow |
 
 ### Section 3 - Agents
 
@@ -46,11 +53,9 @@ This system automates the design, development, testing, and documentation workfl
 
 ### Section 5 - Authentication
 
-| Page | Description |
-|------|-------------|
-| [Overview](05-authentication/overview.md) | How authentication works |
-| [Vertex AI](05-authentication/vertex-ai.md) | Google Vertex AI setup guide |
-| [API Key](05-authentication/api-key.md) | Direct API key setup |
+| Page                                                  | Description                            |
+|-------------------------------------------------------|----------------------------------------|
+| [Authentication](05-authentication/authentication.md) | Authentication setup and configuration |
 
 ### Section 6 - Advanced
 
@@ -60,6 +65,7 @@ This system automates the design, development, testing, and documentation workfl
 | [Logging](06-advanced/logging.md) | Log files, levels, and session logs |
 | [Output Validation](06-advanced/output-validation.md) | Per-phase validation and manual approval |
 | [Troubleshooting](06-advanced/troubleshooting.md) | Common issues and fixes |
+| [Code Flow](06-advanced/code-flow.md) | Function call mapping across the pipeline |
 
 ### Section 7 - Security
 
@@ -70,23 +76,31 @@ This system automates the design, development, testing, and documentation workfl
 | [Log & Output Sanitizer](07-security/output-sanitizer.md)                   | Layer 3: egress protection — scrubs sensitive data from logs and outputs     |
 | [claude-hooks PostToolUse Integration](07-security/claude-hooks.md)         | Layer 4: host-level defense via Claude Code hooks                            |
 
-### Section 7 - Examples
+### Section 8 - Examples
 
 | Page | Description |
 | ---- | ----------- |
 | [Examples](07-examples/README.md) | Runnable scripts for testing agents, auth, logging, and the dashboard API |
 
-### Section 8 - Testing
+### Section 9 - Testing
 
 | Page                          | Description                                                                         |
 |-------------------------------|-------------------------------------------------------------------------------------|
 | [Testing](08-testing/README.md) | Test suite overview, dual-mode execution, fixtures, markers, and writing new tests |
 
-### Section 9 - Integrations
+### Section 10 - Integrations
+
+| Page                                                               | Description                                                                       |
+|--------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| [Jira & Rovo](09-integrations/jira-rovo.md)                        | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup                  |
+| [Publishing Artifacts (`publish.py`)](09-integrations/publish.md)  | Push generated code, docs, and summaries to GitHub or Jira                        |
+
+### Section 11 - Reference
 
 | Page | Description |
 |------|-------------|
-| [Jira & Rovo](09-integrations/jira-rovo.md) | Feed Jira tickets directly to the agent pipeline; Rovo MCP setup |
+| [CLI Reference](10-reference/cli.md) | All CLI commands, options, and usage examples |
+| [API Reference](10-reference/api.md) | REST API endpoints, heartbeat protocol, database schema |
 
 ---
 
@@ -94,18 +108,22 @@ This system automates the design, development, testing, and documentation workfl
 
 | I want to... | Go to |
 |---|---|
+| Run the full SDLC from a Jira ticket | [Quick Start](01-getting-started/quick-start.md) |
 | Install the system for the first time | [Installation](01-getting-started/installation.md) |
 | Run my first workflow | [Quick Start](01-getting-started/quick-start.md) |
 | Configure environment variables | [Configuration](01-getting-started/configuration.md) |
 | Understand what each agent does | [Agents Overview](02-concepts/agents-overview.md) |
 | Call an agent directly from Python | [Design Agent](03-agents/design-agent.md) / [Testing Agent](03-agents/testing-agent.md) |
 | Monitor a running workflow | [Dashboard Overview](04-dashboard/overview.md) |
-| Set up Google Vertex AI authentication | [Vertex AI](05-authentication/vertex-ai.md) |
+| Set up Google Vertex AI authentication | [Authentication](05-authentication/authentication.md) |
 | Test without making API calls | [Dry Run Mode](06-advanced/dry-run-mode.md) |
 | Debug a failing workflow | [Troubleshooting](06-advanced/troubleshooting.md) |
 | Understand how state flows between agents | [State Management](02-concepts/state-management.md) |
 | Use a Jira ticket as workflow input | [Jira & Rovo Integration](09-integrations/jira-rovo.md) |
+| Publish code/docs to GitHub or Jira | [Publishing Artifacts](09-integrations/publish.md) |
 | Review generated code automatically | [Code Review Agent](03-agents/code-review-agent.md) |
+| Use the CLI for scripting | [CLI Reference](10-reference/cli.md) |
+| Use the REST API directly | [API Reference](10-reference/api.md) |
 
 ---
 
@@ -114,7 +132,7 @@ This system automates the design, development, testing, and documentation workfl
 | Item | Value |
 |------|-------|
 | Default model | `claude-sonnet-4-6` |
-| Python requirement | 3.11 or higher |
+| Python requirement | 3.12 or higher |
 | Auth method | Google Vertex AI (Application Default Credentials) |
 | Dashboard port | 8080 (local only) |
 | Dry run support | Yes - no credentials needed |

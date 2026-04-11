@@ -1,6 +1,6 @@
 # Testing
 
-The test suite validates all agents, the orchestration workflow, the skills layer, the PII redaction layer, the Prompt Injection Guard, the Output Sanitizer, and the claude-hooks prompt injection defender using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All 659 tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
+The test suite validates all stages, the orchestration workflow, the PII redaction layer, the Prompt Injection Guard, the Output Sanitizer, and the claude-hooks prompt injection defender using a dual-mode approach: fast offline testing with mocked responses when no API credentials are present, and full integration testing against the real Claude API when Vertex AI is configured. All tests run under pytest with automatic skip logic so you never need to change commands based on your environment.
 
 ---
 
@@ -74,8 +74,6 @@ The 6 tests that are skipped in mock mode are:
 - `test_agents_validator_design.py::test_design_agent_with_real_api`
 - `test_agents_validator_develop.py::test_development_agent_with_real_api`
 - `test_agents_validator_docs.py::test_docs_agent_with_real_api`
-- `test_agents_validator_orchestration.py::test_full_orchestration_with_real_api`
-- `test_agents_validator_orchestration.py::test_shipwright_timeout_feature`
 - `test_agents_validator_testing.py::test_testing_agent_with_real_api`
 
 ---
@@ -88,11 +86,10 @@ The 6 tests that are skipped in mock mode are:
 | `uv run pytest tests/ -v -s` | All tests with captured output printed |
 | `uv run pytest tests/test_agents_validator_design.py -v` | Design agent only |
 | `uv run pytest tests/test_agents_validator_docs.py -v` | Docs agent only |
-| `uv run pytest tests/test_agents_validator_orchestration.py -v` | Orchestration only |
 | `uv run pytest tests/test_agents_code_review.py -v` | Code Review Agent only |
 | `uv run pytest tests/test_agents_validator_jira.py -v` | Jira integration only |
 | `uv run pytest tests/test_agents_validator_develop.py -v` | Development agent only |
-| `uv run pytest tests/ --cov=agents --cov=graph --cov-report=html` | All tests with HTML coverage report |
+| `uv run pytest tests/ --cov=stages --cov=orchestrator --cov-report=html` | All tests with HTML coverage report |
 | `uv run pytest -m "not real_api"` | Explicitly skip real API tests |
 | `uv run pytest -m real_api` | Run only real API tests |
 | `uv run pytest -m integration` | Run only integration tests |
@@ -116,9 +113,7 @@ uv run pytest tests/test_agents_validator_design.py::TestDesignAgent::test_desig
 | `test_agents_code_review.py` | 90 | Code Review Agent: output parsing, severity classification, auto-fix loop routing, dry-run, validators, mock responses |
 | `test_agents_validator_jira.py` | 68 | Jira ticket fetching, context injection, field parsing, error handling, dry-run mode |
 | `test_pii_redactor.py` | 43 | PII redaction: regex patterns (IPv4, IPv6, email, phone, hostname), allowlist suffix matching, personal name fields, field routing, env var toggle |
-| `test_skills.py` | 31 | `Skill` base class DRY_RUN dispatch, `FetchJiraTicketSkill`, `UpdateJiraSkill`, `FetchGitHubPRsSkill`, `SkillRegistry` |
 | `test_agents_validator_develop.py` | 34 | Development agent code generation, prompt building, output parsing, review feedback injection |
-| `test_agents_validator_orchestration.py` | 29 | Full 5-agent workflow, state management, node execution, graph routing, auto-fix loop |
 | `test_agents_validator_dashboard.py` | 25 | Dashboard heartbeat, enricher pipeline, session storage, REST endpoints |
 | `test_agents_validator_docs_enhanced.py` | 24 | Enhanced docs generation scenarios, RAG integration, SHIP format, JTBD docs |
 | `test_agents_validator_docs.py` | 23 | Docs agent core: mock and real API, context building, section parsing, error scenarios |
@@ -146,17 +141,6 @@ Four test classes plus a standalone function:
 - `TestHelperFunctions` - context construction and response parsing
 - `TestEdgeCases` - missing data, malformed responses, API failures
 - `TestIntegration` - full context flow from input to output
-
-### test_agents_validator_orchestration.py (29 tests)
-
-Six test classes validate the LangGraph pipeline end to end, including the auto-fix loop routing introduced by the Code Review Agent:
-
-- `TestOrchestration` - full workflow with mock and real API
-- `TestWorkflowNodes` - individual design and docs node execution
-- `TestWorkflowGraph` - graph structure and edge validation
-- `TestStateManagement` - state persistence across phases
-- `TestIntegration` - end-to-end scenarios with realistic inputs
-- `TestRealWorldScenarios` - real Shipwright issue simulations (e.g., BuildRun timeout feature)
 
 ### test_agents_code_review.py (90 tests)
 
@@ -195,7 +179,7 @@ All shared test data is defined in `tests/conftest.py` and automatically availab
 | `sample_code_changes` | `Dict[str, str]` | Three modified Go files with descriptions |
 | `sample_test_results` | `Dict[str, Dict[str, int]]` | Unit, integration, and E2E test pass/fail/skip counts |
 | `sample_docs_context` | `Dict[str, Any]` | Complete docs agent input assembled from the four fixtures above |
-| `sample_workflow_state` | `Dict[str, Any]` | Full LangGraph `AgentState` with all fields initialized |
+| `sample_workflow_state` | `Dict[str, Any]` | Full `AgentState` with all fields initialized |
 
 ### Fixture Composition
 
@@ -256,7 +240,7 @@ class TestMyAgent:
 
     def test_my_agent_with_mock(self, sample_issue_data):
         """Validate agent output structure using a mocked API response."""
-        with patch("agents.my_agent.get_anthropic_client") as mock_client:
+        with patch("stages.my_agent.get_anthropic_client") as mock_client:
             mock_client.return_value.messages.create.return_value = MagicMock(
                 content=[MagicMock(text="## Section\nContent")]
             )
@@ -285,15 +269,15 @@ class TestMyAgent:
 ## Coverage Report
 
 ```bash
-uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
+uv run pytest tests/ --cov=stages --cov=orchestrator --cov-report=html
 ```
 
-This generates an HTML report in `htmlcov/index.html`. Open it in a browser to see line-by-line coverage for the `agents/` and `graph/` packages. The project target is 90% coverage across these modules.
+This generates an HTML report in `htmlcov/index.html`. Open it in a browser to see line-by-line coverage for the `stages/` and `orchestrator/` packages. The project target is 90% coverage across these modules.
 
 To view a terminal summary instead:
 
 ```bash
-uv run pytest tests/ --cov=agents --cov=graph --cov-report=term-missing
+uv run pytest tests/ --cov=stages --cov=orchestrator --cov-report=term-missing
 ```
 
 ---
@@ -305,7 +289,7 @@ The test suite is designed to run in CI without credentials. Mock tests execute 
 ```yaml
 # Example GitHub Actions step
 - name: Run tests
-  run: uv run pytest tests/ -v --cov=agents --cov=graph
+  run: uv run pytest tests/ -v --cov=stages --cov=orchestrator
   env:
     ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
 ```

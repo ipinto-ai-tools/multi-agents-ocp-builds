@@ -8,12 +8,53 @@ Each call to `orchestrate()` creates one session in the dashboard database. Sess
 
 A session progresses through these phases:
 
-```
-planning → executing → done
-                    → error  (on failure)
+```text
+planning → executing → done ──→ archived ──→ deleted
+                    → error ──→ archived ──→ deleted
 ```
 
-Active sessions (any phase other than `done` or `error`) are never touched by cleanup operations.
+- **Active** sessions (`planning`, `executing`) are never touched by cleanup operations or archive/delete actions.
+- **Completed** or **failed** sessions can be archived from the UI or removed by API-based cleanup.
+- **Archived** sessions are hidden from the default dashboard view and excluded from status card counts. They can be permanently deleted.
+
+### Dual Timestamps
+
+Each session card in the UI shows two timestamps:
+
+- **Started** — when the first heartbeat for the session was received. This is the wall-clock time the workflow began.
+- **Last updated** — time elapsed since the most recent heartbeat. This value refreshes every 3 seconds while the dashboard is open.
+
+Use the gap between these two values to identify stuck sessions. If "Last updated" has not advanced for several minutes while the session is still in an active phase, the agent has likely hung or lost connectivity. See [Troubleshooting](#troubleshooting) for steps to investigate.
+
+---
+
+## Managing Sessions in the UI
+
+The React dashboard provides a two-step archive-then-delete workflow so that completed runs are hidden from day-to-day view without being immediately destroyed.
+
+### Archive a Completed Run
+
+Runs with a **Completed** or **Failed** status display an **Archive** button in the Actions column. Clicking it moves the run to the `archived` state. Archived runs are immediately hidden from the session list and are no longer counted in the summary status cards (Running, Waiting, Failed, Completed).
+
+### Show or Hide Archived Runs
+
+A **Show archived** / **Hide archived** toggle link sits above the runs table. Clicking it toggles visibility of all archived runs in the current view. When archived runs are visible they appear alongside active runs and can be filtered normally.
+
+### Delete an Archived Run
+
+Archived runs display a red **Delete** button. Clicking it opens a browser confirmation dialog:
+
+> Permanently delete this run? This cannot be undone.
+
+Confirming the dialog permanently removes the session, all associated heartbeat records, and the pipeline log file from disk.
+
+### Clean Stale Sessions
+
+A **Clean stale sessions** button is available above the runs table. Clicking it removes sessions that appear stuck — sessions in an active phase with no recent heartbeat. This is useful when agent processes have crashed or lost connectivity, leaving sessions in a permanently "running" state.
+
+### Status Card Counts
+
+The four summary cards at the top of the dashboard (Running, Waiting, Failed, Completed) are computed from whichever sessions are currently loaded. By default, archived sessions are excluded from the API response, so they do not contribute to any card count. Archiving a failed run, for example, removes it from view and decreases the Failed count by one. Toggling **Show archived** re-fetches all sessions including archived ones, so their original status is reflected in the counts again.
 
 ---
 
@@ -78,6 +119,27 @@ Response:
 }
 ```
 
+### Delete Stuck Sessions
+
+Remove sessions that have been inactive (no new heartbeat) for a specified duration while still in a non-terminal phase. Useful for cleaning up sessions where the agent process has crashed or lost connectivity. Defaults to 6 hours.
+
+```bash
+# Default: delete sessions stuck for 6+ hours
+curl -X DELETE http://localhost:8080/api/sessions/stuck
+
+# Custom: delete sessions stuck for 2+ hours
+curl -X DELETE "http://localhost:8080/api/sessions/stuck?max_stale_hours=2"
+```
+
+Response:
+
+```json
+{
+  "sessions_deleted": 2,
+  "heartbeats_deleted": 8
+}
+```
+
 ---
 
 ## Python Client Examples
@@ -98,6 +160,14 @@ print(f"Deleted {result['heartbeats_deleted']} heartbeats")
 response = requests.delete("http://localhost:8080/api/sessions/completed")
 result = response.json()
 print(f"Cleared {result['sessions_cleared']} completed sessions")
+
+# Delete stuck sessions (no heartbeat for 2+ hours)
+response = requests.delete(
+    "http://localhost:8080/api/sessions/stuck",
+    params={"max_stale_hours": 2}
+)
+result = response.json()
+print(f"Deleted {result['sessions_deleted']} stuck sessions")
 ```
 
 ---
@@ -161,7 +231,16 @@ Deletes sessions that meet ANY of these conditions:
 2. No age restriction applies
 3. Cascade: also deletes all associated heartbeat records
 
-**Active sessions are never deleted by either endpoint.**
+### `DELETE /api/sessions/stuck` (stale sessions)
+
+Deletes sessions that meet ALL of these conditions:
+1. Phase is NOT `done` or `error` (i.e., the session appears to still be running)
+2. Last heartbeat was received more than `max_stale_hours` ago (default: 6 hours)
+3. Cascade: also deletes all associated heartbeat records
+
+**Completed and errored sessions are never affected by this endpoint.**
+
+**Active sessions are never deleted by either the cleanup or completed endpoints.**
 
 ---
 
@@ -219,4 +298,4 @@ result = db.cleanup_old_sessions(max_age_hours=48)
 
 ---
 
-[← Previous: Dashboard Overview](overview.md) | [Next: Authentication Overview →](../05-authentication/overview.md)
+[← Previous: Dashboard Overview](overview.md) | [Next: Authentication Overview →](../05-authentication/authentication.md)

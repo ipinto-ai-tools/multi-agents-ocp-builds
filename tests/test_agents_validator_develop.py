@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 
 from tests.auth_helper import HAS_ANTHROPIC_AUTH
 
-from agents.go_k8s_developer import (
+from stages.develop import (
     run_development,
     DevelopmentAgentError,
     _validate_context,
@@ -445,7 +445,7 @@ class TestDevelopmentAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -483,7 +483,7 @@ class TestDevelopmentAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -520,7 +520,7 @@ class TestDevelopmentAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -595,7 +595,7 @@ class TestDevelopmentAgent:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -864,7 +864,7 @@ class TestEdgeCases:
 
     def test_anthropic_api_error(self):
         """Test handling of Anthropic API errors."""
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.side_effect = Exception("API Error")
             mock_get_client.return_value = mock_client
@@ -875,7 +875,7 @@ class TestEdgeCases:
 
     def test_invalid_anthropic_client_initialization(self):
         """Test handling of client initialization errors."""
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_get_client.side_effect = Exception("Invalid API key")
 
             with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
@@ -887,7 +887,7 @@ class TestEdgeCases:
         mock_response = Mock()
         mock_response.content = []  # Empty content
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client
@@ -954,8 +954,8 @@ Simple change.
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
-            with patch("agents.go_k8s_developer.emit_heartbeat") as mock_heartbeat:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
+            with patch("stages.develop.emit_heartbeat") as mock_heartbeat:
                 mock_client = Mock()
                 mock_client.messages.create.return_value = mock_response
                 mock_get_client.return_value = mock_client
@@ -998,7 +998,7 @@ class TestIntegration:
         mock_response = Mock()
         mock_response.content = [Mock(text=SAMPLE_DEVELOPMENT_OUTPUT)]
 
-        with patch("agents.go_k8s_developer.get_anthropic_client") as mock_get_client:
+        with patch("stages.develop.get_anthropic_client") as mock_get_client:
             mock_client = Mock()
             mock_client.messages.create.return_value = mock_response
             mock_get_client.return_value = mock_client

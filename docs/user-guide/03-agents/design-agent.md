@@ -2,14 +2,14 @@
 
 The Design Agent analyzes a GitHub issue and produces a comprehensive design document for the Shipwright Build project. It identifies impacted components, assesses risks, and creates a step-by-step implementation plan.
 
-**File:** `agents/design_agent.py`
+**File:** `stages/design.py`
 **Entry point:** `run_design(title, description, repo_path)`
 
 ---
 
 ## System Prompt
 
-The Design Agent is driven by `DESIGN_AGENT_PROMPT` defined in [`config/agent_prompts.py`](../../../config/agent_prompts.py).
+The Design Agent is driven by `DESIGN_AGENT_PROMPT` defined in [`prompts/design.py`](../../../prompts/design.py).
 
 The prompt instructs the agent to:
 
@@ -18,7 +18,7 @@ The prompt instructs the agent to:
 - Evaluate compatibility, upgrade, security, and performance impact
 - Produce a structured Markdown design document with: Problem Statement, Scope, Impacted Components, Risks and Mitigation, Acceptance Criteria, Implementation Plan, Required Tests, Required Documentation Changes
 
-To customize Design Agent behavior, edit `DESIGN_AGENT_PROMPT` in `config/agent_prompts.py`.
+To customize Design Agent behavior, edit `DESIGN_AGENT_PROMPT` in `prompts/design.py`.
 
 ---
 
@@ -28,9 +28,9 @@ To customize Design Agent behavior, edit `DESIGN_AGENT_PROMPT` in `config/agent_
 |-----------|------|----------|-------------|
 | `title` | str | Yes | GitHub issue title |
 | `description` | str | Yes | GitHub issue description |
-| `repo_path` | str | No | Path to the Shipwright Build repository |
+| `repo_path` | str | No | Path to a repository for code analysis (first path from `repos.yaml` or env vars) |
 
-When `repo_path` is provided, the agent searches the repository for API types (`*_types.go`), controllers, CRDs, and package structure before constructing the design prompt. This produces more accurate component impact analysis.
+When `repo_path` is provided, the agent searches the repository for API types, controllers, CRDs, and package structure before constructing the design prompt. The system auto-detects the project type (Go/Kubernetes or generic Go) and uses appropriate search patterns. Configure multiple repositories via `repos.yaml` for broader context. See [Repository Paths](../01-getting-started/configuration.md#repository-paths).
 
 ---
 
@@ -102,12 +102,31 @@ uv run python design_only.py
 
 ## Repository Analysis
 
-When a Shipwright repository path is set, the agent performs these searches before calling the Claude API:
+When one or more repository paths are configured (via `repos.yaml` or env vars), the agent analyzes each repository before calling the Claude API. The system auto-detects the project type and uses appropriate search patterns.
 
-- **API types** (`pkg/apis/**/*_types.go`) - Finds struct definitions and field names
-- **Controllers** (`pkg/controller/**/*.go`) - Finds reconciliation logic
-- **CRDs** (YAML files) - Finds Custom Resource Definitions
-- **Package structure** - Analyzes Go module and package dependencies
+### Project Type Detection
+
+The agent checks each repository for indicators:
+
+| Type              | Detection                                                                                         | Search Patterns                                                                                                                              |
+|-------------------|---------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Go/Kubernetes** | `go.mod` + K8s directories (`pkg/apis`, `pkg/controller`, `pkg/controllers`, `config/crd`, `api`) | API types in `**/apis/**/*_types.go`, controllers in `**/controller/**/*.go`, `**/controllers/**/*.go`, `**/reconciler/**/*.go`, CRDs in YAML |
+| **Go (generic)**  | `go.mod` without K8s indicators                                                                   | Types in `**/*_types.go`, entry points in `**/cmd/**/*.go` and `**/internal/**/*.go`                                                         |
+
+### What the agent searches for
+
+For each repository, the agent gathers:
+
+- **API types** — Struct definitions and field names from type definition files
+- **Controllers / reconcilers** — Business logic and reconciliation patterns
+- **CRDs** — Custom Resource Definition YAML files
+- **Package structure** — Go module layout and package dependencies
+
+When multiple repositories are configured, context from all repositories is merged and deduplicated before prompt assembly.
+
+### Configuration
+
+See [Repository Paths](../01-getting-started/configuration.md#repository-paths) for setup instructions.
 
 If repository analysis fails (path not found, permission error, etc.), the agent falls back to component metadata from `config/shipwright_components.py` only.
 

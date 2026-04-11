@@ -26,33 +26,33 @@ Dry run mode lets you test the system without making any Claude API calls. It us
 | Docs Agent | Returns mock PR summary and release notes |
 | Heartbeat emissions | Logged but not sent to dashboard |
 | Dashboard API checks | Skipped |
-| Skills (`fetch_jira_ticket`, `update_jira`, `fetch_github_prs`) | Each skill's `_mock_response()` is called instead of `_execute()` — see below |
+| Integrations (`fetch_jira_ticket`, `update_jira_ticket`, `fetch_github_prs`) | Each function checks `DRY_RUN` and returns mock data — see below |
 
 The full workflow code path still executes - only the Claude API call itself is replaced with the mock response.
 
 ---
 
-## Skills Layer and DRY_RUN
+## Integrations and DRY_RUN
 
-`DRY_RUN` handling for the skills layer is centralized in `Skill.run()` (`skills/base.py`). Every skill follows the same dispatch pattern automatically — no per-skill conditional is needed:
+Each integration function in `integrations/` checks the `DRY_RUN` environment variable and returns mock data when it is set to `true`. No special casing is needed in the calling code.
 
 ```python
-# Skill.run() in skills/base.py
-def run(self, inputs: dict) -> dict:
-    if self._is_dry_run():          # reads DRY_RUN env var
-        return self._mock_response()
-    return self._execute(inputs)
+# integrations/jira.py
+def fetch_jira_ticket(ticket_id: str) -> dict[str, Any]:
+    if os.getenv("DRY_RUN", "").lower() == "true":
+        return _mock_fetch(ticket_id)
+    return _live_fetch(ticket_id)
 ```
 
-**Per-skill mock behavior:**
+**Per-function mock behavior:**
 
-| Skill | `_mock_response()` returns |
-| ----- | ------------------------- |
-| `FetchJiraTicketSkill` | Mapped mock Jira state (same fields as a real ticket fetch — title, description, issue type, linked PR URLs) |
-| `UpdateJiraSkill` | `{"success": True, "dry_run": True}` |
-| `FetchGitHubPRsSkill` | `{"pr_data": []}` |
+| Function | Dry-run return value |
+| -------- | -------------------- |
+| `fetch_jira_ticket()` | Mapped mock Jira state (same fields as a real ticket fetch — title, description, issue type, linked PR URLs) |
+| `update_jira_ticket()` | `{"success": True, "dry_run": True}` |
+| `fetch_github_prs()` | `{"pr_data": []}` |
 
-This means entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) need no special casing for skills in dry-run mode — setting `DRY_RUN=true` is sufficient.
+This means entry points (`scripts/orchestrate.py`, `scripts/test_agents.py`) need no special casing for integrations in dry-run mode — setting `DRY_RUN=true` is sufficient.
 
 ---
 
@@ -156,7 +156,7 @@ With a live dashboard:
 
 ```bash
 # Terminal 1: start the dashboard
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+uv run python scripts/run_dashboard.py
 
 # Terminal 2: run dashboard tests
 uv run python scripts/test_agents.py --dashboard --debug
@@ -215,4 +215,4 @@ INFO  | multi_agent_testing | Artifact saved: /tmp/claude/agent-tests/design_out
 
 ---
 
-[← Previous: API Key](../05-authentication/api-key.md) | [Next: Logging →](logging.md) | [Output Validation →](output-validation.md)
+[← Previous: Authentication](../05-authentication/authentication.md) | [Next: Logging →](logging.md) | [Output Validation →](output-validation.md)

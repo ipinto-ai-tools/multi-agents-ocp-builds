@@ -18,7 +18,7 @@ def demo_basic_logger():
     logger.warning("Design pattern mismatch detected")
     logger.error("Missing required field in design spec")
 
-    print("✓ Logs written to: logs/agents/design_agent.log")
+    print("✓ Logs written to: logs/stages/design.log")
 
 
 def demo_dashboard_logger():

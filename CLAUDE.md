@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-agent AI system that automates design analysis and documentation generation for OpenShift/Shipwright Build projects. Uses Claude AI agents orchestrated by LangGraph in a sequential pipeline: Design → Development → Testing → Documentation.
+SDLC orchestration layer that automates the full feature development lifecycle for OpenShift/Shipwright Build projects. Uses Claude as the execution engine for stage-based workflows: Design → Development → Code Review → Testing → Documentation.
 
 ## Commands
 
@@ -25,7 +25,7 @@ uv run pytest tests/ -v
 uv run pytest tests/test_agents_validator_design.py -v
 
 # Run tests with coverage
-uv run pytest tests/ --cov=agents --cov=graph --cov-report=html
+uv run pytest tests/ --cov=stages --cov=orchestrator --cov-report=html
 
 # Manual agent testing with dry-run (no API calls)
 uv run python scripts/test_agents.py --e2e --dry-run --debug
@@ -36,50 +36,50 @@ uv run python scripts/test_agents.py --agent design --dry-run
 
 ## Architecture
 
-### LangGraph Workflow Pipeline (`agents/graph.py`)
+### Workflow Orchestrator (`orchestrator/workflow.py`)
 
-The orchestrator builds a `StateGraph` with four sequential nodes connected by conditional edges. Each node calls its agent, updates shared state, and emits a heartbeat to the dashboard. The `should_continue` function routes based on `current_phase` in state (e.g., `design_complete` → `develop`, `develop_complete` → `testing`). On error, the workflow terminates early via the `END` edge.
+The orchestrator runs stages sequentially. Each stage function is called, its output merged into shared state, and validation runs before proceeding. The review gate runs as part of the develop-with-review loop.
 
 ```
-design_node → develop_node → code_review_node → testing_node → docs_node → END
-                                  ↑         │ (fail + iter ≤ max)
-                                  └─────────┘ (auto-fix loop)
+Design → Development → Code Review (gate) → Testing → Docs
+                           ↑         │ (fail + iter ≤ max)
+                           └─────────┘ (auto-fix loop)
 ```
 
-### Shared State (`graph/state.py`)
+### Shared State (`models/workflow_state.py`)
 
-`AgentState` is a `TypedDict(total=False)` containing all fields shared across agents — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), control flow (session_id, current_phase, approval_status), and LangGraph messages with `add_messages` annotation.
+`WorkflowState` is a `TypedDict(total=False)` containing all fields shared across stages — inputs (issue title/description/type), outputs from each phase (design analysis, code files, test plans, PR summaries), and control flow (session_id, current_phase, approval_status).
 
-### Agent Pattern
+### Stage Pattern
 
-All five agents follow the same pattern:
+All five stage runners follow the same pattern:
 1. Validate context/inputs
 2. Get Claude client via `config/auth_config.get_anthropic_client()`
-3. Build a prompt using system prompt from `config/agent_prompts.py` + user context
+3. Build a prompt using system prompt from `prompts/` package + user context
 4. Call `client.messages.create()` with the configured model (`CLAUDE_MODEL` env var, default `claude-sonnet-4-6`)
 5. Parse the Markdown-structured response into typed dict outputs
 6. Emit heartbeat to dashboard
 
-| Agent | Entry Point | Key Input | Key Output |
+| Stage | Entry Point | Key Input | Key Output |
 |-------|------------|-----------|------------|
-| Design | `agents/design_agent.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
-| Development | `agents/go_k8s_developer.run_development()` | AgentState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
-| Code Review | `agents/code_review_agent.run_code_review()` | AgentState dict (code_files from development) | review_passed, review_findings, review_summary, review_iteration |
-| Testing | `agents/testing_agent.run_testing()` | context dict (needs design_analysis, impacted_components, acceptance_criteria) | test_plan, unit/integration/e2e_tests, coverage_analysis |
-| Docs | `agents/docs_agent.run_docs()` | context dict + optional input_files, output_format, enable_rag | pr_summary, release_notes, docs_changes |
+| Design | `stages/design.run_design()` | title, description, repo_path | design_analysis, impacted_components, risks, acceptance_criteria |
+| Development | `stages/develop.run_development()` | WorkflowState dict (needs implementation_plan as list) | code_files, test_files, pr_description |
+| Code Review | `stages/code_review.run_code_review()` | WorkflowState dict (code_files from development) | review_passed, review_findings, review_summary, review_iteration |
+| Testing | `stages/test.run_testing()` | context dict (needs design_analysis, impacted_components, acceptance_criteria) | test_plan, unit/integration/e2e_tests, coverage_analysis |
+| Docs | `stages/docs.run_docs()` | context dict + optional input_files, output_format, enable_rag | pr_summary, release_notes, docs_changes |
 
 ### Authentication (`config/auth_config.py`)
 
-Uses Google Vertex AI (`ANTHROPIC_VERTEX_PROJECT_ID`) for authentication. All agents use `get_anthropic_client()` which returns an `AnthropicVertex` client.
+Uses Google Vertex AI (`ANTHROPIC_VERTEX_PROJECT_ID`) for authentication. All stage runners use `get_anthropic_client()` which returns an `AnthropicVertex` client.
 
 ### Dashboard (`dashboard/`)
 
-FastAPI backend (`backend.py`) with SQLite storage at `/tmp/claude/dashboard.db`. Agents emit heartbeats via HTTP POST to `localhost:8080/api/heartbeat` using the `emit_heartbeat()` convenience function from `dashboard/heartbeat.py`. The `enrichers.py` module enriches raw heartbeat data before storage. Frontend is a single `dashboard/frontend/index.html`.
+FastAPI backend (`backend.py`) with SQLite storage at `/tmp/claude/dashboard.db`. Stage runners emit heartbeats via HTTP POST to `localhost:8080/api/heartbeat` using the `emit_heartbeat()` convenience function from `dashboard/heartbeat.py`. The `enrichers.py` module enriches raw heartbeat data before storage. Frontend is a single `dashboard/frontend/index.html`.
 
 ### Domain Configuration (`config/`)
 
 - `shipwright_components.py`: Shipwright Build component definitions (BuildRun, Build, BuildStrategy, webhooks), CRD types, build strategies, OpenShift integrations
-- `agent_prompts.py`: System prompts for each agent
+- `prompts/`: System prompts for each stage runner (split into per-stage modules)
 - `testing_config.py`: Ginkgo v2 test patterns and templates, pattern detection for build strategies/source types
 - `mock_responses.py`: Mock API responses for dry-run mode
 
@@ -101,10 +101,12 @@ Tests are in `tests/` and use pytest. The `conftest.py` provides shared fixtures
 | `CLOUD_ML_REGION` | GCP region (default: `us-east5`) |
 | `CLAUDE_MODEL` | Model override (default: `claude-sonnet-4-6`) |
 | `CLAUDE_MAX_TOKENS` | Max tokens override |
-| `SHIPWRIGHT_REPO_PATH` / `OPENSHIFT_BUILDS_REPO_PATH` | Repo paths for code analysis |
+| `SHIPWRIGHT_REPO_PATH` | Primary repo path for code analysis (used by Design, Development, and Docs agents) |
+| `OPENSHIFT_BUILDS_REPO_PATH` | Secondary repo path, merged with primary for additional context |
+| `ENABLE_REPO_ANALYSIS` | Enable/disable repo analysis (default: `true`). Set to `false` to skip repo scanning. |
 | `DASHBOARD_URL` | Dashboard URL (default: `http://localhost:8080`) |
 | `DASHBOARD_ENABLED` | Enable heartbeats (default: `true`) |
-| `DASHBOARD_DB_PATH` | SQLite DB path (default: `/tmp/claude/dashboard.db`) |
+| `DASHBOARD_DB_PATH` | SQLite DB path (default: `~/.local/share/flowpilot/dashboard.db`) |
 | `PII_REDACTION_ENABLED` | Redact PII from Jira/GitHub data at fetch time (default: `true`). Set to `false` for local dev only. |
 | `PROMPT_GUARD_ENABLED` | Sanitize external text for prompt injection patterns before prompt assembly (default: `true`). Set to `false` for local dev only. |
 | `OUTPUT_SANITIZER_ENABLED` | Enable/disable output sanitizer (default: `true`) |

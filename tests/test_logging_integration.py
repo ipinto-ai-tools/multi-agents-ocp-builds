@@ -7,37 +7,37 @@ from pathlib import Path
 
 def test_design_agent_logging():
     """Test that design_agent has logging configured."""
-    from agents.design_agent import logger
+    from stages.design import logger
 
     assert logger is not None
-    assert logger.name == "agents.design_agent"
+    assert logger.name == "stages.design"
     print(f"✓ Design agent logger: {logger.name}")
 
 
 def test_development_agent_logging():
     """Test that go_k8s_developer has logging configured."""
-    from agents.go_k8s_developer import logger
+    from stages.develop import logger
 
     assert logger is not None
-    assert logger.name == "agents.go_k8s_developer"
+    assert logger.name == "stages.develop"
     print(f"✓ Development agent logger: {logger.name}")
 
 
 def test_testing_agent_logging():
     """Test that testing_agent has logging configured."""
-    from agents.testing_agent import logger
+    from stages.test import logger
 
     assert logger is not None
-    assert logger.name == "agents.testing_agent"
+    assert logger.name == "stages.test"
     print(f"✓ Testing agent logger: {logger.name}")
 
 
 def test_docs_agent_logging():
     """Test that docs_agent has logging configured."""
-    from agents.docs_agent import logger
+    from stages.docs import logger
 
     assert logger is not None
-    assert logger.name == "agents.docs_agent"
+    assert logger.name == "stages.docs"
     print(f"✓ Docs agent logger: {logger.name}")
 
 

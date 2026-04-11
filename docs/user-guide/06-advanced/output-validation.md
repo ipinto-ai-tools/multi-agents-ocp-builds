@@ -35,9 +35,9 @@ Validation is split into two categories:
 
 ---
 
-## The Validators Module (`agents/validators.py`)
+## The Validators Module (`stages/validators.py`)
 
-The validation logic lives entirely in `agents/validators.py`. Understanding this module is useful when you need to add a new agent phase or tighten quality thresholds.
+The validation logic lives entirely in `stages/validators.py`. Understanding this module is useful when you need to add a new agent phase or tighten quality thresholds.
 
 ### `ValidationResult` dataclass
 
@@ -71,7 +71,7 @@ Each function accepts the full LangGraph `state` dict and reads only the fields 
 The orchestrator always calls `validate_phase()` rather than individual validator functions directly:
 
 ```python
-from agents.validators import validate_phase
+from stages.validators import validate_phase
 
 result = validate_phase("design", state)
 if not result.passed:
@@ -97,7 +97,7 @@ VALIDATORS = {
 
 ### Configuration (validation thresholds)
 
-Minimum character thresholds are defined as inline constants inside `agents/validators.py`:
+Minimum character thresholds are defined as inline constants inside `stages/validators.py`:
 
 | Field | Threshold | Location in source |
 | ----- | --------- | ------------------ |
@@ -106,13 +106,13 @@ Minimum character thresholds are defined as inline constants inside `agents/vali
 | `test_plan` | 20 chars | `validate_testing_output` |
 | `pr_summary` | 20 chars | `validate_docs_output` |
 
-To tighten or relax a threshold, edit the integer literal directly in the corresponding function in `agents/validators.py`.
+To tighten or relax a threshold, edit the integer literal directly in the corresponding function in `stages/validators.py`.
 
 ### How to extend
 
 When adding a new agent phase:
 
-1. Add a `validate_<phase>_output(state)` function in `agents/validators.py` that returns a `ValidationResult`.
+1. Add a `validate_<phase>_output(state)` function in `stages/validators.py` that returns a `ValidationResult`.
 2. Register it in the `VALIDATORS` dict using the phase name string as the key.
 3. The orchestrator calls `validate_phase("<phase>", state)` automatically — no other changes needed.
 
@@ -174,7 +174,8 @@ Or pass it inline for a single run:
 ```bash
 MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
-  --description "Users need to build from private Git repos using SSH authentication"
+  --description "Users need to build from private Git repos using SSH authentication" \
+  --output-dir ./output
 ```
 
 ### What It Looks Like
@@ -238,7 +239,8 @@ This is the right mode for CI/CD pipelines and unattended runs where you want au
 # Auto mode (default - no changes needed)
 uv run python scripts/orchestrate.py \
   --title "Add SSH key support for private Git repos" \
-  --description "Users need to build from private Git repos using SSH authentication"
+  --description "Users need to build from private Git repos using SSH authentication" \
+  --output-dir ./output
 ```
 
 ---

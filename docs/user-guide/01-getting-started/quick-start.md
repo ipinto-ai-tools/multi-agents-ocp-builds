@@ -1,203 +1,161 @@
 # Quick Start
 
-Run your first multi-agent workflow in under five minutes.
+Everything you need to go from zero to running your first pipeline. The FlowPilot dashboard is the recommended interface — it provides a web UI for creating runs, monitoring progress, streaming logs, and downloading artifacts. A [CLI](../10-reference/cli.md) is also available for scripting and automation.
 
 ---
 
-## Prerequisites
+## 1. Install
 
-Before running the workflow, confirm you have:
+```bash
+git clone https://github.com/your-org/muilti-agents-ocp-builds.git
+cd muilti-agents-ocp-builds
+uv venv && uv pip install -r requirements.txt
+cp .env.example .env
+```
 
-- [Installed the system](installation.md)
-- Authenticated with Google Cloud: `gcloud auth application-default login`
-- Set `ANTHROPIC_VERTEX_PROJECT_ID` in your `.env` file
+Open `.env` in your editor and fill in the credentials from the sections below.
 
-If you want to try the system without credentials, skip to [Dry Run](#dry-run-no-credentials-needed) below.
+**Prerequisites:** Python 3.12+, [uv](https://docs.astral.sh/uv/getting-started/installation/), [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (`gcloud`).
 
 ---
 
-## Run Your First Workflow
+## 2. Configure Claude API (Vertex AI)
 
-The orchestrator runs all five agents (Design → Development → Code Review → Testing → Documentation) in sequence and prints the results to the console.
+The system uses Google Vertex AI to access Claude. Authentication is handled through Application Default Credentials (ADC) — no API key is stored anywhere.
 
 ```bash
-uv run python scripts/orchestrate.py \
-  --title "Add timeout support to BuildRun" \
-  --description "Users need ability to specify build timeout to prevent hanging builds"
+# One-time setup
+gcloud auth application-default login
+gcloud auth application-default set-quota-project YOUR_GCP_PROJECT_ID
+gcloud services enable aiplatform.googleapis.com --project=YOUR_GCP_PROJECT_ID
 ```
 
-### What Happens
+Add to `.env`:
 
-The workflow runs through five sequential phases:
-
-```text
-Issue → Design Agent → Development Agent → Code Review → Testing Agent → Docs Agent → Done
-          |               |                    |               |               |
-          v               v                    v               v               v
-        Plan            Code               Pass/Fix         Tests           Docs
+```bash
+ANTHROPIC_VERTEX_PROJECT_ID=your-gcp-project-id
+CLOUD_ML_REGION=us-east5  # Optional, defaults to us-east5
 ```
 
-State transitions:
+Verify:
 
+```bash
+gcloud auth application-default print-access-token
 ```
-init → design_complete → develop_complete → review_complete → testing_complete → done
-```
 
-If an agent raises an unhandled exception, the workflow sets `current_phase = "error"` and stops early. The final state contains the error message.
-
-> **Note:** After each phase, outputs are automatically validated. If required fields
-> are missing or empty, the workflow stops immediately with a clear error rather than
-> silently passing bad data to the next agent.
-
-### What You Get
-
-When the workflow completes, five outputs are printed to the console:
-
-1. **Design Analysis** - Component analysis, risks, acceptance criteria, and implementation plan
-2. **Production Code** - Go code for Kubernetes/OpenShift with TLS 1.3 and security best practices
-3. **Code Review** - Automated review findings with blocking/warning severity and auto-fix loop (up to 3 iterations)
-4. **Test Suite** - Ginkgo v2 tests (unit, integration, E2E) with data-driven patterns
-5. **Documentation** - PR summary, release notes, and Jobs-to-be-Done user documentation
+See [Authentication](../05-authentication/authentication.md) for full Vertex AI setup including IAM permissions and troubleshooting.
 
 ---
 
-## Run from a Jira Ticket
+## 3. Configure Jira (Recommended)
 
-If your team tracks work in Jira, pass a ticket ID instead of `--title` and `--description`. The system fetches all ticket data automatically.
+Jira integration lets you pass a ticket ID directly to the pipeline. The system fetches title, description, acceptance criteria, priority, labels, and linked issues automatically.
 
-> **Requires:** Jira configured in `.env` and VPN access. See [Jira & Rovo Integration](../09-integrations/jira-rovo.md).
-
-```bash
-uv run python scripts/orchestrate.py --jira-ticket SHIP-123
-```
-
-To test without VPN, add `--dry-run` — it returns a mock SHIP-123 ticket with no credentials needed:
+Add to `.env`:
 
 ```bash
-uv run python scripts/orchestrate.py --jira-ticket SHIP-123 --dry-run
+JIRA_BASE_URL=https://your-org.atlassian.net
+JIRA_USER_EMAIL=your-email@company.com
+JIRA_API_TOKEN=your-api-token-here
 ```
+
+Generate a token at [https://id.atlassian.com/manage-profile/security](https://id.atlassian.com/manage-profile/security).
+
+> **VPN required:** The Jira REST API is not reachable outside the corporate network. Use dry-run mode when off-VPN.
+
+See [Jira & Rovo Integration](../09-integrations/jira-rovo.md) for full details.
 
 ---
 
-## Run with Manual Approval
+## 4. Configure GitHub (Optional)
 
-Set `MANUAL_APPROVAL=true` to pause after each phase and review the output before continuing:
+Enriches the docs agent with upstream PR context from Jira-linked pull requests. Also required by `publish.py` for pushing generated code as a PR.
+
+Add to `.env`:
 
 ```bash
-MANUAL_APPROVAL=true uv run python scripts/orchestrate.py \
-  --title "Add timeout support to BuildRun API" \
-  --description "Users need to specify timeouts for build execution"
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+TARGET_GITHUB_REPO=openshift-builds/builds
+TARGET_GITHUB_BASE_BRANCH=main
 ```
 
-After each phase completes, you'll see a summary and a prompt:
-
-```text
-──────────────────────────────────────────────────────────
-  Phase: DESIGN  |  Validation: PASSED
-──────────────────────────────────────────────────────────
-  Analysis length: 1243 chars
-  Implementation plan steps: 5
-  Impacted components: 3
-  Risks identified: 2
-  Acceptance criteria: 4
-
-  Next phase: DEVELOPMENT
-
-  Continue to development? [Y/n]:
-```
-
-Type `Y` (or press Enter) to continue, or `n` to stop the workflow. The completed phases are kept.
-
-> **When to use manual approval:**
->
-> - Reviewing design analysis before committing to code generation (saves API costs)
-> - Quality-checking in sensitive environments
-> - Step-by-step debugging of the agent pipeline
+Without a `GITHUB_TOKEN`, the pipeline runs normally — PR enrichment is silently skipped.
 
 ---
 
-## Monitor Progress in Real Time
+## 5. Configure Repository Paths (Optional)
 
-Start the dashboard before running the orchestrator to watch each agent's progress as it runs.
-
-**Terminal 1 - Start the dashboard:**
+Repository paths let agents analyze actual Go types, CRDs, and controllers from source for more accurate analysis and code generation. Configure multiple repositories using `repos.yaml`:
 
 ```bash
-uv run --with fastapi --with "uvicorn[standard]" --with requests python scripts/run_dashboard.py
+cp repos.yaml.example repos.yaml
 ```
 
-Open http://localhost:8080 in your browser.
+Edit `repos.yaml` to list your local clones:
 
-**Terminal 2 - Run the workflow:**
-
-```bash
-uv run python scripts/orchestrate.py \
-  --title "Add timeout support to BuildRun" \
-  --description "Users need ability to specify build timeout to prevent hanging builds"
+```yaml
+repos:
+  - path: /home/user/git/shipwright-io/build
+  - path: /home/user/git/shipwright-io/operator
+  - path: /home/user/git/redhat-openshift-builds/operator
 ```
 
-The dashboard shows each agent's current phase, context window usage, and impacted components updating in real time.
+See `repos.yaml.example` for a full template with all Shipwright and OpenShift Builds repositories.
+
+**Alternative:** Set `SHIPWRIGHT_REPO_PATH` and `OPENSHIFT_BUILDS_REPO_PATH` in `.env` for single-repo setups. See [Configuration](configuration.md) for details.
+
+Without repo paths, agents fall back to component metadata only. Analysis is still valid, but less precise.
 
 ---
 
-## Dry Run (No Credentials Needed)
+## 6. Run
 
-Dry run mode uses pre-configured mock responses. No authentication is needed and no API calls are made.
+Start the dashboard and open the web UI:
 
 ```bash
-uv run python scripts/test_agents.py --e2e --dry-run
+uv run python scripts/run_dashboard.py
 ```
 
-To see verbose output:
+Open [http://localhost:8080](http://localhost:8080) in your browser. Click **New Run** and fill in:
+
+1. **Feature description** — describe the feature or bug to work on
+2. **Jira Ticket** (recommended) — enter a ticket ID like `BUILD-123` to auto-fetch context
+3. Click **Run Feature**
+
+The pipeline runs all five phases automatically: Design → Development → Code Review → Testing → Documentation. Progress is visible in real time on the Dashboard page.
+
+### Try It Without Credentials
+
+Use dry-run mode to test the system without API credentials or VPN:
+
+1. Open `http://localhost:8080`
+2. Click **New Run**
+3. Toggle **Dry Run** to `On` in Advanced Options
+4. Enter any description and click **Run Feature**
+
+### Alternative: CLI
+
+For scripting and automation, see the [CLI Reference](../10-reference/cli.md):
 
 ```bash
-uv run python scripts/test_agents.py --e2e --dry-run --debug
-```
-
-Test a single agent:
-
-```bash
-uv run python scripts/test_agents.py --agent design --dry-run --debug
-```
-
----
-
-## More Examples
-
-**Analyze a bug report:**
-
-```bash
-uv run python scripts/orchestrate.py \
-  --title "BuildRun stuck in Running state" \
-  --description "BuildRuns remain Running even after pod completes. Status reconciliation fails."
-```
-
-**Analyze a feature with repository context for deeper analysis:**
-
-```bash
-export SHIPWRIGHT_REPO_PATH=/home/user/git/shipwright-build
-
-uv run python scripts/orchestrate.py \
-  --title "Add SSH key support for private Git repos" \
-  --description "Users need to build from private Git repos using SSH authentication"
-```
-
-**Analyze a caching feature:**
-
-```bash
-uv run python scripts/orchestrate.py \
-  --title "Implement build output caching" \
-  --description "Allow BuildRuns to cache intermediate build layers to speed up subsequent builds. Should support OCI registry-based caching."
+uv run python scripts/orchestrate.py --jira-ticket BUILD-1707 --output-dir ./output
 ```
 
 ---
 
 ## Next Steps
 
-- [Configuration](configuration.md) - Tune environment variables, logging, and performance
-- [Agents Overview](../02-concepts/agents-overview.md) - Understand what each agent does
-- [Dashboard Overview](../04-dashboard/overview.md) - Learn what the dashboard shows
+| I want to... | Go to |
+| --- | --- |
+| Understand the dashboard pages | [Dashboard Overview](../04-dashboard/overview.md) |
+| Learn what each agent does | [Agents Overview](../02-concepts/agents-overview.md) |
+| See all environment variables | [Configuration](configuration.md) |
+| Run from the command line | [CLI Reference](../10-reference/cli.md) |
+| Use the REST API directly | [API Reference](../10-reference/api.md) |
+| Test without API calls | [Dry Run Mode](../06-advanced/dry-run-mode.md) |
+| Set up Vertex AI authentication | [Authentication](../05-authentication/authentication.md) |
+| Publish artifacts to GitHub/Jira | [Publishing](../09-integrations/publish.md) |
 
 ---
 
-[← Previous: Installation](installation.md) | [Next: Configuration →](configuration.md)
+[← Installation](installation.md) | [Configuration →](configuration.md)

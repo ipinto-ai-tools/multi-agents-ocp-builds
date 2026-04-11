@@ -11,8 +11,8 @@ Five output channels are sanitized:
 | Channel | Mechanism | Where applied |
 |---------|-----------|---------------|
 | Python logging (all handlers) | `SanitizingFilter` attached to every handler | `utils/file_logger.py` |
-| `test_plan.md` artifact | `sanitize()` before `write_text()` | `agents/testing_agent.py` |
-| `go_tests/*.go` artifacts | `sanitize()` before `write_text()` | `agents/testing_agent.py` |
+| `test_plan.md` artifact | `sanitize()` before `write_text()` | `stages/test.py` |
+| `go_tests/*.go` artifacts | `sanitize()` before `write_text()` | `stages/test.py` |
 | Dashboard heartbeat payloads | `sanitize_dict()` on full payload before HTTP POST | `dashboard/heartbeat.py` |
 | Session log files | `SanitizingFilter` on file handler | `utils/file_logger.py` |
 
@@ -150,7 +150,7 @@ DEBUG output_sanitizer: [IP_REDACTED] applied in source='heartbeat'
 | `tools/pii_redactor.py` | Shared regex patterns and replacement logic (`_redact_text`) |
 | `config/redaction_config.py` | `PUBLIC_DOMAIN_ALLOWLIST` — applies to both Layer 1 and Layer 3 |
 | `utils/file_logger.py` | Attaches `SanitizingFilter` to all logging handlers |
-| `agents/testing_agent.py` | Calls `sanitize()` before writing `test_plan.md` and Go test files |
+| `stages/test.py` | Calls `sanitize()` before writing `test_plan.md` and Go test files |
 | `dashboard/heartbeat.py` | Calls `sanitize_dict()` on the full heartbeat payload before HTTP POST |
 | `tests/test_output_sanitizer.py` | 56 tests covering all functions, edge cases, and env var toggle |
 
