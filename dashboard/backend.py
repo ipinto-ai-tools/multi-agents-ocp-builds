@@ -863,6 +863,18 @@ async def pause_session(session_id: str):
     return {"status": "ok"}
 
 
+@app.post("/api/sessions/{session_id}/resume")
+async def resume_session(session_id: str):
+    """Resume a paused pipeline by removing its pause signal."""
+    _validate_session_id(session_id)
+    pause_file = SIGNAL_DIR / f"pause-{session_id}"
+    existed = pause_file.exists()
+    pause_file.unlink(missing_ok=True)
+    if existed:
+        logger.info(f"Resume signal sent: session={session_id}")
+    return {"status": "ok"}
+
+
 @app.patch("/api/sessions/{session_id}/archive")
 async def archive_session(session_id: str):
     """Archive a session — hides it from the dashboard but preserves all data and artifacts."""

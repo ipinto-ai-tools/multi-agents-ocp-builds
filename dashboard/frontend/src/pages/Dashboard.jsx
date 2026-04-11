@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSessions, approveSession, pauseSession, archiveSession, deleteSession, cleanStuckSessions } from '../api/client'
+import { getSessions, approveSession, pauseSession, resumeSession, archiveSession, deleteSession, cleanStuckSessions } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 
 const PHASE_LABELS = {
@@ -11,6 +11,7 @@ const PHASE_LABELS = {
   testing_complete: { label: 'Tests ✓',     color: 'bg-teal-100 text-teal-700' },
   done:             { label: 'Done ✓',      color: 'bg-green-100 text-green-700' },
   error:            { label: 'Error',       color: 'bg-red-100 text-red-600' },
+  paused:           { label: 'Paused',     color: 'bg-yellow-100 text-yellow-700' },
 }
 
 function PhaseChip({ phase }) {
@@ -174,10 +175,16 @@ export default function Dashboard() {
                             Approve
                           </button>
                         )}
-                        {status === 'running' && (
+                        {status === 'running' && session.latest_heartbeat?.phase !== 'paused' && (
                           <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
                             onClick={() => pauseSession(session.id).then(load)}>
                             Pause
+                          </button>
+                        )}
+                        {status === 'running' && session.latest_heartbeat?.phase === 'paused' && (
+                          <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
+                            onClick={() => resumeSession(session.id).then(load)}>
+                            Resume
                           </button>
                         )}
                         {(status === 'completed' || status === 'failed') && (

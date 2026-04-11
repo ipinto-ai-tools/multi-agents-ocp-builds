@@ -11,12 +11,17 @@ Develop via :func:`orchestrator.gates.run_review_gate`.
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 
 # Maximum code-review retry iterations (develop -> review loop).
 _DEFAULT_MAX_REVIEW_ITERATIONS = 2
+
+_SIGNAL_DIR = Path("/tmp/claude/signals")
+_PAUSE_POLL_INTERVAL = 2  # seconds
+_MAX_PAUSE_SECONDS = int(os.getenv("MAX_PAUSE_SECONDS", "3600"))
 
 
 def _get_max_review_iterations() -> int:
@@ -115,6 +120,33 @@ class WorkflowOrchestrator:
     def _should_run_stage(self, stage: str) -> bool:
         """Check if a stage should run based on repos.yaml configuration."""
         return stage in self._active_stages
+
+    def _check_pause_signal(self, state: Dict[str, Any]) -> None:
+        """Check for pause signal and block until resumed or timeout."""
+        pause_file = _SIGNAL_DIR / f"pause-{self.session_id}"
+        if not pause_file.exists():
+            return
+
+        previous_phase = state.get("current_phase", "init")
+        state["current_phase"] = "paused"
+        state["paused_at_phase"] = previous_phase
+        self._emit_heartbeat("orchestrator", state)
+
+        elapsed = 0
+        while pause_file.exists():
+            if elapsed >= _MAX_PAUSE_SECONDS:
+                state["current_phase"] = "error"
+                state["error"] = f"Pause timeout after {_MAX_PAUSE_SECONDS}s"
+                self._emit_heartbeat("orchestrator", state)
+                pause_file.unlink(missing_ok=True)
+                return
+            time.sleep(_PAUSE_POLL_INTERVAL)
+            elapsed += _PAUSE_POLL_INTERVAL
+
+        # Resumed — restore previous phase
+        state["current_phase"] = previous_phase
+        del state["paused_at_phase"]
+        self._emit_heartbeat("orchestrator", state)
 
     def _check_approval(self, phase: str, next_phase: str) -> bool:
         """Check if approval is needed based on repos.yaml or env var.
@@ -309,6 +341,7 @@ class WorkflowOrchestrator:
                 self._emit_heartbeat("design", state)
                 return state
 
+            self._check_pause_signal(state)
             if not self._check_approval("design", "develop"):
                 return state
         else:
@@ -321,6 +354,7 @@ class WorkflowOrchestrator:
             if state.get("current_phase") == "error":
                 return state
 
+            self._check_pause_signal(state)
             if not self._check_approval("develop", "testing"):
                 return state
         else:
@@ -354,6 +388,7 @@ class WorkflowOrchestrator:
                 for g in test_gate_results
             ]
 
+            self._check_pause_signal(state)
             if not self._check_approval("testing", "docs"):
                 return state
         else:
