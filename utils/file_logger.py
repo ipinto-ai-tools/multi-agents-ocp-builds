@@ -45,13 +45,12 @@ def get_logger(
          logger.info("Starting design analysis")
     """
     logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.propagate = False
 
     # Avoid adding duplicate handlers
     if logger.handlers:
         return logger
-
-    logger.setLevel(level)
-    logger.propagate = False
 
     # Create formatter
     formatter = logging.Formatter(
