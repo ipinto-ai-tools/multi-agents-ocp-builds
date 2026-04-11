@@ -28,9 +28,16 @@ def cleanup_loggers():
 class TestGetLogger:
     """Test the get_logger function."""
 
-    def test_logger_creation_with_defaults(self):
+    def test_logger_creation_with_defaults(self, monkeypatch):
         """Test creating a logger with default settings."""
-        logger = get_logger('test_agent')
+        monkeypatch.delenv('LOG_LEVEL', raising=False)
+
+        import importlib
+        import utils.file_logger as _fl_mod
+        importlib.reload(_fl_mod)
+        _get_logger = _fl_mod.get_logger
+
+        logger = _get_logger('test_agent')
 
         assert logger.name == 'test_agent'
         assert logger.level == logging.INFO

@@ -6,7 +6,7 @@ Tests the cleanup endpoints and automatic cleanup task.
 import os
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Set test database path before importing backend
@@ -29,7 +29,7 @@ def setup_test_db() -> Database:
 def insert_test_session(db: Database, session_id: str, phase: str, hours_ago: int = 0):
     """Insert a test session with heartbeat."""
     # Calculate timestamp
-    timestamp = datetime.now() - timedelta(hours=hours_ago)
+    timestamp = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
     timestamp_str = timestamp.isoformat()
 
     # Prepare test data

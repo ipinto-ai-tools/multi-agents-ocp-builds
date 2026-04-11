@@ -392,7 +392,7 @@ class Database:
         Returns:
             dict with counts of deleted sessions and heartbeats
         """
-        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         cutoff_timestamp = cutoff_time.isoformat()
 
         # Get session IDs to delete
@@ -765,7 +765,7 @@ async def health():
     Returns:
         Health status
     """
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.post("/api/runs")
