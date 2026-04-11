@@ -32,7 +32,8 @@ from utils.file_logger import get_logger
 logger = get_logger('dashboard.backend')
 
 # Database path
-DB_PATH = os.getenv("DASHBOARD_DB_PATH", "/tmp/claude/dashboard.db")
+_DEFAULT_DB_PATH = str(Path.home() / ".local" / "share" / "flowpilot" / "dashboard.db")
+DB_PATH = os.path.expanduser(os.getenv("DASHBOARD_DB_PATH", _DEFAULT_DB_PATH))
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORCHESTRATE_SCRIPT = os.path.join(PROJECT_ROOT, "scripts", "orchestrate.py")
