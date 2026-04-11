@@ -27,6 +27,13 @@ MANUAL_APPROVAL = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
 
 from orchestrator.workflow import WorkflowOrchestrator
 
+# Keys that WorkflowOrchestrator.run() sets from its explicit parameters.
+# Excluded from extra_state to avoid duplication.
+_CORE_STATE_KEYS = frozenset({
+    "session_id", "issue_title", "issue_description", "issue_type",
+    "repo_path", "repo_paths", "current_phase",
+})
+
 
 # -- helpers ------------------------------------------------------------------
 
@@ -323,10 +330,13 @@ def orchestrate(
             output_dir=pathlib.Path(output_dir) if output_dir else None,
         )
 
+        extra_state = {k: v for k, v in state.items() if k not in _CORE_STATE_KEYS}
+
         state = orchestrator.run(
             title=title,
             description=description,
             issue_type=issue_type,
+            extra_state=extra_state if extra_state else None,
         )
 
         total_duration = time.time() - pipeline_start
