@@ -10,7 +10,7 @@ import logging
 import pytest
 import yaml
 
-from config.repo_config import load_repo_paths
+from config.repo_config import load_repo_entries, load_repo_paths
 
 
 # ---------------------------------------------------------------------------
@@ -328,3 +328,157 @@ def test_yaml_entry_without_path_key(tmp_path, monkeypatch, caplog):
 
     assert result == []
     assert any("validation failed" in msg.lower() for msg in caplog.messages)
+
+
+# ===========================================================================
+# load_repo_entries tests
+# ===========================================================================
+
+
+# ---------------------------------------------------------------------------
+# 14. load_repo_entries returns dicts with path and language
+# ---------------------------------------------------------------------------
+
+def test_entries_returns_path_and_language(tmp_path, monkeypatch):
+    """load_repo_entries returns dicts with 'path' and 'language' keys."""
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    dirs = _make_repo_dirs(tmp_path, ["go-repo", "py-repo"])
+    _write_repos_yaml(tmp_path, {
+        "repos": [
+            {"path": dirs[0], "language": "go"},
+            {"path": dirs[1], "language": "python"},
+        ]
+    })
+
+    result = load_repo_entries(project_root=str(tmp_path))
+
+    assert len(result) == 2
+    assert result[0]["path"] == dirs[0]
+    assert result[0]["language"] == "go"
+    assert result[1]["path"] == dirs[1]
+    assert result[1]["language"] == "python"
+
+
+# ---------------------------------------------------------------------------
+# 15. load_repo_entries preserves None language when not specified
+# ---------------------------------------------------------------------------
+
+def test_entries_language_defaults_to_none(tmp_path, monkeypatch):
+    """When repos.yaml omits the language field, entries have language=None."""
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    dirs = _make_repo_dirs(tmp_path, ["repo-no-lang"])
+    _write_repos_yaml(tmp_path, {"repos": [{"path": dirs[0]}]})
+
+    result = load_repo_entries(project_root=str(tmp_path))
+
+    assert len(result) == 1
+    assert result[0]["language"] is None
+
+
+# ---------------------------------------------------------------------------
+# 16. load_repo_entries CLI arg gets language=None
+# ---------------------------------------------------------------------------
+
+def test_entries_cli_arg_has_no_language(tmp_path, monkeypatch):
+    """CLI argument entries have language=None since they lack metadata."""
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    dirs = _make_repo_dirs(tmp_path, ["cli-repo"])
+
+    result = load_repo_entries(cli_repo_path=dirs[0], project_root=str(tmp_path))
+
+    assert len(result) == 1
+    assert result[0]["path"] == dirs[0]
+    assert result[0]["language"] is None
+
+
+# ---------------------------------------------------------------------------
+# 17. load_repo_entries deduplicates and keeps first occurrence
+# ---------------------------------------------------------------------------
+
+def test_entries_deduplication_keeps_first(tmp_path, monkeypatch):
+    """When the same path appears from CLI and YAML, CLI (first) wins."""
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    dirs = _make_repo_dirs(tmp_path, ["shared"])
+    _write_repos_yaml(tmp_path, {
+        "repos": [{"path": dirs[0], "language": "go"}]
+    })
+
+    result = load_repo_entries(cli_repo_path=dirs[0], project_root=str(tmp_path))
+
+    assert len(result) == 1
+    # CLI entry (language=None) takes precedence over YAML (language="go")
+    assert result[0]["language"] is None
+
+
+# ---------------------------------------------------------------------------
+# 18. load_repo_entries respects ENABLE_REPO_ANALYSIS=false
+# ---------------------------------------------------------------------------
+
+def test_entries_enable_repo_analysis_false(tmp_path, monkeypatch):
+    """Setting ENABLE_REPO_ANALYSIS=false returns empty list."""
+    dirs = _make_repo_dirs(tmp_path, ["a-repo"])
+    _write_repos_yaml(tmp_path, {
+        "repos": [{"path": dirs[0], "language": "go"}]
+    })
+    monkeypatch.setenv("ENABLE_REPO_ANALYSIS", "false")
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+
+    result = load_repo_entries(project_root=str(tmp_path))
+
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# 19. load_repo_entries env var entries have language=None
+# ---------------------------------------------------------------------------
+
+def test_entries_env_var_has_no_language(tmp_path, monkeypatch):
+    """Env var fallback paths have language=None."""
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    dirs = _make_repo_dirs(tmp_path, ["env-repo"])
+    monkeypatch.setenv("SHIPWRIGHT_REPO_PATH", dirs[0])
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+
+    empty_root = tmp_path / "empty-root"
+    empty_root.mkdir()
+
+    result = load_repo_entries(project_root=str(empty_root))
+
+    assert len(result) == 1
+    assert result[0]["language"] is None
+
+
+# ---------------------------------------------------------------------------
+# 20. load_repo_entries skips non-existent paths
+# ---------------------------------------------------------------------------
+
+def test_entries_skips_nonexistent(tmp_path, monkeypatch, caplog):
+    """Non-existent paths are excluded from entries."""
+    monkeypatch.delenv("SHIPWRIGHT_REPO_PATH", raising=False)
+    monkeypatch.delenv("OPENSHIFT_BUILDS_REPO_PATH", raising=False)
+    monkeypatch.delenv("ENABLE_REPO_ANALYSIS", raising=False)
+
+    fake = str(tmp_path / "does-not-exist")
+    _write_repos_yaml(tmp_path, {
+        "repos": [{"path": fake, "language": "go"}]
+    })
+
+    with caplog.at_level(logging.WARNING, logger="config.repo_config"):
+        result = load_repo_entries(project_root=str(tmp_path))
+
+    assert result == []
+    assert any("does not exist" in msg for msg in caplog.messages)

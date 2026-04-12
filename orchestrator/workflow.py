@@ -188,6 +188,7 @@ class WorkflowOrchestrator:
             description=state["issue_description"],
             repo_path=state.get("repo_path"),
             repo_paths=state.get("repo_paths", []),
+            repo_entries=state.get("repo_entries"),
         )
 
     def _run_develop(self, state: Dict[str, Any]) -> Dict[str, Any]:

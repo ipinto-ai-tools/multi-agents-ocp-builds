@@ -39,6 +39,7 @@ def run_design(
     description: str,
     repo_path: Optional[str] = None,
     repo_paths: Optional[List[str]] = None,
+    repo_entries: Optional[List[dict]] = None,
 ) -> Dict[str, Any]:
     """Run design analysis on a GitHub issue.
 
@@ -53,6 +54,9 @@ def run_design(
                   If not provided, analysis is based on component metadata only.
         repo_paths: Optional list of repository paths to gather context from.
                    When provided, takes precedence over repo_path.
+        repo_entries: Optional list of repo entry dicts (``{"path": ..., "language": ...}``).
+                     When provided, takes precedence over repo_paths and repo_path
+                     so that per-repo language metadata is preserved.
 
     Returns:
         Dictionary containing:
@@ -83,11 +87,15 @@ def run_design(
         logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
         raise DesignAgentError(f"Failed to initialize Claude client: {e}") from e
 
-    # Resolve effective repo list: prefer repo_paths, fall back to repo_path
-    effective_paths = repo_paths or ([repo_path] if repo_path else [])
+    # Resolve effective repo list: prefer repo_entries > repo_paths > repo_path
+    effective_entries: List = (
+        repo_entries
+        or repo_paths
+        or ([repo_path] if repo_path else [])
+    )
 
-    if effective_paths:
-        repo_context = _gather_multi_repo_context(effective_paths)
+    if effective_entries:
+        repo_context = _gather_multi_repo_context(effective_entries)
     else:
         logger.info("No repository paths provided, skipping repository context")
         repo_context = None
@@ -209,18 +217,25 @@ def _detect_project_type(repo_path: str) -> str:
     return "go_generic"
 
 
-def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
+def _gather_repo_context(
+    repo_path: str, language: Optional[str] = None
+) -> Dict[str, Any]:
     """Gather relevant context from the repository.
 
     Automatically detects the project type and uses appropriate search patterns.
+    When *language* is explicitly set to a non-Go value (e.g. ``"python"``),
+    Go-specific analysis (API types, controllers, CRDs, Go packages) is skipped.
 
     Args:
         repo_path: Path to the repository
+        language: Optional language hint from repos.yaml.  When ``None`` or
+            ``"go"`` the existing Go auto-detection runs.  Any other value
+            skips Go-specific analysis.
 
     Returns:
         Dictionary containing repository insights
     """
-    context = {
+    context: Dict[str, Any] = {
         "package_structure": [],
         "api_files": [],
         "controller_files": [],
@@ -228,10 +243,20 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
         "project_type": "unknown",
     }
 
+    # When the language is explicitly non-Go, skip Go-specific analysis
+    if language is not None and language != "go":
+        context["project_type"] = language
+        logger.info(
+            "Repo language is '%s'; skipping Go-specific analysis for %s",
+            language,
+            repo_path,
+        )
+        return context
+
     try:
         searcher = RepoSearch(repo_path)
 
-        # Auto-detect project type
+        # Auto-detect project type (only reached for Go / unknown repos)
         project_type = _detect_project_type(repo_path)
         patterns = REPO_PATTERNS.get(project_type, REPO_PATTERNS["go_generic"])
         context["project_type"] = patterns["name"]
@@ -281,8 +306,19 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
     return context
 
 
-def _gather_multi_repo_context(repo_paths: List[str]) -> Optional[Dict[str, Any]]:
-    """Gather and merge repository context from multiple repos."""
+def _gather_multi_repo_context(
+    repo_entries: List,
+) -> Optional[Dict[str, Any]]:
+    """Gather and merge repository context from multiple repos.
+
+    Args:
+        repo_entries: A list of repo entries.  Each element may be a plain
+            path string (backward compatible) **or** a dict with ``"path"``
+            and optional ``"language"`` keys.
+
+    Returns:
+        Merged context dict, or ``None`` when every repo yielded nothing.
+    """
     merged: Dict[str, Any] = {
         "package_structure": [],
         "api_files": [],
@@ -291,10 +327,18 @@ def _gather_multi_repo_context(repo_paths: List[str]) -> Optional[Dict[str, Any]
         "project_types": [],
     }
 
-    for path in repo_paths:
+    for entry in repo_entries:
+        # Support both plain strings and dicts
+        if isinstance(entry, str):
+            path = entry
+            language = None
+        else:
+            path = entry.get("path", "")
+            language = entry.get("language")
+
         logger.info(f"Gathering repository context from: {path}")
         try:
-            ctx = _gather_repo_context(path)
+            ctx = _gather_repo_context(path, language=language)
             if ctx:
                 for key in merged:
                     items = ctx.get(key, [])
@@ -306,7 +350,7 @@ def _gather_multi_repo_context(repo_paths: List[str]) -> Optional[Dict[str, Any]
             logger.warning(f"Failed to gather context from {path}: {e}")
 
     logger.info(
-        f"Merged context from {len(repo_paths)} repos: "
+        f"Merged context from {len(repo_entries)} repos: "
         f"{len(merged['api_files'])} API files, "
         f"{len(merged['controller_files'])} controllers, "
         f"{len(merged['crd_files'])} CRDs, "

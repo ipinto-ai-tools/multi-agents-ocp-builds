@@ -31,7 +31,7 @@ from orchestrator.workflow import WorkflowOrchestrator
 # Excluded from extra_state to avoid duplication.
 _CORE_STATE_KEYS = frozenset({
     "session_id", "issue_title", "issue_description", "issue_type",
-    "repo_path", "repo_paths", "current_phase",
+    "repo_path", "repo_paths", "repo_entries", "current_phase",
 })
 
 
@@ -222,8 +222,9 @@ def orchestrate(
     pipeline_start = time.time()
 
     # Build repo_paths from repos.yaml, env vars, and CLI arg
-    from config.repo_config import load_repo_paths
+    from config.repo_config import load_repo_entries, load_repo_paths
     repo_paths = load_repo_paths(cli_repo_path=repo_path)
+    repo_entries = load_repo_entries(cli_repo_path=repo_path)
     # Use first repo_path as primary for backward compatibility
     repo_path = repo_paths[0] if repo_paths else None
 
@@ -250,6 +251,7 @@ def orchestrate(
         "issue_type": issue_type,
         "repo_path": repo_path,
         "repo_paths": repo_paths,
+        "repo_entries": repo_entries,
         "current_phase": "init",
     }
 

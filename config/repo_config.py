@@ -81,6 +81,55 @@ def _deduplicated(paths: list[str]) -> list[str]:
     return result
 
 
+def load_repo_entries(
+    cli_repo_path: str | None = None,
+    project_root: str | None = None,
+) -> list[dict]:
+    """Load repo entries with metadata (path, language).
+
+    Returns a list of dicts with ``"path"`` and optional ``"language"`` keys.
+    Precedence: CLI argument > repos.yaml > environment variables.
+    Entries are deduplicated by resolved path (first occurrence wins)
+    and non-existent directories are skipped with a warning.
+    """
+    if os.getenv("ENABLE_REPO_ANALYSIS", "true").lower() == "false":
+        logger.info("Repository analysis disabled (ENABLE_REPO_ANALYSIS=false)")
+        return []
+
+    root = _resolve_project_root(project_root)
+    yaml_path = root / _DEFAULT_YAML_NAME
+    config = load_repo_config(yaml_path)
+
+    entries: list[dict] = []
+
+    # Highest priority: CLI argument
+    if cli_repo_path:
+        entries.append({"path": cli_repo_path, "language": None})
+
+    # repos.yaml entries (preserve language metadata)
+    for entry in config.repos:
+        entries.append({"path": entry.path, "language": entry.language})
+
+    # Env var fallback
+    for p in _env_var_paths():
+        entries.append({"path": p, "language": None})
+
+    # Deduplicate by resolved path, keeping first occurrence
+    seen: set[str] = set()
+    unique: list[dict] = []
+    for e in entries:
+        resolved = str(Path(e["path"]).resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            if Path(resolved).is_dir():
+                unique.append({"path": resolved, "language": e["language"]})
+            else:
+                logger.warning("Repo path does not exist, skipping: %s", resolved)
+
+    logger.info("Loaded %d repo entries for analysis", len(unique))
+    return unique
+
+
 def load_repo_paths(
     cli_repo_path: str | None = None,
     project_root: str | None = None,
