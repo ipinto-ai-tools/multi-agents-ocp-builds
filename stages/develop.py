@@ -38,7 +38,8 @@ class DevelopmentAgentError(Exception):
 
 def run_development(
     context: Dict[str, Any],
-    repo_path: Optional[str] = None
+    repo_path: Optional[str] = None,
+    repo_paths: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Generate production-quality Go code for Kubernetes/OpenShift features.
 
@@ -120,7 +121,7 @@ def run_development(
 
     # Build the development prompt
     logger.debug("Building development prompt")
-    user_prompt = _build_development_prompt(context, repo_path)
+    user_prompt = _build_development_prompt(context, repo_path, repo_paths)
     session_logger.debug(f"Prompt length: {len(user_prompt)} chars")
 
     # Call Claude API
@@ -357,7 +358,8 @@ def _gather_repo_context(repo_path: str, context: Dict[str, Any]) -> str:
 
 def _build_development_prompt(
     context: Dict[str, Any],
-    repo_path: Optional[str] = None
+    repo_path: Optional[str] = None,
+    repo_paths: Optional[List[str]] = None,
 ) -> str:
     """Build the user prompt for code generation.
 
@@ -427,11 +429,24 @@ def _build_development_prompt(
         for risk in risks:
             prompt_parts.append(f"- {risk}\n")
 
-    if repo_path:
+    # Resolve effective repo list
+    effective_paths = repo_paths or ([repo_path] if repo_path else [])
+
+    if effective_paths:
         prompt_parts.append(f"\n## Repository Path\n")
-        prompt_parts.append(f"{repo_path}\n")
-        # Gather actual repo context for better code generation
-        repo_context = _gather_repo_context(repo_path, context)
+        for path in effective_paths:
+            prompt_parts.append(f"{path}\n")
+
+        repo_context_parts = []
+        for path in effective_paths:
+            try:
+                ctx = _gather_repo_context(path, context)
+                if ctx:
+                    repo_context_parts.append(ctx)
+            except Exception as e:
+                logger.warning(f"Failed to gather context from {path}: {e}")
+
+        repo_context = "\n\n".join(repo_context_parts) if repo_context_parts else None
         if repo_context:
             prompt_parts.append(repo_context)
 

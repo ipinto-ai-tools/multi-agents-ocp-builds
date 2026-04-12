@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 # Maximum code-review retry iterations (develop -> review loop).
@@ -62,10 +62,12 @@ class WorkflowOrchestrator:
         self,
         session_id: str,
         repo_path: Optional[str] = None,
+        repo_paths: Optional[List[str]] = None,
         output_dir: Optional[Path] = None,
     ) -> None:
         self.session_id = session_id
-        self.repo_path = repo_path
+        self.repo_paths = repo_paths or ([repo_path] if repo_path else [])
+        self.repo_path = repo_path or (self.repo_paths[0] if self.repo_paths else None)
         self.output_dir = output_dir
         self._manual_approval = os.getenv("MANUAL_APPROVAL", "false").lower() == "true"
         self._repo_config = self._load_repo_config()
@@ -185,11 +187,16 @@ class WorkflowOrchestrator:
             title=state["issue_title"],
             description=state["issue_description"],
             repo_path=state.get("repo_path"),
+            repo_paths=state.get("repo_paths", []),
         )
 
     def _run_develop(self, state: Dict[str, Any]) -> Dict[str, Any]:
         from stages.develop import run_development
-        return run_development(state, repo_path=state.get("repo_path"))
+        return run_development(
+            state,
+            repo_path=state.get("repo_path"),
+            repo_paths=state.get("repo_paths", []),
+        )
 
     def _run_develop_with_review_gate(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Run development followed by the review quality gate.
@@ -310,7 +317,8 @@ class WorkflowOrchestrator:
             "issue_title": title,
             "issue_description": description,
             "issue_type": issue_type,
-            "repo_path": self.repo_path or "",
+            "repo_path": self.repo_paths[0] if self.repo_paths else "",
+            "repo_paths": self.repo_paths,
             "current_phase": "init",
         }
 
