@@ -32,6 +32,18 @@ uv run python scripts/test_agents.py --e2e --dry-run --debug
 
 # Test a specific agent
 uv run python scripts/test_agents.py --agent design --dry-run
+
+# Clean dashboard DB (delete all sessions, heartbeats, logs, signals)
+uv run python scripts/clean_dashboard.py --all -y
+
+# Preview what would be deleted (dry-run)
+uv run python scripts/clean_dashboard.py --all --dry-run
+
+# Delete stale sessions (no heartbeat in last N hours, default 6)
+uv run python scripts/clean_dashboard.py --stale 12
+
+# Delete a specific session
+uv run python scripts/clean_dashboard.py --session <SESSION_ID>
 ```
 
 ## Architecture
