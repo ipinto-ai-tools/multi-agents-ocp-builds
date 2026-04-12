@@ -192,6 +192,26 @@ class WorkflowOrchestrator:
             return _prompt_approval(phase, next_phase)
         return True
 
+    def _should_skip_testing(self, state: Dict[str, Any]) -> str:
+        """Check if the testing stage should be skipped.
+
+        Returns a reason string if testing should be skipped, or empty string if not.
+        """
+        if state.get("issue_type") == "docs":
+            return "docs-only task"
+        if not state.get("code_files"):
+            return "no code files produced"
+        return ""
+
+    def _should_skip_develop(self, state: Dict[str, Any]) -> str:
+        """Check if the develop stage should be skipped.
+
+        Returns a reason string if develop should be skipped, or empty string if not.
+        """
+        if state.get("issue_type") == "docs":
+            return "docs-only task"
+        return ""
+
     # -- stage runners (deferred imports to avoid circular deps) ---------------
 
     def _run_design(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -319,7 +339,7 @@ class WorkflowOrchestrator:
         Args:
             title: Issue / feature title.
             description: Issue / feature description.
-            issue_type: One of ``"feature"``, ``"bug"``, ``"refactor"``.
+            issue_type: One of ``"feature"``, ``"bug"``, ``"refactor"``, ``"docs"``.
             extra_state: Optional additional fields to merge into the
                 initial pipeline state (e.g. Jira enrichment data).
 
@@ -381,7 +401,8 @@ class WorkflowOrchestrator:
             self._emit_heartbeat("design", {**state, "skipped": True})
 
         # -- Stage 2: Development (with review gate) ----------------------------
-        if self._should_run_stage("develop"):
+        skip_develop_reason = self._should_skip_develop(state)
+        if self._should_run_stage("develop") and not skip_develop_reason:
             if self._memory_service:
                 memory_ctx = self._memory_service.retrieve_for_stage("develop", state)
                 if memory_ctx:
@@ -402,10 +423,14 @@ class WorkflowOrchestrator:
             if not self._check_approval("develop", "testing"):
                 return state
         else:
-            self._emit_heartbeat("develop", {**state, "skipped": True})
+            reason = skip_develop_reason or "excluded in repos.yaml"
+            from utils.file_logger import get_logger
+            get_logger(__name__).info("Skipping develop stage: %s", reason)
+            self._emit_heartbeat("develop", {**state, "skipped": True, "skip_reason": reason})
 
         # -- Stage 3: Testing --------------------------------------------------
-        if self._should_run_stage("testing"):
+        skip_testing_reason = self._should_skip_testing(state)
+        if self._should_run_stage("testing") and not skip_testing_reason:
             if self._memory_service:
                 memory_ctx = self._memory_service.retrieve_for_stage("testing", state)
                 if memory_ctx:
@@ -446,7 +471,10 @@ class WorkflowOrchestrator:
             if not self._check_approval("testing", "docs"):
                 return state
         else:
-            self._emit_heartbeat("testing", {**state, "skipped": True})
+            reason = skip_testing_reason or "excluded in repos.yaml"
+            from utils.file_logger import get_logger
+            get_logger(__name__).info("Skipping testing stage: %s", reason)
+            self._emit_heartbeat("testing", {**state, "skipped": True, "skip_reason": reason})
 
         # -- Stage 4: Documentation --------------------------------------------
         if self._should_run_stage("docs"):
