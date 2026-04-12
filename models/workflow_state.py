@@ -61,6 +61,7 @@ class WorkflowState(TypedDict, total=False):
     # Repository context
     repo_path: str
     repo_paths: list[str]
+    repo_entries: list[dict]
     target_branch: str
 
     # Jira integration

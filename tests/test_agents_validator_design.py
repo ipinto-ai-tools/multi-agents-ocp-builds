@@ -15,6 +15,7 @@ from stages.design import (
     run_design,
     DesignAgentError,
     _gather_repo_context,
+    _gather_multi_repo_context,
     _build_component_context,
     _build_analysis_prompt,
     _parse_design_output,
@@ -420,6 +421,140 @@ def test_integration_with_real_components(sample_repo_context):
     assert len(prompt) > 1000  # Should be substantial
     assert "Component Information" in prompt
     assert "Repository Context" in prompt
+
+
+class TestLanguageAwareRepoContext:
+    """Tests for language-aware repository context gathering."""
+
+    def test_gather_repo_context_skips_go_for_python(self):
+        """When language='python', Go-specific analysis is skipped entirely."""
+        # No RepoSearch should be instantiated for non-Go repos
+        with patch("stages.design.RepoSearch") as mock_repo_search:
+            context = _gather_repo_context("/fake/python/repo", language="python")
+
+            mock_repo_search.assert_not_called()
+            assert context["project_type"] == "python"
+            assert context["api_files"] == []
+            assert context["controller_files"] == []
+            assert context["crd_files"] == []
+            assert context["package_structure"] == []
+
+    def test_gather_repo_context_runs_go_when_language_is_go(self):
+        """When language='go', normal Go analysis runs."""
+        with patch("stages.design.RepoSearch") as mock_repo_search:
+            mock_searcher = Mock()
+            mock_searcher.search_files.return_value = []
+            mock_searcher.find_kubernetes_crds.return_value = []
+            mock_searcher.analyze_go_packages.return_value = []
+            mock_repo_search.return_value = mock_searcher
+
+            context = _gather_repo_context("/fake/go/repo", language="go")
+
+            mock_repo_search.assert_called_once_with("/fake/go/repo")
+            # project_type is set by _detect_project_type, not "go" literally
+            assert context["project_type"] in ("Go", "Go/Kubernetes")
+
+    def test_gather_repo_context_runs_go_when_language_is_none(self):
+        """When language=None (default), normal Go auto-detection runs."""
+        with patch("stages.design.RepoSearch") as mock_repo_search:
+            mock_searcher = Mock()
+            mock_searcher.search_files.return_value = []
+            mock_searcher.find_kubernetes_crds.return_value = []
+            mock_searcher.analyze_go_packages.return_value = []
+            mock_repo_search.return_value = mock_searcher
+
+            context = _gather_repo_context("/fake/repo", language=None)
+
+            mock_repo_search.assert_called_once()
+
+    def test_gather_multi_repo_context_with_mixed_languages(self):
+        """Multi-repo context gathers correctly when repos have different languages."""
+        go_api_file = "pkg/apis/build/v1beta1/build_types.go"
+
+        with patch("stages.design.RepoSearch") as mock_repo_search:
+            mock_searcher = Mock()
+            mock_searcher.search_files.return_value = [
+                Mock(file_path=go_api_file),
+            ]
+            mock_searcher.find_kubernetes_crds.return_value = []
+            mock_searcher.analyze_go_packages.return_value = []
+            mock_repo_search.return_value = mock_searcher
+
+            entries = [
+                {"path": "/fake/go/repo", "language": "go"},
+                {"path": "/fake/python/repo", "language": "python"},
+            ]
+
+            result = _gather_multi_repo_context(entries)
+
+            assert result is not None
+            # Go repo contributes API files; Python repo does not
+            assert go_api_file in result["api_files"]
+            # Both project types should be recorded
+            assert "python" in result["project_types"]
+
+    def test_gather_multi_repo_context_backward_compat_strings(self):
+        """_gather_multi_repo_context still works with plain string paths."""
+        with patch("stages.design.RepoSearch") as mock_repo_search:
+            mock_searcher = Mock()
+            mock_searcher.search_files.return_value = []
+            mock_searcher.find_kubernetes_crds.return_value = []
+            mock_searcher.analyze_go_packages.return_value = []
+            mock_repo_search.return_value = mock_searcher
+
+            result = _gather_multi_repo_context(["/fake/repo"])
+
+            mock_repo_search.assert_called_once_with("/fake/repo")
+
+    def test_run_design_uses_repo_entries(self):
+        """run_design prefers repo_entries over repo_paths when provided."""
+        mock_response = Mock()
+        mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
+
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
+            with patch("stages.design._gather_multi_repo_context") as mock_gather:
+                mock_gather.return_value = None
+                mock_client = Mock()
+                mock_client.messages.create.return_value = mock_response
+                mock_get_client.return_value = mock_client
+
+                with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
+                    entries = [
+                        {"path": "/fake/go", "language": "go"},
+                        {"path": "/fake/py", "language": "python"},
+                    ]
+                    run_design(
+                        title=SAMPLE_ISSUE_TITLE,
+                        description=SAMPLE_ISSUE_DESCRIPTION,
+                        repo_paths=["/fake/go", "/fake/py"],
+                        repo_entries=entries,
+                    )
+
+                    # Should be called with entries (dicts), not plain paths
+                    mock_gather.assert_called_once_with(entries)
+
+    def test_run_design_falls_back_to_repo_paths(self):
+        """run_design falls back to repo_paths when repo_entries is None."""
+        mock_response = Mock()
+        mock_response.content = [Mock(text=SAMPLE_DESIGN_OUTPUT)]
+
+        with patch("stages.design.get_anthropic_client") as mock_get_client:
+            with patch("stages.design._gather_multi_repo_context") as mock_gather:
+                mock_gather.return_value = None
+                mock_client = Mock()
+                mock_client.messages.create.return_value = mock_response
+                mock_get_client.return_value = mock_client
+
+                with patch.dict(os.environ, {"ANTHROPIC_VERTEX_PROJECT_ID": "test-project-id"}):
+                    run_design(
+                        title=SAMPLE_ISSUE_TITLE,
+                        description=SAMPLE_ISSUE_DESCRIPTION,
+                        repo_paths=["/fake/go", "/fake/py"],
+                        repo_entries=None,
+                    )
+
+                    # Should be called with plain paths (backward compat)
+                    mock_gather.assert_called_once_with(["/fake/go", "/fake/py"])
 
 
 if __name__ == "__main__":
