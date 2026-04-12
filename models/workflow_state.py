@@ -57,6 +57,7 @@ class WorkflowState(TypedDict, total=False):
     session_id: str
     current_phase: str
     approval_status: str
+    memory_context: str
 
     # Repository context
     repo_path: str

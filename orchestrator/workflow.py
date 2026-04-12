@@ -73,6 +73,7 @@ class WorkflowOrchestrator:
         self._repo_config = self._load_repo_config()
         self._repo_commands = self._extract_repo_commands()
         self._active_stages = self._repo_config.stages
+        self._memory_service = self._init_memory_service()
 
     def _load_repo_config(self) -> "RepoConfig":  # noqa: F821
         """Load the full RepoConfig from repos.yaml.
@@ -102,6 +103,18 @@ class WorkflowOrchestrator:
             if repo.path == self.repo_path:
                 return repo.commands.model_dump(exclude_none=True)
         return None
+
+    def _init_memory_service(self) -> "Optional[MemoryService]":  # noqa: F821
+        """Initialize the memory service if enabled via MEMORY_ENABLED env var."""
+        try:
+            from memory.service import MemoryService
+            service = MemoryService()
+            if service.enabled:
+                from utils.file_logger import get_logger
+                get_logger(__name__).info("Memory service enabled")
+            return service if service.enabled else None
+        except Exception:
+            return None
 
     # -- internal helpers -----------------------------------------------------
 
@@ -189,6 +202,7 @@ class WorkflowOrchestrator:
             repo_path=state.get("repo_path"),
             repo_paths=state.get("repo_paths", []),
             repo_entries=state.get("repo_entries"),
+            memory_context=state.get("memory_context", ""),
         )
 
     def _run_develop(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -333,16 +347,26 @@ class WorkflowOrchestrator:
 
         # -- Stage 1: Design --------------------------------------------------
         if self._should_run_stage("design"):
+            if self._memory_service:
+                memory_ctx = self._memory_service.retrieve_for_stage("design", state)
+                if memory_ctx:
+                    state["memory_context"] = memory_ctx
+
             try:
                 result = self._run_design(state)
                 state.update(result)
                 state["current_phase"] = "design_complete"
                 self._emit_heartbeat("design", state)
+                if self._memory_service:
+                    self._memory_service.store_from_stage("design", state, result)
             except Exception as e:
                 state["current_phase"] = "error"
                 state["error"] = f"Design stage failed: {e}"
                 self._emit_heartbeat("design", state)
+                state.pop("memory_context", None)
                 return state
+
+            state.pop("memory_context", None)
 
             if not self._validate("design", state):
                 state["current_phase"] = "error"
@@ -358,8 +382,19 @@ class WorkflowOrchestrator:
 
         # -- Stage 2: Development (with review gate) ----------------------------
         if self._should_run_stage("develop"):
+            if self._memory_service:
+                memory_ctx = self._memory_service.retrieve_for_stage("develop", state)
+                if memory_ctx:
+                    state["memory_context"] = memory_ctx
+
             # _run_develop_with_review_gate mutates *state* in-place.
             self._run_develop_with_review_gate(state)
+
+            if self._memory_service:
+                self._memory_service.store_from_stage("develop", state, state)
+
+            state.pop("memory_context", None)
+
             if state.get("current_phase") == "error":
                 return state
 
@@ -371,16 +406,26 @@ class WorkflowOrchestrator:
 
         # -- Stage 3: Testing --------------------------------------------------
         if self._should_run_stage("testing"):
+            if self._memory_service:
+                memory_ctx = self._memory_service.retrieve_for_stage("testing", state)
+                if memory_ctx:
+                    state["memory_context"] = memory_ctx
+
             try:
                 result = self._run_testing(state)
                 state.update(result)
                 state["current_phase"] = "testing_complete"
                 self._emit_heartbeat("testing", state)
+                if self._memory_service:
+                    self._memory_service.store_from_stage("testing", state, result)
             except Exception as e:
                 state["current_phase"] = "error"
                 state["error"] = f"Testing stage failed: {e}"
                 self._emit_heartbeat("testing", state)
+                state.pop("memory_context", None)
                 return state
+
+            state.pop("memory_context", None)
 
             if not self._validate("testing", state):
                 state["current_phase"] = "error"
@@ -405,16 +450,26 @@ class WorkflowOrchestrator:
 
         # -- Stage 4: Documentation --------------------------------------------
         if self._should_run_stage("docs"):
+            if self._memory_service:
+                memory_ctx = self._memory_service.retrieve_for_stage("docs", state)
+                if memory_ctx:
+                    state["memory_context"] = memory_ctx
+
             try:
                 result = self._run_docs(state)
                 state.update(result)
                 state["current_phase"] = "done"
                 self._emit_heartbeat("docs", state)
+                if self._memory_service:
+                    self._memory_service.store_from_stage("docs", state, result)
             except Exception as e:
                 state["current_phase"] = "error"
                 state["error"] = f"Docs stage failed: {e}"
                 self._emit_heartbeat("docs", state)
+                state.pop("memory_context", None)
                 return state
+
+            state.pop("memory_context", None)
 
             if not self._validate("docs", state):
                 state["current_phase"] = "error"

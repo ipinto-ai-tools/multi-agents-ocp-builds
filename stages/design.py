@@ -40,6 +40,7 @@ def run_design(
     repo_path: Optional[str] = None,
     repo_paths: Optional[List[str]] = None,
     repo_entries: Optional[List[dict]] = None,
+    memory_context: str = "",
 ) -> Dict[str, Any]:
     """Run design analysis on a GitHub issue.
 
@@ -112,6 +113,10 @@ def run_design(
         component_context=component_context,
         repo_context=repo_context,
     )
+
+    # Inject cross-session memory context if provided
+    if memory_context:
+        user_prompt += f"\n\n{memory_context}"
 
     # Call Claude API
     try:
