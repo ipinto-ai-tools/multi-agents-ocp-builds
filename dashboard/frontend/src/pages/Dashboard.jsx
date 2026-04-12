@@ -24,12 +24,11 @@ function PhaseChip({ phase }) {
 }
 
 function deriveStatus(session) {
-  const phase = session.latest_heartbeat?.phase || session.status || 'init'
-  const currentPhase = session.latest_heartbeat?.raw_state?.current_phase
-  if (phase === 'done' || currentPhase === 'done') return 'completed'
-  if (phase === 'error' || currentPhase === 'error') return 'failed'
-  if (phase?.includes('waiting') || currentPhase?.includes('waiting')) return 'waiting'
-  if (phase === 'init' && !currentPhase) return 'init'
+  const phase = session.latest_heartbeat?.raw_state?.current_phase || session.status || 'init'
+  if (phase === 'done') return 'completed'
+  if (phase === 'error') return 'failed'
+  if (phase.includes('waiting')) return 'waiting'
+  if (phase === 'init') return 'init'
   return 'running'
 }
 
@@ -175,13 +174,13 @@ export default function Dashboard() {
                             Approve
                           </button>
                         )}
-                        {status === 'running' && session.latest_heartbeat?.phase !== 'paused' && (
+                        {status === 'running' && session.latest_heartbeat?.raw_state?.current_phase !== 'paused' && (
                           <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
                             onClick={() => pauseSession(session.id).then(load)}>
                             Pause
                           </button>
                         )}
-                        {status === 'running' && session.latest_heartbeat?.phase === 'paused' && (
+                        {status === 'running' && session.latest_heartbeat?.raw_state?.current_phase === 'paused' && (
                           <button className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50"
                             onClick={() => resumeSession(session.id).then(load)}>
                             Resume
