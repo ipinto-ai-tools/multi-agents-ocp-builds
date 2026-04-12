@@ -937,3 +937,139 @@ class TestPauseSignal:
         assert "Pause timeout" in state["error"]
         # Pause file should be cleaned up on timeout
         assert not pause_file.exists()
+
+
+class TestSmartStageSkipping:
+    """Smart skip logic based on issue_type and code_files content."""
+
+    # -- _should_skip_testing unit tests --------------------------------------
+
+    def test_should_skip_testing_no_code_files(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_skip_testing returns 'no code files produced' when code_files is empty or missing."""
+        # Missing key
+        assert orchestrator._should_skip_testing({}) == "no code files produced"
+        # Empty list
+        assert orchestrator._should_skip_testing({"code_files": []}) == "no code files produced"
+        # Explicitly None
+        assert orchestrator._should_skip_testing({"code_files": None}) == "no code files produced"
+
+    def test_should_skip_testing_with_code_files(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_skip_testing returns empty string when code_files has items."""
+        state = {"code_files": [{"path": "main.go", "content": "package main"}]}
+        assert orchestrator._should_skip_testing(state) == ""
+
+    def test_should_skip_testing_docs_type(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_skip_testing returns 'docs-only task' when issue_type is 'docs'."""
+        state = {"issue_type": "docs", "code_files": [{"path": "f.go", "content": "x"}]}
+        assert orchestrator._should_skip_testing(state) == "docs-only task"
+
+    # -- _should_skip_develop unit tests --------------------------------------
+
+    def test_should_skip_develop_docs_type(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_skip_develop returns 'docs-only task' when issue_type is 'docs'."""
+        assert orchestrator._should_skip_develop({"issue_type": "docs"}) == "docs-only task"
+
+    def test_should_skip_develop_feature_type(
+        self, orchestrator: WorkflowOrchestrator
+    ) -> None:
+        """_should_skip_develop returns empty string for issue_type 'feature'."""
+        assert orchestrator._should_skip_develop({"issue_type": "feature"}) == ""
+
+    # -- full pipeline integration tests --------------------------------------
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_run_skips_testing_when_no_code_files(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When develop produces no code_files, testing stage is NOT called."""
+        mock_design.return_value = _design_result()
+        # Develop returns empty code_files
+        develop_result = _develop_result()
+        develop_result["code_files"] = []
+        mock_develop.return_value = develop_result
+        mock_review_gate.return_value = _review_pass_result()
+        mock_docs.return_value = _docs_result()
+
+        state = orchestrator.run(**_run_kwargs())
+
+        assert state["current_phase"] == "done"
+        mock_design.assert_called_once()
+        mock_develop.assert_called_once()
+        mock_review_gate.assert_called_once()
+        mock_testing.assert_not_called()
+        mock_docs.assert_called_once()
+
+        # Verify testing heartbeat was emitted with skipped=True and skip_reason
+        hb_calls = [(c.args[0], c.args[1]) for c in mock_heartbeat.call_args_list]
+        testing_hb = [s for agent, s in hb_calls if agent == "testing"]
+        assert len(testing_hb) == 1
+        assert testing_hb[0].get("skipped") is True
+        assert testing_hb[0].get("skip_reason") == "no code files produced"
+
+    @patch(_HEARTBEAT_PATCH, return_value=True)
+    @patch(_VALIDATE_PATCH, return_value=True)
+    @patch(_DOCS_PATCH)
+    @patch(_TESTING_PATCH)
+    @patch(_REVIEW_GATE_PATCH)
+    @patch(_DEVELOP_PATCH)
+    @patch(_DESIGN_PATCH)
+    def test_run_skips_develop_and_testing_for_docs(
+        self,
+        mock_design: MagicMock,
+        mock_develop: MagicMock,
+        mock_review_gate: MagicMock,
+        mock_testing: MagicMock,
+        mock_docs: MagicMock,
+        mock_validate: MagicMock,
+        mock_heartbeat: MagicMock,
+        orchestrator: WorkflowOrchestrator,
+    ) -> None:
+        """When issue_type='docs', develop and testing are NOT called but design and docs ARE."""
+        mock_design.return_value = _design_result()
+        mock_docs.return_value = _docs_result()
+
+        state = orchestrator.run(
+            title="Update README",
+            description="Add installation instructions",
+            issue_type="docs",
+        )
+
+        assert state["current_phase"] == "done"
+        mock_design.assert_called_once()
+        mock_develop.assert_not_called()
+        mock_review_gate.assert_not_called()
+        mock_testing.assert_not_called()
+        mock_docs.assert_called_once()
+
+        # Verify both develop and testing heartbeats were emitted with skipped=True
+        hb_calls = [(c.args[0], c.args[1]) for c in mock_heartbeat.call_args_list]
+        develop_hb = [s for agent, s in hb_calls if agent == "develop"]
+        testing_hb = [s for agent, s in hb_calls if agent == "testing"]
+        assert len(develop_hb) == 1
+        assert develop_hb[0].get("skipped") is True
+        assert develop_hb[0].get("skip_reason") == "docs-only task"
+        assert len(testing_hb) == 1
+        assert testing_hb[0].get("skipped") is True
+        assert testing_hb[0].get("skip_reason") == "docs-only task"
