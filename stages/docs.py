@@ -613,6 +613,11 @@ def _build_context_message(
             message_parts.append(f"- {url}\n")
         message_parts.append("\n")
 
+    # Inject cross-session memory context if provided
+    memory_context = context.get("memory_context", "")
+    if memory_context:
+        message_parts.append(f"\n{memory_context}\n")
+
     # Request documentation generation based on format
     message_parts.append("\n---\n\n")
     message_parts.append(_get_generation_request(output_format))

@@ -311,6 +311,11 @@ def _build_testing_prompt(
                 f"**Security Contexts:** {', '.join(patterns_detected['security_contexts'])}\n"
             )
 
+    # Inject cross-session memory context if provided
+    memory_context = context.get("memory_context", "")
+    if memory_context:
+        prompt_parts.append(f"\n{memory_context}\n")
+
     # Add test generation instructions
     prompt_parts.append(
         "\n## Test Generation Instructions\n\n"

@@ -455,6 +455,11 @@ def _build_development_prompt(
     if review_feedback:
         prompt_parts.append(review_feedback)
 
+    # Inject cross-session memory context if provided
+    memory_context = context.get("memory_context", "")
+    if memory_context:
+        prompt_parts.append(f"\n{memory_context}\n")
+
     # Add code generation instructions
     prompt_parts.append(
         "\n## Code Generation Instructions\n\n"

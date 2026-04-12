@@ -122,3 +122,5 @@ Tests are in `tests/` and use pytest. The `conftest.py` provides shared fixtures
 | `PII_REDACTION_ENABLED` | Redact PII from Jira/GitHub data at fetch time (default: `true`). Set to `false` for local dev only. |
 | `PROMPT_GUARD_ENABLED` | Sanitize external text for prompt injection patterns before prompt assembly (default: `true`). Set to `false` for local dev only. |
 | `OUTPUT_SANITIZER_ENABLED` | Enable/disable output sanitizer (default: `true`) |
+| `MEMORY_ENABLED` | Enable cross-session agent memory (default: `false`) |
+| `MEMORY_DB_PATH` | SQLite DB path for memory (default: `~/.local/share/flowpilot/memory.db`) |
