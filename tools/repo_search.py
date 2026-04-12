@@ -354,7 +354,7 @@ class RepoSearch:
         search_path = self.repo_path / base_path if base_path else self.repo_path
 
         if not search_path.exists():
-            raise RepositorySearchError(f"Path does not exist: {search_path}")
+            return []
 
         packages: Dict[str, PackageInfo] = {}
 
