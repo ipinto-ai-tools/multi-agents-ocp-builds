@@ -64,7 +64,8 @@ def run_docs(
             - issue_title: str - Original issue title
             - issue_description: str - Original issue description
             - issue_type: str - Type of issue (bug, feature, etc.)
-            - repo_path: str - Path to repository (required for RAG)
+            - repo_path: str - Path to repository (required for RAG, single repo)
+            - repo_paths: list[str] - Paths to multiple repositories (preferred for RAG)
         input_files: Optional list of file paths to include as context
         output_format: Output format - "standard", "ship", "jtbd", or "all"
         enable_rag: Enable RAG for fetching relevant documentation
@@ -103,11 +104,13 @@ def run_docs(
     logger.debug("Context validation passed")
 
     # Initialize RAG search if enabled
+    # Support both multi-repo (repo_paths) and single-repo (repo_path) context
     rag_context = {}
-    if enable_rag and "repo_path" in context:
-        logger.info(f"RAG search enabled for repo: {context['repo_path']}")
+    repo_paths = _resolve_repo_paths(context)
+    if enable_rag and repo_paths:
+        logger.info(f"RAG search enabled for repos: {repo_paths}")
         try:
-            rag_context = _fetch_rag_context(context, input_files)
+            rag_context = _fetch_rag_context(context, input_files, repo_paths)
             logger.info(f"RAG context fetched: {list(rag_context.keys())}")
             session_logger.info(f"RAG context: {len(rag_context.get('related_docs', []))} docs, {len(rag_context.get('code_examples', []))} examples")
         except RAGSearchError as e:
@@ -118,9 +121,10 @@ def run_docs(
     input_file_context = {}
     if input_files:
         logger.info(f"Processing {len(input_files)} input files")
+        base_repo_path = repo_paths[0] if repo_paths else context.get("repo_path", ".")
         input_file_context = _process_input_files(
             input_files,
-            context.get("repo_path", ".")
+            base_repo_path
         )
         session_logger.info(f"Processed {len(input_file_context.get('file_contents', {}))} input files")
 
@@ -213,15 +217,43 @@ def run_docs(
         raise RuntimeError(f"Unexpected error in docs agent: {e}") from e
 
 
-def _fetch_rag_context(
-    context: Dict[str, Any],
-    input_files: Optional[List[str]] = None
-) -> Dict[str, Any]:
-    """Fetch relevant context using RAG search.
+def _resolve_repo_paths(context: Dict[str, Any]) -> List[str]:
+    """Resolve repository paths from context.
+
+    Supports both multi-repo (``repo_paths``) and single-repo (``repo_path``)
+    context keys, with proper fallback handling.
 
     Args:
-        context: Agent context with repo_path and files_modified
+        context: Agent context dictionary.
+
+    Returns:
+        List of repository path strings. May be empty if neither key is present.
+    """
+    repo_paths = context.get("repo_paths")
+    if repo_paths and isinstance(repo_paths, list):
+        # Filter out any empty/None entries
+        return [p for p in repo_paths if p]
+
+    single = context.get("repo_path")
+    if single:
+        return [single]
+
+    return []
+
+
+def _fetch_rag_context(
+    context: Dict[str, Any],
+    input_files: Optional[List[str]] = None,
+    repo_paths: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Fetch relevant context using RAG search across one or more repositories.
+
+    Args:
+        context: Agent context with files_modified and other metadata
         input_files: Optional input files to analyze
+        repo_paths: List of repository paths to search. When multiple paths are
+            provided, RAG results from each repo are merged (deduplicated by
+            file path).
 
     Returns:
         Dictionary with RAG context:
@@ -230,81 +262,109 @@ def _fetch_rag_context(
             - api_patterns: List of API usage patterns
             - similar_implementations: List of similar code
     """
-    repo_path = context.get("repo_path")
-    if not repo_path:
-        logger.debug("No repo_path in context, skipping RAG")
+    if not repo_paths:
+        repo_paths = _resolve_repo_paths(context)
+    if not repo_paths:
+        logger.debug("No repo paths available, skipping RAG")
         return {}
 
-    logger.debug(f"Initializing RAG search for repo: {repo_path}")
-    rag_search = RAGSearch(repo_path)
-    rag_context: Dict[str, Any] = {}
+    merged_context: Dict[str, List[Any]] = {
+        "related_docs": [],
+        "code_examples": [],
+        "similar_implementations": [],
+        "api_patterns": [],
+    }
 
-    # Search Shipwright documentation
-    if "issue_title" in context:
-        logger.debug(f"Searching Shipwright docs for: {context['issue_title']}")
-        doc_matches = rag_search.search_shipwright_docs(
-            query=context["issue_title"],
-            max_results=3
-        )
-        rag_context["related_docs"] = [
-            {
-                "file": match.file_path,
-                "section": match.section_title,
-                "content": match.content[:500]  # First 500 chars
-            }
-            for match in doc_matches
-        ]
-        logger.debug(f"Found {len(doc_matches)} related docs")
+    seen_files: Dict[str, set] = {
+        "related_docs": set(),
+        "code_examples": set(),
+        "similar_implementations": set(),
+        "api_patterns": set(),
+    }
 
-    # Extract code examples from modified files or input files
-    files_to_analyze = input_files or context.get("files_modified", [])
-    if files_to_analyze:
-        logger.debug(f"Extracting code examples from {len(files_to_analyze)} files")
-        code_examples = rag_search.extract_code_examples(files_to_analyze)
-        rag_context["code_examples"] = [
-            {
-                "file": ex.file_path,
-                "language": ex.language,
-                "context": ex.context,
-                "code": ex.code[:300]  # First 300 chars
-            }
-            for ex in code_examples[:5]  # Top 5 examples
-        ]
-        logger.debug(f"Extracted {len(code_examples)} code examples")
+    for repo_path in repo_paths:
+        logger.debug(f"Initializing RAG search for repo: {repo_path}")
+        try:
+            rag_search = RAGSearch(repo_path)
+        except RAGSearchError as e:
+            logger.warning(f"Failed to initialise RAGSearch for {repo_path}: {e}")
+            continue
 
-    # Search for similar implementations
-    if files_to_analyze:
-        logger.debug("Searching for similar code implementations")
-        similar = rag_search.search_similar_code(
-            reference_files=files_to_analyze[:3],  # Top 3 files
-            max_results=5
-        )
-        rag_context["similar_implementations"] = [
-            {"file": res.file_path, "line": res.line_number}
-            for res in similar
-        ]
-        logger.debug(f"Found {len(similar)} similar implementations")
+        try:
+            # Search Shipwright documentation
+            if "issue_title" in context:
+                logger.debug(f"Searching docs in {repo_path} for: {context['issue_title']}")
+                doc_matches = rag_search.search_shipwright_docs(
+                    query=context["issue_title"],
+                    max_results=3
+                )
+                for match in doc_matches:
+                    if match.file_path not in seen_files["related_docs"]:
+                        seen_files["related_docs"].add(match.file_path)
+                        merged_context["related_docs"].append({
+                            "file": match.file_path,
+                            "section": match.section_title,
+                            "content": match.content[:500],
+                        })
+                logger.debug(f"Found {len(doc_matches)} related docs in {repo_path}")
 
-    # Find API usage patterns (extract from design analysis)
-    api_names = _extract_api_names(context.get("design_analysis", ""))
-    if api_names:
-        logger.debug(f"Searching API patterns for: {api_names[:3]}")
-        api_patterns = rag_search.search_api_patterns(
-            api_names=api_names[:3],  # Top 3 APIs
-            file_pattern="**/*.go"
-        )
-        rag_context["api_patterns"] = [
-            {
-                "api": pattern.api_name,
-                "file": pattern.file_path,
-                "type": pattern.pattern_type,
-                "code": pattern.usage_code[:200]
-            }
-            for pattern in api_patterns[:5]  # Top 5 patterns
-        ]
-        logger.debug(f"Found {len(api_patterns)} API patterns")
+            # Extract code examples from modified files or input files
+            files_to_analyze = input_files or context.get("files_modified", [])
+            if files_to_analyze:
+                logger.debug(f"Extracting code examples from {len(files_to_analyze)} files in {repo_path}")
+                code_examples = rag_search.extract_code_examples(files_to_analyze)
+                for ex in code_examples[:5]:
+                    if ex.file_path not in seen_files["code_examples"]:
+                        seen_files["code_examples"].add(ex.file_path)
+                        merged_context["code_examples"].append({
+                            "file": ex.file_path,
+                            "language": ex.language,
+                            "context": ex.context,
+                            "code": ex.code[:300],
+                        })
+                logger.debug(f"Extracted {len(code_examples)} code examples from {repo_path}")
 
-    return rag_context
+            # Search for similar implementations
+            if files_to_analyze:
+                logger.debug(f"Searching for similar code in {repo_path}")
+                similar = rag_search.search_similar_code(
+                    reference_files=files_to_analyze[:3],
+                    max_results=5
+                )
+                for res in similar:
+                    key = f"{res.file_path}:{res.line_number}"
+                    if key not in seen_files["similar_implementations"]:
+                        seen_files["similar_implementations"].add(key)
+                        merged_context["similar_implementations"].append(
+                            {"file": res.file_path, "line": res.line_number}
+                        )
+                logger.debug(f"Found {len(similar)} similar implementations in {repo_path}")
+
+            # Find API usage patterns (extract from design analysis)
+            api_names = _extract_api_names(context.get("design_analysis", ""))
+            if api_names:
+                logger.debug(f"Searching API patterns in {repo_path} for: {api_names[:3]}")
+                api_patterns = rag_search.search_api_patterns(
+                    api_names=api_names[:3],
+                    file_pattern="**/*.go"
+                )
+                for pattern in api_patterns[:5]:
+                    key = f"{pattern.api_name}:{pattern.file_path}"
+                    if key not in seen_files["api_patterns"]:
+                        seen_files["api_patterns"].add(key)
+                        merged_context["api_patterns"].append({
+                            "api": pattern.api_name,
+                            "file": pattern.file_path,
+                            "type": pattern.pattern_type,
+                            "code": pattern.usage_code[:200],
+                        })
+                logger.debug(f"Found {len(api_patterns)} API patterns in {repo_path}")
+        except Exception as e:
+            logger.warning(f"RAG search failed for {repo_path}: {e}")
+            continue
+
+    # Only return keys that have results
+    return {k: v for k, v in merged_context.items() if v}
 
 
 def _extract_api_names(design_text: str) -> List[str]:

@@ -327,6 +327,7 @@ def orchestrate(
         orchestrator = WorkflowOrchestrator(
             session_id=session_id,
             repo_path=repo_path,
+            repo_paths=repo_paths,
             output_dir=pathlib.Path(output_dir) if output_dir else None,
         )
 

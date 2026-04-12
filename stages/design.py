@@ -10,7 +10,7 @@ implementation planning.
 
 import os
 import re
-from typing import Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from prompts.design import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
@@ -34,7 +34,12 @@ class DesignAgentError(Exception):
     """Base exception for Design Agent errors."""
 
 
-def run_design(title: str, description: str, repo_path: Optional[str] = None) -> Dict[str, Any]:
+def run_design(
+    title: str,
+    description: str,
+    repo_path: Optional[str] = None,
+    repo_paths: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """Run design analysis on a GitHub issue.
 
     This function analyzes a feature request or bug report and produces a comprehensive
@@ -46,6 +51,8 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
         description: GitHub issue description/body
         repo_path: Optional path to the Shipwright repository for code analysis.
                   If not provided, analysis is based on component metadata only.
+        repo_paths: Optional list of repository paths to gather context from.
+                   When provided, takes precedence over repo_path.
 
     Returns:
         Dictionary containing:
@@ -76,12 +83,13 @@ def run_design(title: str, description: str, repo_path: Optional[str] = None) ->
         logger.error(f"Failed to initialize Claude client: {e}", exc_info=True)
         raise DesignAgentError(f"Failed to initialize Claude client: {e}") from e
 
-    # Gather repository context if path provided
-    if repo_path:
-        logger.info(f"Gathering repository context from: {repo_path}")
-        repo_context = _gather_repo_context(repo_path)
+    # Resolve effective repo list: prefer repo_paths, fall back to repo_path
+    effective_paths = repo_paths or ([repo_path] if repo_path else [])
+
+    if effective_paths:
+        repo_context = _gather_multi_repo_context(effective_paths)
     else:
-        logger.info("No repository path provided, skipping repository context")
+        logger.info("No repository paths provided, skipping repository context")
         repo_context = None
 
     # Build component information context
@@ -271,6 +279,40 @@ def _gather_repo_context(repo_path: str) -> Dict[str, Any]:
         context["error"] = f"Repository analysis failed: {str(e)}"
 
     return context
+
+
+def _gather_multi_repo_context(repo_paths: List[str]) -> Optional[Dict[str, Any]]:
+    """Gather and merge repository context from multiple repos."""
+    merged: Dict[str, Any] = {
+        "package_structure": [],
+        "api_files": [],
+        "controller_files": [],
+        "crd_files": [],
+        "project_types": [],
+    }
+
+    for path in repo_paths:
+        logger.info(f"Gathering repository context from: {path}")
+        try:
+            ctx = _gather_repo_context(path)
+            if ctx:
+                for key in merged:
+                    items = ctx.get(key, [])
+                    if isinstance(items, list):
+                        merged[key].extend(items)
+                if ctx.get("project_type"):
+                    merged["project_types"].append(ctx["project_type"])
+        except Exception as e:
+            logger.warning(f"Failed to gather context from {path}: {e}")
+
+    logger.info(
+        f"Merged context from {len(repo_paths)} repos: "
+        f"{len(merged['api_files'])} API files, "
+        f"{len(merged['controller_files'])} controllers, "
+        f"{len(merged['crd_files'])} CRDs, "
+        f"{len(merged['package_structure'])} packages"
+    )
+    return merged if any(merged.values()) else None
 
 
 def _build_component_context() -> str:
