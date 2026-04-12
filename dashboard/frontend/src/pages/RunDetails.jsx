@@ -5,12 +5,11 @@ import StatusBadge from '../components/StatusBadge'
 import PipelineProgress from '../components/PipelineProgress'
 
 function deriveStatus(session) {
-  const phase = session?.latest_heartbeat?.phase || 'init'
-  const currentPhase = session?.latest_heartbeat?.raw_state?.current_phase
-  if (phase === 'done' || currentPhase === 'done') return 'completed'
-  if (phase === 'error' || currentPhase === 'error') return 'failed'
-  if (phase?.includes('waiting') || currentPhase?.includes('waiting')) return 'waiting'
-  if (phase === 'init' && !currentPhase) return 'init'
+  const phase = session?.latest_heartbeat?.raw_state?.current_phase || session?.status || 'init'
+  if (phase === 'done') return 'completed'
+  if (phase === 'error') return 'failed'
+  if (phase.includes('waiting')) return 'waiting'
+  if (phase === 'init') return 'init'
   return 'running'
 }
 
@@ -145,13 +144,13 @@ export default function RunDetails() {
               </button>
             </>
           )}
-          {status === 'running' && session?.latest_heartbeat?.phase !== 'paused' && (
+          {status === 'running' && session?.latest_heartbeat?.raw_state?.current_phase !== 'paused' && (
             <button onClick={() => pauseSession(sessionId).then(loadSession)}
               className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
               Pause
             </button>
           )}
-          {status === 'running' && session?.latest_heartbeat?.phase === 'paused' && (
+          {status === 'running' && session?.latest_heartbeat?.raw_state?.current_phase === 'paused' && (
             <button onClick={() => resumeSession(sessionId).then(loadSession)}
               className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
               Resume
