@@ -244,15 +244,15 @@ export default function RunDetails() {
             {state.design_analysis && (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">Design Analysis</h3>
-                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-64 whitespace-pre-wrap">
-                  {state.design_analysis.slice(0, 2000)}{state.design_analysis.length > 2000 ? '...' : ''}
+                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[80vh] whitespace-pre-wrap">
+                  {state.design_analysis}
                 </pre>
               </div>
             )}
             {prSummary && (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">PR Summary</h3>
-                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">{prSummary}</pre>
+                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[60vh] whitespace-pre-wrap">{prSummary}</pre>
               </div>
             )}
           </div>
@@ -278,7 +278,7 @@ export default function RunDetails() {
                     <div className="bg-gray-100 px-4 py-2 text-xs font-mono text-gray-600 border-b border-gray-200">
                       {file.path || `file-${i}`}
                     </div>
-                    <pre className="text-xs text-gray-700 p-4 overflow-auto max-h-64 bg-gray-50">
+                    <pre className="text-xs text-gray-700 p-4 overflow-auto max-h-[80vh] bg-gray-50">
                       {file.content || ''}
                     </pre>
                   </div>
@@ -302,7 +302,7 @@ export default function RunDetails() {
             {testPlan && (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">Test Plan</h3>
-                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap">{testPlan}</pre>
+                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[60vh] whitespace-pre-wrap">{testPlan}</pre>
               </div>
             )}
             {[
@@ -315,7 +315,7 @@ export default function RunDetails() {
                 {Object.entries(files).map(([path, content]) => (
                   <div key={path} className="border border-gray-200 rounded-lg overflow-hidden mb-3">
                     <div className="bg-gray-100 px-4 py-2 text-xs font-mono text-gray-600 border-b">{path}</div>
-                    <pre className="text-xs text-gray-700 p-4 overflow-auto max-h-48 bg-gray-50">{content}</pre>
+                    <pre className="text-xs text-gray-700 p-4 overflow-auto max-h-[80vh] bg-gray-50">{content}</pre>
                   </div>
                 ))}
               </div>
@@ -337,13 +337,13 @@ export default function RunDetails() {
             {prSummary ? (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">PR Summary</h3>
-                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">{prSummary}</pre>
+                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[80vh] whitespace-pre-wrap">{prSummary}</pre>
               </div>
             ) : null}
             {releaseNotes ? (
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">Release Notes</h3>
-                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">{releaseNotes}</pre>
+                <pre className="text-xs text-gray-600 bg-gray-50 p-4 rounded-lg overflow-auto max-h-[80vh] whitespace-pre-wrap">{releaseNotes}</pre>
               </div>
             ) : null}
             {!prSummary && !releaseNotes && (
