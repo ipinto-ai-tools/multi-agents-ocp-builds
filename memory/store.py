@@ -185,7 +185,8 @@ class MemoryStore:
         try:
             params: list[object] = []
 
-            if query.query_text:
+            escaped_query = _escape_fts5(query.query_text) if query.query_text and query.query_text.strip() else ""
+            if escaped_query:
                 # FTS5 path -- join back to memories for filter columns.
                 sql = """
                     SELECT m.*
@@ -193,25 +194,25 @@ class MemoryStore:
                     JOIN memories m ON m.id = fts.rowid
                     WHERE memories_fts MATCH ?
                 """
-                params.append(_escape_fts5(query.query_text))
+                params.append(escaped_query)
             else:
                 sql = "SELECT * FROM memories WHERE 1=1"
 
             if query.stage:
-                sql += " AND m.stage = ?" if query.query_text else " AND stage = ?"
+                sql += " AND m.stage = ?" if escaped_query else " AND stage = ?"
                 params.append(query.stage)
 
             if query.memory_types:
                 placeholders = ",".join("?" * len(query.memory_types))
-                col = "m.memory_type" if query.query_text else "memory_type"
+                col = "m.memory_type" if escaped_query else "memory_type"
                 sql += f" AND {col} IN ({placeholders})"
                 params.extend(query.memory_types)
 
             if query.issue_type:
-                sql += " AND m.issue_type = ?" if query.query_text else " AND issue_type = ?"
+                sql += " AND m.issue_type = ?" if escaped_query else " AND issue_type = ?"
                 params.append(query.issue_type)
 
-            if query.query_text:
+            if escaped_query:
                 sql += " ORDER BY rank"
             else:
                 sql += " ORDER BY created_at DESC"

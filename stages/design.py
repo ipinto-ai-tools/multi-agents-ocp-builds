@@ -10,7 +10,7 @@ implementation planning.
 
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from prompts.design import DESIGN_AGENT_PROMPT
 from config.auth_config import get_anthropic_client
@@ -312,7 +312,7 @@ def _gather_repo_context(
 
 
 def _gather_multi_repo_context(
-    repo_entries: List,
+    repo_entries: List[Union[str, Dict[str, Any]]],
 ) -> Optional[Dict[str, Any]]:
     """Gather and merge repository context from multiple repos.
 

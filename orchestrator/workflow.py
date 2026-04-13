@@ -10,6 +10,7 @@ Develop via :func:`orchestrator.gates.run_review_gate`.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from pathlib import Path
@@ -18,6 +19,11 @@ from typing import Any, Dict, List, Optional
 
 # Maximum code-review retry iterations (develop -> review loop).
 _DEFAULT_MAX_REVIEW_ITERATIONS = 2
+
+
+def _log() -> logging.Logger:
+    from utils.file_logger import get_logger
+    return get_logger(__name__)
 
 _SIGNAL_DIR = Path("/tmp/claude/signals")
 _PAUSE_POLL_INTERVAL = 2  # seconds
@@ -91,8 +97,7 @@ class WorkflowOrchestrator:
         try:
             return load_repo_config(yaml_path)
         except Exception as e:
-            from utils.file_logger import get_logger
-            get_logger(__name__).warning("Failed to load repo config: %s", e)
+            _log().warning("Failed to load repo config: %s", e)
             return RepoConfig()
 
     def _extract_repo_commands(self) -> Optional[Dict[str, str]]:
@@ -110,10 +115,10 @@ class WorkflowOrchestrator:
             from memory.service import MemoryService
             service = MemoryService()
             if service.enabled:
-                from utils.file_logger import get_logger
-                get_logger(__name__).info("Memory service enabled")
+                _log().info("Memory service enabled")
             return service if service.enabled else None
-        except Exception:
+        except Exception as e:
+            _log().warning("Failed to initialize memory service: %s", e)
             return None
 
     # -- internal helpers -----------------------------------------------------
@@ -412,7 +417,10 @@ class WorkflowOrchestrator:
             self._run_develop_with_review_gate(state)
 
             if self._memory_service:
-                self._memory_service.store_from_stage("develop", state, state)
+                _develop_keys = ("code_files", "test_files", "review_passed",
+                                 "review_findings", "security_notes", "pr_description")
+                develop_output = {k: state[k] for k in _develop_keys if k in state}
+                self._memory_service.store_from_stage("develop", state, develop_output)
 
             state.pop("memory_context", None)
 
@@ -424,8 +432,7 @@ class WorkflowOrchestrator:
                 return state
         else:
             reason = skip_develop_reason or "excluded in repos.yaml"
-            from utils.file_logger import get_logger
-            get_logger(__name__).info("Skipping develop stage: %s", reason)
+            _log().info("Skipping develop stage: %s", reason)
             self._emit_heartbeat("develop", {**state, "skipped": True, "skip_reason": reason})
 
         # -- Stage 3: Testing --------------------------------------------------
@@ -472,8 +479,7 @@ class WorkflowOrchestrator:
                 return state
         else:
             reason = skip_testing_reason or "excluded in repos.yaml"
-            from utils.file_logger import get_logger
-            get_logger(__name__).info("Skipping testing stage: %s", reason)
+            _log().info("Skipping testing stage: %s", reason)
             self._emit_heartbeat("testing", {**state, "skipped": True, "skip_reason": reason})
 
         # -- Stage 4: Documentation --------------------------------------------

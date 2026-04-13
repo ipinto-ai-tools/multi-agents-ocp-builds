@@ -81,7 +81,8 @@ class MemoryService:
                 max_results=5,
             )
 
-            assert self._store is not None  # guarded by self.enabled
+            if self._store is None:
+                return ""
             results = self._store.search(query)
             return self.format_memories_for_prompt(results)
         except Exception:
@@ -108,7 +109,8 @@ class MemoryService:
 
         try:
             entries = extract_memories(stage, context, stage_output)
-            assert self._store is not None  # guarded by self.enabled
+            if self._store is None:
+                return []
             ids: list[int] = []
             for entry in entries:
                 row_id = self._store.store(entry)

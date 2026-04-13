@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
@@ -49,7 +50,7 @@ def _remove_session_files(
 
     Returns (removed_logs, removed_signals) lists of file paths.
     """
-    if '/' in session_id or '\\' in session_id or '..' in session_id:
+    if not re.match(r'^[a-zA-Z0-9_\-]+$', session_id):
         return [], []
 
     removed_logs: List[str] = []
@@ -86,6 +87,29 @@ def _tables_exist(cursor: sqlite3.Cursor) -> bool:
     return 'sessions' in found and 'heartbeats' in found
 
 
+def _delete_sessions_batch(
+    cursor: sqlite3.Cursor, session_ids: list[str]
+) -> tuple[int, int]:
+    """Delete sessions and their heartbeats in batch.
+
+    Returns (sessions_deleted, heartbeats_deleted).
+    """
+    if not session_ids:
+        return 0, 0
+    placeholders = ",".join("?" * len(session_ids))
+    cursor.execute(
+        f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
+        session_ids,
+    )
+    heartbeats_deleted = cursor.rowcount
+    cursor.execute(
+        f"DELETE FROM sessions WHERE id IN ({placeholders})",
+        session_ids,
+    )
+    sessions_deleted = cursor.rowcount
+    return sessions_deleted, heartbeats_deleted
+
+
 def clean_all(
     db_path: Path, *, dry_run: bool, skip_confirm: bool
 ) -> None:
@@ -115,8 +139,7 @@ def clean_all(
                 print("Aborted.")
                 return
 
-            cursor.execute("DELETE FROM heartbeats")
-            cursor.execute("DELETE FROM sessions")
+            _delete_sessions_batch(cursor, session_ids)
             conn.commit()
     finally:
         conn.close()
@@ -232,14 +255,7 @@ def clean_stale(
                 print("Aborted.")
                 return
 
-            cursor.execute(
-                f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
-                session_ids,
-            )
-            cursor.execute(
-                f"DELETE FROM sessions WHERE id IN ({placeholders})",
-                session_ids,
-            )
+            _delete_sessions_batch(cursor, session_ids)
             conn.commit()
     finally:
         conn.close()
@@ -297,14 +313,7 @@ def clean_completed(
                 print("Aborted.")
                 return
 
-            cursor.execute(
-                f"DELETE FROM heartbeats WHERE session_id IN ({placeholders})",
-                session_ids,
-            )
-            cursor.execute(
-                f"DELETE FROM sessions WHERE id IN ({placeholders})",
-                session_ids,
-            )
+            _delete_sessions_batch(cursor, session_ids)
             conn.commit()
     finally:
         conn.close()
