@@ -109,6 +109,7 @@ repos.yaml
 .vscode/tasks.json
 .vscode/launch.json
 .vscode/extensions.json
+*.code-workspace
 
 # JetBrains IDEs (PyCharm, IntelliJ, etc.)
 .idea/
