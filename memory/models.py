@@ -47,7 +47,7 @@ class MemoryEntry(BaseModel):
 class MemoryQuery(BaseModel):
     """Query parameters for retrieving memories."""
 
-    query_text: str
+    query_text: str = ""
     stage: str | None = None
     memory_types: list[MemoryType] | None = None
     issue_type: str | None = None
